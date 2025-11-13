@@ -1,0 +1,64 @@
+{
+    "name": "cuiguo-light-workstation",
+    "version": "1.0.0",
+    "author": {
+        "name": "AIQL",
+        "email": "contact@aiql.com"
+    },
+    "description": "MCP Chat Desktop by AIQL.com",
+    "main": "dist/main/main.js",
+    "type": "module",
+    "scripts": {
+        "start": "npm run build && electron ./dist/main/main.js",
+        "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
+        "build-app": "npm run build && electron-builder"
+    },
+    "build": {
+        "appId": "com.cuiguo.lightworkstation",
+        "directories": {
+            "output": "artifacts"
+        },
+        "files": [
+            "**/*"
+        ],
+        "extraFiles": [
+            {
+                "from": "./src/main/config.json",
+                "to": "."
+            }
+        ],
+        "win": {
+            "target": "nsis",
+            "icon": "icon.ico"
+        },
+        "mac": {
+            "target": "dmg",
+            "icon": "icon.icns"
+        },
+        "linux": {
+            "target": [
+                "AppImage",
+                "deb",
+                "rpm"
+            ],
+            "icon": "icon.png"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    },
+    "devDependencies": {
+        "@types/node-notifier": "^8.0.5",
+        "copyfiles": "^2.4.1",
+        "electron": "^34.0.0",
+        "electron-builder": "^25.1.8",
+        "electron-debug": "^4.1.0",
+        "node-notifier": "^10.0.1",
+        "typescript": "^5.7.3"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.13.2",
+        "bazi-mcp": "^0.1.0"
+    }
+}

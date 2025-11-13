@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+      "module": "es2022",
+      "target": "es2017",
+      "lib": [
+        "es6",
+        "dom"
+      ],
+      "types": [
+        "node"
+      ],
+      "esModuleInterop": true,
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "allowSyntheticDefaultImports": true,
+      "useUnknownInCatchVariables": false,
+      "strict": true,
+      "outDir": "./dist",
+      "rootDir": "./src"
+    },
+    "include": [
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "node_modules"
+    ]
+  }
