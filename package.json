@@ -2,10 +2,10 @@
     "name": "cuiguo-light-workstation",
     "version": "1.0.0",
     "author": {
-        "name": "AIQL",
-        "email": "contact@aiql.com"
+        "name": "- (排名不分先后)",
+        "email": "nobug@unknown.com"
     },
-    "description": "MCP Chat Desktop by AIQL.com",
+    "description": "light workstation for mcp",
     "main": "dist/main/main.js",
     "type": "module",
     "scripts": {
