@@ -116,7 +116,7 @@
         };
     </script>
 
-    <style scoped lang="scss">
+    <style scoped lanMCP="scss">
         [v-cloak] {
             display: none;
         }
@@ -824,7 +824,13 @@
                         </v-row>
                         <v-row v-if="mcpStore.getServers" class="ma-1">
                             <v-col>
-                                <h5 class="font-weight-bold mb-4">MCP</h5>
+                                <div class="d-flex align-center mb-4">
+                                    <h5 class="font-weight-bold mb-0">MCP</h5>
+                                    <v-spacer></v-spacer>
+                                    <v-btn variant="text" rounded icon="mdi-plus" size="small" color="primary"
+                                        @click="settingStore.addMcpDialog = true">
+                                    </v-btn>
+                                </div>
                                 <v-divider></v-divider>
                                 <v-data-table-server hide-default-footer hide-default-header hide-no-data disable-sort
                                     v-if="mcpStore.getServers" :items="mcpStore.serverTools"
@@ -865,6 +871,36 @@
                         <v-spacer></v-spacer>
                         <v-btn variant="outlined" @click="agentStore.editDialog = false">Cancel</v-btn>
                         <v-btn class="ml-5" variant="flat" color="primary" @click="agentStore.saveCard()">Save</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- Add MCP Server Dialog -->
+            <v-dialog v-model="settingStore.addMcpDialog" class="dialog-card">
+                <v-card prepend-icon="mdi-plus-circle" title="Add MCP Server">
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
+                            v-model="settingStore.mcpServerName" label="Server Name" 
+                            prepend-inner-icon="mdi-label" clearable hide-details></v-text-field>
+                        
+                        <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
+                            v-model="settingStore.mcpServerUrl" label="Server URL" 
+                            prepend-inner-icon="mdi-web" clearable hide-details></v-text-field>
+                        
+                        <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
+                            v-model="settingStore.mcpServerPort" label="Server Port" type="number"
+                            prepend-inner-icon="mdi-ports" clearable hide-details></v-text-field>
+                        
+                        <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
+                            v-model="settingStore.mcpServerConfig" label="Server Configuration (JSON)" 
+                            rows="4" auto-grow hide-details></v-textarea>
+                    </v-card-text>
+
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="outlined" @click="settingStore.addMcpDialog = false">Cancel</v-btn>
+                        <v-btn variant="flat" color="primary" @click="mcpStore.addMcpServer(settingStore)">Add Server</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -1203,6 +1239,51 @@
                             text: string
                         }]
                     }
+                },
+                addMcpServer: function (settingStore) {
+                    // Validate required fields
+                    if (!settingStore.mcpServerName || !settingStore.mcpServerUrl) {
+                        console.error('Server name and URL are required');
+                        return;
+                    }
+
+                    try {
+                        // Parse the configuration JSON if provided
+                        let config = {};
+                        if (settingStore.mcpServerConfig) {
+                            config = JSON.parse(settingStore.mcpServerConfig);
+                        }
+
+                        // Create the server configuration object
+                        const serverConfig = {
+                            url: settingStore.mcpServerUrl,
+                            port: settingStore.mcpServerPort ? parseInt(settingStore.mcpServerPort) : undefined,
+                            ...config
+                        };
+
+                        // Add server to window.mcpServers (or create if doesn't exist)
+                        if (!window.mcpServers) {
+                            window.mcpServers = {};
+                        }
+
+                        // Note: This is a placeholder implementation
+                        // The actual implementation would depend on how MCP servers are initialized
+                        // You may need to call an IPC method to the main process to actually add the server
+                        window.mcpServers[settingStore.mcpServerName] = serverConfig;
+
+                        console.log('MCP Server added:', settingStore.mcpServerName, serverConfig);
+
+                        // Reset form
+                        settingStore.resetMcpFields();
+                        settingStore.addMcpDialog = false;
+
+                        // Reload tools after adding new server
+                        this.loadTools();
+
+                    } catch (error) {
+                        console.error('Failed to add MCP server:', error);
+                        alert('Failed to add MCP server: ' + error.message);
+                    }
                 }
             },
         });
@@ -1361,6 +1442,13 @@
 
                 toolboxShow: false,
                 fontStatus: false,
+                
+                // MCP Server configuration
+                addMcpDialog: false,
+                mcpServerName: '',
+                mcpServerUrl: '',
+                mcpServerPort: '',
+                mcpServerConfig: '',
             }),
             actions: {
                 initDialog() {
@@ -1371,6 +1459,12 @@
                     setTimeout(() => {
                         this.inputRow = int
                     }, timeout);
+                },
+                resetMcpFields() {
+                    this.mcpServerName = '';
+                    this.mcpServerUrl = '';
+                    this.mcpServerPort = '';
+                    this.mcpServerConfig = '';
                 }
 
             },
@@ -2036,7 +2130,7 @@
                             "Content-Type": chatbotStore.contentType,
                         };
 
-                        if (chatbotStore.apiKey) headers.Authorization = `${chatbotStore.authPrefix} ${chatbotStore.apiKey}`
+                        if (chatbotStore.apiKey) headers.Token = `${chatbotStore.authPrefix} ${chatbotStore.apiKey}`
 
                         const body = {
                             messages: agentStore.promptMessage(conversation),
@@ -2470,14 +2564,14 @@
                             standby: 'Standby'
                         },
                         l: { title: 'Language' },
-                        a: { title: 'Agent' },
+                        a: { title: 'Prompts & MCP' },
                         r: { title: 'Resources' },
                         g: {
                             new: 'New Conversation',
                             reg: 'Regeneration'
                         },
                         i: {
-                            title: 'Interface Configuration',
+                            title: 'Model Integration',
                             apikey: 'API Key',
                             reasoning: 'Reasoning Effort',
                             endpoint: 'Endpoint',
@@ -2513,9 +2607,10 @@
                         title: 'Layout della Query AI',
                         q: { title: 'Cronologia delle Query' },
                         l: { title: 'Lingua' },
+                        a: { title: 'Prompts & MCP' },
                         r: { title: 'Risorse' },
                         i: {
-                            title: 'Configurazione dell\'interfaccia',
+                            title: 'Integrazione Modelli',
                             apikey: 'Chiave API',
                             endpoint: 'Endpoint',
                             url: 'URL',
@@ -2549,9 +2644,10 @@
                         title: 'AI お問い合わせ',
                         q: { title: '歴史' },
                         l: { title: '言語設定' },
+                        a: { title: 'プロンプト&MCP' },
                         r: { title: '資源' },
                         i: {
-                            title: 'インターフェイス構成',
+                            title: 'モデル統合',
                             apikey: 'API キー',
                             endpoint: '端点',
                             contentType: 'コンテンツタイプ',
@@ -2576,9 +2672,10 @@
                         title: 'Layout för AI-frågor',
                         q: { title: 'Frågehistorik' },
                         l: { title: 'Språkinställning' },
+                        a: { title: 'Prompts & MCP' },
                         r: { title: 'Resurser' },
                         i: {
-                            title: 'Konfiguration av gränssnitt',
+                            title: 'Modellintegration',
                             apikey: 'API Nyckel',
                             endpoint: 'Slutpunkt',
                             url: 'URL',
@@ -2609,14 +2706,14 @@
                             title: 'MCP提示词模板',
                             sheet: 'MCP提示词表单'
                         },
-                        a: { title: '智能体' },
+                        a: { title: '提示词和MCP' },
                         r: { title: '资源' },
                         g: {
                             new: '新对话',
                             reg: '重新生成'
                         },
                         i: {
-                            title: '接口配置',
+                            title: '模型接入',
                             apikey: 'API 密钥',
                             endpoint: '端口',
                             reasoning: '推理负荷',
