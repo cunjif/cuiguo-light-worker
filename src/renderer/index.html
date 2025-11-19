@@ -876,31 +876,114 @@
             </v-dialog>
 
             <!-- Add MCP Server Dialog -->
-            <v-dialog v-model="settingStore.addMcpDialog" class="dialog-card">
+            <v-dialog v-model="settingStore.addMcpDialog" max-width="700" class="dialog-card">
                 <v-card prepend-icon="mdi-plus-circle" title="Add MCP Server">
                     <v-divider></v-divider>
+                    
+                    <!-- Tab Navigation -->
+                    <v-tabs v-model="settingStore.mcpAddMode" class="mb-2">
+                        <v-tab value="quick" prepend-icon="mdi-lightning-bolt">Quick</v-tab>
+                        <v-tab value="advanced" prepend-icon="mdi-wrench">Advanced</v-tab>
+                    </v-tabs>
+                    
+                    <v-divider></v-divider>
                     <v-card-text>
-                        <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
-                            v-model="settingStore.mcpServerName" label="Server Name" 
-                            prepend-inner-icon="mdi-label" clearable hide-details></v-text-field>
-                        
-                        <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
-                            v-model="settingStore.mcpServerUrl" label="Server URL" 
-                            prepend-inner-icon="mdi-web" clearable hide-details></v-text-field>
-                        
-                        <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
-                            v-model="settingStore.mcpServerPort" label="Server Port" type="number"
-                            prepend-inner-icon="mdi-ports" clearable hide-details></v-text-field>
-                        
-                        <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
-                            v-model="settingStore.mcpServerConfig" label="Server Configuration (JSON)" 
-                            rows="4" auto-grow hide-details></v-textarea>
+                        <!-- Quick Mode: Paste JSON -->
+                        <v-window v-model="settingStore.mcpAddMode">
+                            <v-window-item value="quick">
+                                <div class="pa-4">
+                                    <p class="text-caption text-grey mb-3">Paste your MCP configuration JSON and we'll extract the servers for you:</p>
+                                    <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpJsonConfig" 
+                                        label='Paste JSON (e.g., {"mcpServers":{"playwright":{...}}})'
+                                        rows="8" auto-grow clearable hide-details></v-textarea>
+                                    
+                                    <v-btn variant="flat" color="primary" class="mb-4" @click="settingStore.parseAndShowMcpServers()">
+                                        <v-icon start>mdi-magnify</v-icon>Extract Servers
+                                    </v-btn>
+                                    
+                                    <!-- Extracted Servers List -->
+                                    <div v-if="settingStore.extractedMcpServers.length > 0" class="mb-4">
+                                        <p class="text-subtitle2 mb-2">Found {{ settingStore.extractedMcpServers.length }} MCP Server(s):</p>
+                                        <v-checkbox v-for="(server, idx) in settingStore.extractedMcpServers" :key="idx"
+                                            v-model="settingStore.selectedMcpServers" :value="idx"
+                                            class="mb-2" hide-details>
+                                            <template #label>
+                                                <span class="font-weight-bold">{{ server.name }}</span>
+                                                <span class="text-caption text-grey ml-2">
+                                                    {{ server.command }} {{ server.args ? `(${server.args.length} args)` : '' }}
+                                                </span>
+                                            </template>
+                                        </v-checkbox>
+                                    </div>
+                                    
+                                    <v-alert v-if="settingStore.mcpJsonError" type="error" class="mb-4" closable @input="settingStore.mcpJsonError = ''">
+                                        {{ settingStore.mcpJsonError }}
+                                    </v-alert>
+                                </div>
+                            </v-window-item>
+                            
+                            <!-- Advanced Mode: Manual Entry -->
+                            <v-window-item value="advanced">
+                                <div class="pa-4">
+                                    <!-- Server Name -->
+                                    <v-text-field class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerName" label="Server Name" 
+                                        prepend-inner-icon="mdi-label" clearable hide-details></v-text-field>
+                                    
+                                    <!-- Server Type Selection -->
+                                    <v-select class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerType" 
+                                        :items="[
+                                            { title: 'HTTP/SSE (Remote)', value: 'http' },
+                                            { title: 'Local Command', value: 'local' }
+                                        ]"
+                                        label="Server Type" 
+                                        prepend-inner-icon="mdi-server-network" hide-details></v-select>
+                                    
+                                    <!-- HTTP/SSE Remote Server Fields -->
+                                    <v-text-field v-if="settingStore.mcpServerType === 'http'" 
+                                        class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerUrl" label="Server URL (HTTP/SSE)" 
+                                        placeholder="http://localhost:3000"
+                                        prepend-inner-icon="mdi-web" clearable hide-details></v-text-field>
+                                    
+                                    <v-text-field v-if="settingStore.mcpServerType === 'http'" 
+                                        class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerPort" label="Server Port (Optional)" type="number"
+                                        prepend-inner-icon="mdi-ports" clearable hide-details></v-text-field>
+
+                                    <!-- Local MCP Server Fields -->
+                                    <v-text-field v-if="settingStore.mcpServerType === 'local'" 
+                                        class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerCommand" label="Command/Executable Path" 
+                                        placeholder="python -m mcp_server"
+                                        prepend-inner-icon="mdi-console" clearable hide-details></v-text-field>
+                                    
+                                    <v-textarea v-if="settingStore.mcpServerType === 'local'" 
+                                        class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerArgs" label="Command Arguments (One per line)" 
+                                        rows="2" auto-grow hide-details></v-textarea>
+                                    
+                                    <!-- Common Configuration -->
+                                    <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpServerConfig" label="Additional Configuration (JSON)" 
+                                        rows="3" auto-grow placeholder="{}" hide-details></v-textarea>
+                                </div>
+                            </v-window-item>
+                        </v-window>
                     </v-card-text>
 
                     <v-card-actions>
                         <v-spacer></v-spacer>
                         <v-btn variant="outlined" @click="settingStore.addMcpDialog = false">Cancel</v-btn>
-                        <v-btn variant="flat" color="primary" @click="mcpStore.addMcpServer(settingStore)">Add Server</v-btn>
+                        <v-btn v-if="settingStore.mcpAddMode === 'quick'" 
+                            variant="flat" color="primary" 
+                            :disabled="settingStore.selectedMcpServers.length === 0"
+                            @click="settingStore.addExtractedMcpServers()">
+                            Add Selected ({{ settingStore.selectedMcpServers.length }})
+                        </v-btn>
+                        <v-btn v-else variant="flat" color="primary" @click="mcpStore.addMcpServer(settingStore)">Add Server</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -1242,8 +1325,9 @@
                 },
                 addMcpServer: function (settingStore) {
                     // Validate required fields
-                    if (!settingStore.mcpServerName || !settingStore.mcpServerUrl) {
-                        console.error('Server name and URL are required');
+                    if (!settingStore.mcpServerName) {
+                        console.error('Server name is required');
+                        alert('Server name is required');
                         return;
                     }
 
@@ -1254,12 +1338,46 @@
                             config = JSON.parse(settingStore.mcpServerConfig);
                         }
 
-                        // Create the server configuration object
-                        const serverConfig = {
-                            url: settingStore.mcpServerUrl,
-                            port: settingStore.mcpServerPort ? parseInt(settingStore.mcpServerPort) : undefined,
+                        let serverConfig = {
+                            type: settingStore.mcpServerType,
                             ...config
                         };
+
+                        // Handle different server types
+                        if (settingStore.mcpServerType === 'http') {
+                            // Validate HTTP/SSE server
+                            if (!settingStore.mcpServerUrl) {
+                                console.error('Server URL is required for HTTP/SSE servers');
+                                alert('Server URL is required for HTTP/SSE servers');
+                                return;
+                            }
+
+                            serverConfig = {
+                                type: 'http',
+                                url: settingStore.mcpServerUrl,
+                                port: settingStore.mcpServerPort ? parseInt(settingStore.mcpServerPort) : undefined,
+                                transport: 'sse', // Default to SSE, can be overridden in config
+                                ...config
+                            };
+                        } else if (settingStore.mcpServerType === 'local') {
+                            // Validate local server
+                            if (!settingStore.mcpServerCommand) {
+                                console.error('Command is required for local servers');
+                                alert('Command is required for local servers');
+                                return;
+                            }
+
+                            const args = settingStore.mcpServerArgs
+                                ? settingStore.mcpServerArgs.split('\n').filter(arg => arg.trim())
+                                : [];
+
+                            serverConfig = {
+                                type: 'local',
+                                command: settingStore.mcpServerCommand,
+                                args: args.length > 0 ? args : undefined,
+                                ...config
+                            };
+                        }
 
                         // Add server to window.mcpServers (or create if doesn't exist)
                         if (!window.mcpServers) {
@@ -1268,7 +1386,8 @@
 
                         // Note: This is a placeholder implementation
                         // The actual implementation would depend on how MCP servers are initialized
-                        // You may need to call an IPC method to the main process to actually add the server
+                        // For local servers, you'll need to call an IPC method to the main process
+                        // For HTTP/SSE servers, the client can connect directly
                         window.mcpServers[settingStore.mcpServerName] = serverConfig;
 
                         console.log('MCP Server added:', settingStore.mcpServerName, serverConfig);
@@ -1276,6 +1395,9 @@
                         // Reset form
                         settingStore.resetMcpFields();
                         settingStore.addMcpDialog = false;
+
+                        // Show success message
+                        console.log(`Successfully added ${settingStore.mcpServerType} MCP server: ${settingStore.mcpServerName}`);
 
                         // Reload tools after adding new server
                         this.loadTools();
@@ -1445,10 +1567,20 @@
                 
                 // MCP Server configuration
                 addMcpDialog: false,
+                mcpAddMode: 'quick', // 'quick' or 'advanced'
                 mcpServerName: '',
+                mcpServerType: 'local', // http, or local
                 mcpServerUrl: '',
                 mcpServerPort: '',
+                mcpServerCommand: '', // For local MCP servers
+                mcpServerArgs: '', // For local MCP servers
                 mcpServerConfig: '',
+                
+                // Quick mode - JSON parsing
+                mcpJsonConfig: '',
+                mcpJsonError: '',
+                extractedMcpServers: [], // Array of {name, command, args}
+                selectedMcpServers: [], // Array of indices of selected servers
             }),
             actions: {
                 initDialog() {
@@ -1462,9 +1594,89 @@
                 },
                 resetMcpFields() {
                     this.mcpServerName = '';
+                    this.mcpServerType = 'local';
                     this.mcpServerUrl = '';
                     this.mcpServerPort = '';
+                    this.mcpServerCommand = '';
+                    this.mcpServerArgs = '';
                     this.mcpServerConfig = '';
+                },
+                parseAndShowMcpServers() {
+                    this.mcpJsonError = '';
+                    this.extractedMcpServers = [];
+                    this.selectedMcpServers = [];
+
+                    if (!this.mcpJsonConfig.trim()) {
+                        this.mcpJsonError = 'Please paste the JSON configuration';
+                        return;
+                    }
+
+                    try {
+                        const jsonData = JSON.parse(this.mcpJsonConfig);
+                        
+                        // Support both direct mcpServers object and wrapped format
+                        let servers = jsonData.mcpServers || jsonData;
+                        
+                        if (!servers || typeof servers !== 'object') {
+                            this.mcpJsonError = 'No valid MCP servers found in the JSON';
+                            return;
+                        }
+
+                        // Extract all servers
+                        for (const [serverName, serverConfig] of Object.entries(servers)) {
+                            if (serverConfig && typeof serverConfig === 'object') {
+                                const command = serverConfig.command || '';
+                                const args = serverConfig.args || [];
+                                
+                                this.extractedMcpServers.push({
+                                    name: serverName,
+                                    command: command,
+                                    args: Array.isArray(args) ? args : [args],
+                                    config: serverConfig // Store full config for later use
+                                });
+                            }
+                        }
+
+                        if (this.extractedMcpServers.length === 0) {
+                            this.mcpJsonError = 'No valid MCP servers found (each server must have a "command" property)';
+                            return;
+                        }
+
+                        // Auto-select all servers
+                        this.selectedMcpServers = this.extractedMcpServers.map((_, idx) => idx);
+
+                    } catch (error) {
+                        this.mcpJsonError = `Invalid JSON: ${error.message}`;
+                    }
+                },
+                addExtractedMcpServers() {
+                    for (const idx of this.selectedMcpServers) {
+                        const server = this.extractedMcpServers[idx];
+                        if (server) {
+                            // Reset fields and populate with extracted server data
+                            this.resetMcpFields();
+                            this.mcpServerName = server.name;
+                            this.mcpServerType = 'local';
+                            this.mcpServerCommand = server.command;
+                            this.mcpServerArgs = server.args.join('\n');
+                            
+                            // Store any additional config
+                            const { command, args, ...additionalConfig } = server.config;
+                            if (Object.keys(additionalConfig).length > 0) {
+                                this.mcpServerConfig = JSON.stringify(additionalConfig, null, 2);
+                            }
+
+                            // Add the server using the MCP store
+                            useMcpStore().addMcpServer(this);
+                        }
+                    }
+
+                    // Reset quick mode
+                    this.mcpJsonConfig = '';
+                    this.mcpJsonError = '';
+                    this.extractedMcpServers = [];
+                    this.selectedMcpServers = [];
+                    this.addMcpDialog = false;
                 }
 
             },
