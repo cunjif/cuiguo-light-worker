@@ -124,6 +124,53 @@ async function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
+let features: any[] = [];
+
+// Register IPC handlers for a MCP server
+function registerIpcHandlers(
+  name: string,
+  client: Client,
+  capabilities: Record<string, any> | undefined) {
+
+  const feature: { [key: string]: any } = { name };
+
+  const registerHandler = (method: string, schema: any) => {
+    const eventName = `${name}-${method}`;
+    console.log(`IPC Main ${eventName}`);
+    ipcMain.handle(eventName, async (event, params) => {
+      return await manageRequests(client, `${method}`, schema, params);
+    });
+    return eventName;
+  };
+
+  const capabilitySchemas = {
+    tools: {
+      list: ListToolsResultSchema,
+      call: CallToolResultSchema,
+    },
+    prompts: {
+      list: ListPromptsResultSchema,
+      get: GetPromptResultSchema,
+    },
+    resources: {
+      list: ListResourcesResultSchema,
+      read: ReadResourceResultSchema,
+      'templates/list': ListResourceTemplatesResultSchema,
+    },
+  };
+
+  for (const [type, actions] of Object.entries(capabilitySchemas)) {
+    if (capabilities?.[type]) {
+      feature[type] = {};
+      for (const [action, schema] of Object.entries(actions)) {
+        feature[type][action] = registerHandler(`${type}/${action}`, schema);
+      }
+    }
+  }
+
+  return feature;
+}
+
 app.whenReady().then(async () => {
 
   const clients = await initClient();
@@ -138,51 +185,54 @@ app.whenReady().then(async () => {
     return features;
   });
 
-  function registerIpcHandlers(
-    name: string,
-    client: Client,
-    capabilities: Record<string, any> | undefined) {
+  // Handle dynamic MCP server initialization
+  ipcMain.handle('initialize-mcp-server', async (event, serverName, serverConfig) => {
+    try {
+      console.log(`Dynamically initializing MCP server: ${serverName}`, serverConfig);
 
-    const feature: { [key: string]: any } = { name };
-
-    const registerHandler = (method: string, schema: any) => {
-      const eventName = `${name}-${method}`;
-      console.log(`IPC Main ${eventName}`);
-      ipcMain.handle(eventName, async (event, params) => {
-        return await manageRequests(client, `${method}`, schema, params);
-      });
-      return eventName;
-    };
-
-    const capabilitySchemas = {
-      tools: {
-        list: ListToolsResultSchema,
-        call: CallToolResultSchema,
-      },
-      prompts: {
-        list: ListPromptsResultSchema,
-        get: GetPromptResultSchema,
-      },
-      resources: {
-        list: ListResourcesResultSchema,
-        read: ReadResourceResultSchema,
-        'templates/list': ListResourceTemplatesResultSchema,
-      },
-    };
-
-    for (const [type, actions] of Object.entries(capabilitySchemas)) {
-      if (capabilities?.[type]) {
-        feature[type] = {};
-        for (const [action, schema] of Object.entries(actions)) {
-          feature[type][action] = registerHandler(`${type}/${action}`, schema);
-        }
+      // Check if server already exists
+      const existingServerIndex = features.findIndex(f => f.name === serverName);
+      if (existingServerIndex !== -1) {
+        console.log(`Server ${serverName} already exists, skipping initialization`);
+        return { success: false, message: 'Server already exists' };
       }
+
+      // Initialize the new client
+      const timeoutPromise = new Promise<Client>((resolve, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Initialization of client for ${serverName} timed out after 30 seconds`));
+        }, 30000);
+      });
+
+      const client = await Promise.race([
+        initializeClient(serverName, serverConfig),
+        timeoutPromise,
+      ]);
+
+      console.log(`${serverName} initialized dynamically.`);
+      const capabilities = client.getServerCapabilities();
+      
+      // Register IPC handlers for the new server
+      const newServerFeature = registerIpcHandlers(serverName, client, capabilities);
+      features.push(newServerFeature);
+
+      console.log(`New server ${serverName} registered with IPC handlers`);
+
+      return { 
+        success: true, 
+        message: `Server ${serverName} initialized successfully`,
+        feature: newServerFeature
+      };
+    } catch (error) {
+      console.error(`Error initializing MCP server ${serverName}:`, error?.message);
+      return { 
+        success: false, 
+        message: `Failed to initialize server: ${error?.message}` 
+      };
     }
+  });
 
-    return feature;
-  }
-
-  const features = clients.map(({ name, client, capabilities }) => {
+  features = clients.map(({ name, client, capabilities }) => {
     console.log('Capabilities:', name, '\n', capabilities);
     return registerIpcHandlers(name, client, capabilities);
   });

@@ -31,6 +31,10 @@ async function listClients(): Promise<CLIENT[]> {
   return await ipcRenderer.invoke('list-clients');
 }
 
+async function initializeMcpServer(serverName: string, serverConfig: any): Promise<any> {
+  return await ipcRenderer.invoke('initialize-mcp-server', serverName, serverConfig);
+}
+
 async function exposeAPIs() {
   const clients = await listClients();
   const api: MCPAPI = {};
@@ -61,6 +65,15 @@ async function exposeAPIs() {
 
   contextBridge.exposeInMainWorld('mcpServers', api);
 }
+
+async function refreshMcpServersAPI() {
+  console.log('Refreshing MCP Servers API...');
+  await exposeAPIs();
+  console.log('MCP Servers API refreshed');
+}
+
+contextBridge.exposeInMainWorld('initializeMcpServer', initializeMcpServer);
+contextBridge.exposeInMainWorld('refreshMcpServersAPI', refreshMcpServersAPI);
 
 exposeAPIs();
 
