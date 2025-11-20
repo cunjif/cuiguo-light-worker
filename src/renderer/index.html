@@ -1866,21 +1866,12 @@
                             }
                         }
                         
-                        // Refresh the MCP Servers API - with error handling
-                        try {
-                            await window.updateMcpServersAPI();
-                            console.log('MCP Servers API updated successfully');
-                        } catch (error) {
-                            console.error('Error updating MCP Servers API:', error);
-                        }
+                        console.log('All servers initialized, showing success message and reloading...');
+                        alert(`Successfully initialized ${serversToInitialize.length} MCP server(s)! The application will now reload to activate the new servers.`);
                         
-                        // Refresh the server list in UI
-                        this.refreshMcpServersList();
-                        
-                        // Reload tools after all servers are initialized
-                        useMcpStore().loadTools();
-                        
-                        alert(`Successfully initialized ${serversToInitialize.length} MCP server(s)!`);
+                        // Reload the window to reinitialize all MCP APIs
+                        // This ensures the new servers are properly exposed through contextBridge
+                        window.location.reload();
                     } catch (error) {
                         console.error('Error during server initialization:', error);
                         alert(`Error initializing servers: ${error.message}`);
