@@ -15,22 +15,23 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, writeFileSync } from 'fs';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 let appPath;
 
 if (app.isPackaged) {
   // Electron Packaged
   appPath = path.dirname(process.execPath);
 } else {
-  // Dev
-  appPath = app.getAppPath();
+  // Dev - config.json is in dist/main/ (same directory as compiled main.js)
+  appPath = __dirname;
 }
 
 const configPath = path.join(appPath, 'config.json');
 
 console.log('Current Path:', appPath);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+console.log('Config Path:', configPath);
 
 
 const preloadPath = path.resolve(__dirname, '..', 'preload', 'preload.js');
@@ -178,14 +179,17 @@ function registerIpcHandlers(
     },
   };
 
+  // Register IPC handlers for all capability types regardless of capabilities
+  // This ensures the feature object always has the methods, even if the server
+  // reports empty capabilities initially
   for (const [type, actions] of Object.entries(capabilitySchemas)) {
-    if (capabilities?.[type]) {
-      feature[type] = {};
-      for (const [action, schema] of Object.entries(actions)) {
-        feature[type][action] = registerHandler(`${type}/${action}`, schema);
-      }
+    feature[type] = {};
+    for (const [action, schema] of Object.entries(actions)) {
+      feature[type][action] = registerHandler(`${type}/${action}`, schema);
     }
   }
+
+  console.log(`[DEBUG] registerIpcHandlers for ${name}: capabilities=${JSON.stringify(capabilities)}, feature=${JSON.stringify(Object.keys(feature))}`);
 
   return feature;
 }
