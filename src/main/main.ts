@@ -25,13 +25,13 @@ if (app.isPackaged) {
   appPath = app.getAppPath();
 }
 
+const configPath = path.join(appPath, 'config.json');
+
 console.log('Current Path:', appPath);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Config file is located in src/main/config.json
-const configPath = path.join(__dirname, 'config.json');
 
 const preloadPath = path.resolve(__dirname, '..', 'preload', 'preload.js');
 const indexPath = path.resolve(__dirname, '..', 'renderer', 'index.html');
