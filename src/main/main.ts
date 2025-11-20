@@ -13,7 +13,7 @@ import notifier from 'node-notifier';
 import path from 'path';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 
 let appPath;
 
@@ -27,10 +27,11 @@ if (app.isPackaged) {
 
 console.log('Current Path:', appPath);
 
-const configPath = path.join(appPath, 'config.json');
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Config file is located in src/main/config.json
+const configPath = path.join(__dirname, 'config.json');
 
 const preloadPath = path.resolve(__dirname, '..', 'preload', 'preload.js');
 const indexPath = path.resolve(__dirname, '..', 'renderer', 'index.html');
@@ -51,9 +52,27 @@ function readConfig(configPath: string): McpServersConfig | null {
   }
 }
 
+function saveConfig(configPath: string, config: McpServersConfig): boolean {
+  try {
+    writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    console.log('Config saved successfully:', configPath);
+    return true;
+  } catch (error) {
+    console.error('Error saving config file:', error);
+    return false;
+  }
+}
+
+function cleanServerConfig(config: any): any {
+  // Remove internal fields that shouldn't be persisted to config.json
+  const cleaned = { ...config };
+  delete cleaned.type;  // Remove type field - it's only for internal use
+  return cleaned;
+}
+
 async function initClient(): Promise<ClientObj[]> {
   const config = readConfig(configPath);
-  if (config) {
+  if (config && config.mcpServers && Object.keys(config.mcpServers).length > 0) {
     console.log('Config loaded:', config);
 
     try {
@@ -97,11 +116,11 @@ async function initClient(): Promise<ClientObj[]> {
       process.exit(1);
     }
   } else {
-    console.log('NO clients initialized.');
+    console.log('NO clients configured.');
     notifier.notify({
       appID: 'AIQL',
-      title: 'NO clients initialized',
-      message: "NO valid JSON config found.",
+      title: 'NO clients configured',
+      message: "NO MCP servers in config.json. You can add them dynamically through the UI.",
     });
     return [];
   }
@@ -174,6 +193,15 @@ function registerIpcHandlers(
 app.whenReady().then(async () => {
 
   const clients = await initClient();
+  
+  // Register IPC handlers for all initialized clients and populate features array
+  features = clients.map(clientObj => {
+    const feature = registerIpcHandlers(clientObj.name, clientObj.client, clientObj.capabilities);
+    feature.type = 'local'; // Mark startup clients as local
+    return feature;
+  });
+  
+  console.log('Features initialized:', features.length, features);
 
   createWindow();
 
@@ -197,37 +225,136 @@ app.whenReady().then(async () => {
         return { success: false, message: 'Server already exists' };
       }
 
-      // Initialize the new client
-      const timeoutPromise = new Promise<Client>((resolve, reject) => {
-        setTimeout(() => {
-          reject(new Error(`Initialization of client for ${serverName} timed out after 30 seconds`));
-        }, 30000);
-      });
+      // For HTTP/SSE servers, we don't need to initialize them in the main process
+      // They will be accessed directly from the renderer via HTTP
+      if (serverConfig.type === 'http') {
+        console.log(`HTTP/SSE server ${serverName} detected. Skipping main process initialization.`);
+        console.log(`Server will be accessible via: ${serverConfig.url}`);
+        
+        // Create a feature entry for HTTP servers with full config
+        const httpFeature = {
+          name: serverName,
+          type: 'http',
+          url: serverConfig.url,
+          config: serverConfig,
+          message: 'HTTP/SSE server - access via HTTP directly'
+        };
+        
+        features.push(httpFeature);
+        
+        // Save the server config (without the type field)
+        const config = readConfig(configPath);
+        if (config) {
+          config.mcpServers[serverName] = cleanServerConfig(serverConfig);
+          saveConfig(configPath, config);
+        }
 
-      const client = await Promise.race([
-        initializeClient(serverName, serverConfig),
-        timeoutPromise,
-      ]);
+        return {
+          success: true,
+          message: `HTTP/SSE server ${serverName} registered successfully`,
+          feature: httpFeature
+        };
+      }
 
-      console.log(`${serverName} initialized dynamically.`);
-      const capabilities = client.getServerCapabilities();
-      
-      // Register IPC handlers for the new server
-      const newServerFeature = registerIpcHandlers(serverName, client, capabilities);
-      features.push(newServerFeature);
+      // For local command servers, initialize normally
+      if (serverConfig.type === 'local') {
+        const timeoutPromise = new Promise<Client>((resolve, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Initialization of client for ${serverName} timed out after 30 seconds`));
+          }, 30000);
+        });
 
-      console.log(`New server ${serverName} registered with IPC handlers`);
+        const client = await Promise.race([
+          initializeClient(serverName, serverConfig),
+          timeoutPromise,
+        ]);
 
-      return { 
-        success: true, 
-        message: `Server ${serverName} initialized successfully`,
-        feature: newServerFeature
+        console.log(`${serverName} initialized dynamically.`);
+        const capabilities = client.getServerCapabilities();
+        console.log(`[DEBUG] Capabilities for ${serverName}:`, capabilities);
+        
+        // Register IPC handlers for the new server
+        const newServerFeature = registerIpcHandlers(serverName, client, capabilities);
+        console.log(`[DEBUG] Feature object for ${serverName}:`, newServerFeature);
+        
+        // Add config information to feature
+        newServerFeature.type = 'local';
+        newServerFeature.config = serverConfig;
+        newServerFeature.command = serverConfig.command;
+        newServerFeature.args = serverConfig.args;
+        
+        features.push(newServerFeature);
+        console.log(`[DEBUG] Features array now contains:`, features.map(f => ({ name: f.name, type: f.type, has_tools: !!f.tools })));
+
+        console.log(`New server ${serverName} registered with IPC handlers`);
+
+        // Save the server config (without the type field)
+        const config = readConfig(configPath);
+        if (config) {
+          config.mcpServers[serverName] = cleanServerConfig(serverConfig);
+          const saved = saveConfig(configPath, config);
+          if (saved) {
+            console.log(`Server ${serverName} configuration saved to config.json`);
+          } else {
+            console.warn(`Failed to save server ${serverName} configuration`);
+          }
+        }
+
+        return { 
+          success: true, 
+          message: `Server ${serverName} initialized successfully`,
+          feature: newServerFeature
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Unknown server type'
       };
     } catch (error) {
       console.error(`Error initializing MCP server ${serverName}:`, error?.message);
       return { 
         success: false, 
         message: `Failed to initialize server: ${error?.message}` 
+      };
+    }
+  });
+
+  // Handle MCP server deletion
+  ipcMain.handle('delete-mcp-server', async (event, serverName) => {
+    try {
+      console.log(`Deleting MCP server: ${serverName}`);
+
+      // Remove from features array
+      const serverIndex = features.findIndex(f => f.name === serverName);
+      if (serverIndex === -1) {
+        console.log(`Server ${serverName} not found in features`);
+        return { success: false, message: 'Server not found' };
+      }
+
+      features.splice(serverIndex, 1);
+
+      // Remove from config file
+      const config = readConfig(configPath);
+      if (config && config.mcpServers[serverName]) {
+        delete config.mcpServers[serverName];
+        const saved = saveConfig(configPath, config);
+        if (saved) {
+          console.log(`Server ${serverName} removed from config.json`);
+        } else {
+          console.warn(`Failed to remove server ${serverName} from config.json`);
+        }
+      }
+
+      return { 
+        success: true, 
+        message: `Server ${serverName} deleted successfully` 
+      };
+    } catch (error) {
+      console.error(`Error deleting MCP server ${serverName}:`, error?.message);
+      return { 
+        success: false, 
+        message: `Failed to delete server: ${error?.message}` 
       };
     }
   });

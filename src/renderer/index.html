@@ -844,7 +844,7 @@
                                 
                                 <v-list v-else density="compact" class="mb-4">
                                     <v-list-item v-for="server in settingStore.mcpServersList" :key="server.name"
-                                        :title="server.name" class="mb-2">
+                                        :title="server.name" class="mb-2" @dblclick="settingStore.showMcpServerConfig(server)" style="cursor: pointer;">
                                         <template v-slot:prepend>
                                             <v-icon v-if="settingStore.mcpServerStatus[server.name] === 'available'" 
                                                 color="success" icon="mdi-check-circle"></v-icon>
@@ -862,7 +862,7 @@
                                         </v-list-item-subtitle>
                                         
                                         <template v-slot:append>
-                                            <v-btn variant="text" size="x-small" icon="mdi-test-tube" 
+                                            <v-btn variant="text" size="x-small" icon="mdi-check-network" 
                                                 :disabled="settingStore.mcpTestingServers.includes(server.name)"
                                                 @click="settingStore.testMcpServer(server.name)"
                                                 title="Test server connection">
@@ -916,6 +916,31 @@
                         <v-spacer></v-spacer>
                         <v-btn variant="outlined" @click="agentStore.editDialog = false">Cancel</v-btn>
                         <v-btn class="ml-5" variant="flat" color="primary" @click="agentStore.saveCard()">Save</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- MCP Server Config Viewer Dialog -->
+            <v-dialog v-model="settingStore.mcpConfigViewerDialog" max-width="800" class="dialog-card">
+                <v-card v-if="settingStore.mcpConfigViewerServer" prepend-icon="mdi-code-json" :title="'MCP Server Config - ' + settingStore.mcpConfigViewerServer.name">
+                    <v-divider></v-divider>
+                    <v-card-text class="pa-4">
+                        <div class="d-flex align-center mb-3">
+                            <span class="text-subtitle2 font-weight-bold">Configuration:</span>
+                            <v-spacer></v-spacer>
+                            <v-btn size="x-small" icon="mdi-content-copy" variant="text" color="primary"
+                                @click="navigator.clipboard.writeText(JSON.stringify(settingStore.mcpConfigViewerServer.config, null, 2))"
+                                title="Copy to clipboard">
+                            </v-btn>
+                        </div>
+                        <v-sheet class="pa-3 bg-surface-variant rounded" style="font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                            <pre>{{ JSON.stringify(settingStore.mcpConfigViewerServer.config, null, 2) }}</pre>
+                        </v-sheet>
+                    </v-card-text>
+                    <v-divider></v-divider>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="outlined" @click="settingStore.mcpConfigViewerDialog = false">Close</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -1366,24 +1391,14 @@
                             };
                         }
 
-                        // Add server to window.mcpServers (or create if doesn't exist)
-                        if (!window.mcpServers) {
-                            window.mcpServers = {};
-                            console.log('Created window.mcpServers object');
-                        }
-
-                        // Store the configuration (without the actual MCP client, since it's not initialized in main process)
-                        // The actual tools/prompts/resources will be available after initialization via IPC
-                        window.mcpServers[settingStore.mcpServerName] = serverConfig;
-
-                        console.log('MCP Server configuration added:', settingStore.mcpServerName, serverConfig);
-                        console.log('Current window.mcpServers:', window.mcpServers);
-                        console.log('Keys in window.mcpServers:', Object.keys(window.mcpServers));
-
-                        // Also store in sessionStorage to persist across page refreshes (within the same session)
+                        // Store in sessionStorage as the source of truth for dynamically added servers
+                        // window.mcpServers is a read-only proxy from contextBridge, so we can't modify it directly
                         const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
                         dynamicServers[settingStore.mcpServerName] = serverConfig;
                         sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+
+                        console.log('MCP Server configuration added:', settingStore.mcpServerName, serverConfig);
+                        console.log('Stored in sessionStorage. Current dynamic servers:', Object.keys(dynamicServers));
 
                         // Show success message
                         console.log(`Successfully added ${settingStore.mcpServerType} MCP server: ${settingStore.mcpServerName}`);
@@ -1393,20 +1408,47 @@
                         alert('Failed to add MCP server: ' + error.message);
                     }
                 },
-                getServersList: function () {
-                    const mcpServers = this.getServers;
-                    console.log('getServersList called, mcpServers:', mcpServers);
-                    if (!mcpServers) {
-                        console.log('mcpServers is null/undefined, returning empty array');
+                getServersList: async function () {
+                    // Get real-time server list from main process via IPC
+                    try {
+                        const clients = await window.listClients();
+                        console.log('getServersList called, clients from main:', clients);
+                        
+                        // Convert clients to server list format
+                        const serverList = [];
+                        
+                        if (Array.isArray(clients)) {
+                            // clients is an array of client objects from list-clients
+                            for (const client of clients) {
+                                serverList.push({
+                                    name: client.name,
+                                    config: {
+                                        type: client.type || 'local',
+                                        url: client.url || undefined,
+                                        command: client.command || undefined,
+                                        args: client.args || undefined,
+                                        message: client.message || undefined
+                                    },
+                                    status: 'unknown'
+                                });
+                            }
+                        } else if (typeof clients === 'object' && clients !== null) {
+                            // clients is an object map of servers
+                            for (const [name, serverConfig] of Object.entries(clients)) {
+                                serverList.push({
+                                    name: name,
+                                    config: serverConfig,
+                                    status: 'unknown'
+                                });
+                            }
+                        }
+                        
+                        console.log('Returning server list:', serverList);
+                        return serverList;
+                    } catch (error) {
+                        console.error('Error fetching server list:', error);
                         return [];
                     }
-                    const serverList = Object.keys(mcpServers).map(name => ({
-                        name: name,
-                        config: mcpServers[name],
-                        status: 'unknown' // 'available', 'unavailable', 'unknown'
-                    }));
-                    console.log('Returning server list:', serverList);
-                    return serverList;
                 },
                 testServer: async function (serverName) {
                     const mcpServers = this.getServers;
@@ -1648,6 +1690,10 @@
                 mcpServersList: [], // List of configured servers
                 mcpServerStatus: {}, // {serverName: 'available'|'unavailable'|'testing'|'unknown'}
                 mcpTestingServers: [], // Array of servers currently being tested
+                
+                // MCP Server config viewer
+                mcpConfigViewerDialog: false,
+                mcpConfigViewerServer: null, // The server being viewed
             }),
             actions: {
                 initDialog() {
@@ -1771,11 +1817,14 @@
                             // Add the server using the MCP store
                             useMcpStore().addMcpServer(this);
                             
-                            // Collect server info for initialization
+                            // Collect server info for initialization - only send serializable data
+                            // Deep clone to ensure no circular references
+                            const serializableConfig = JSON.parse(JSON.stringify(server.config));
+                            // Ensure type is included in the config
+                            serializableConfig.type = server.type;
                             serversToInitialize.push({
                                 name: server.name,
-                                config: server.config,
-                                type: server.type
+                                config: serializableConfig
                             });
                         }
                     }
@@ -1817,9 +1866,13 @@
                             }
                         }
                         
-                        // Refresh the MCP Servers API
-                        await window.refreshMcpServersAPI();
-                        console.log('MCP Servers API refreshed');
+                        // Refresh the MCP Servers API - with error handling
+                        try {
+                            await window.updateMcpServersAPI();
+                            console.log('MCP Servers API updated successfully');
+                        } catch (error) {
+                            console.error('Error updating MCP Servers API:', error);
+                        }
                         
                         // Refresh the server list in UI
                         this.refreshMcpServersList();
@@ -1834,19 +1887,27 @@
                     }
                 },
                 refreshMcpServersList() {
-                    const serversList = useMcpStore().getServersList();
-                    // Update the list reactively
-                    this.mcpServersList = [...serversList];
-                    
-                    // Initialize status for new servers
-                    for (const server of this.mcpServersList) {
-                        if (!this.mcpServerStatus.hasOwnProperty(server.name)) {
-                            // Use Vue set for reactivity if available
-                            this.$set(this.mcpServerStatus, server.name, 'unknown');
+                    // Refresh server list - now async
+                    useMcpStore().getServersList().then(serversList => {
+                        // Update the list reactively
+                        this.mcpServersList = [...serversList];
+                        
+                        // Initialize status for new servers
+                        for (const server of this.mcpServersList) {
+                            if (!this.mcpServerStatus.hasOwnProperty(server.name)) {
+                                // Vue 3: direct assignment works fine
+                                this.mcpServerStatus[server.name] = 'unknown';
+                            }
                         }
-                    }
-                    
-                    console.log('MCP Servers List Updated:', this.mcpServersList);
+                        
+                        console.log('MCP Servers List Updated:', this.mcpServersList);
+                    }).catch(error => {
+                        console.error('Error refreshing MCP servers list:', error);
+                    });
+                },
+                showMcpServerConfig(server) {
+                    this.mcpConfigViewerServer = server;
+                    this.mcpConfigViewerDialog = true;
                 },
                 testMcpServer(serverName) {
                     if (this.mcpTestingServers.includes(serverName)) {
@@ -1871,7 +1932,26 @@
                 },
                 deleteMcpServer(serverName) {
                     if (confirm(`Are you sure you want to delete the MCP server "${serverName}"?`)) {
+                        // Delete from window.mcpServers
                         useMcpStore().deleteServer(serverName);
+                        
+                        // Delete from sessionStorage dynamic servers
+                        const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
+                        delete dynamicServers[serverName];
+                        sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+                        
+                        // Delete from config file via IPC
+                        window.deleteMcpServer(serverName).then(result => {
+                            if (result.success) {
+                                console.log(`Server ${serverName} deleted successfully:`, result.message);
+                            } else {
+                                console.error(`Failed to delete server ${serverName}:`, result.message);
+                            }
+                        }).catch(error => {
+                            console.error(`Error deleting server ${serverName}:`, error);
+                        });
+                        
+                        // Refresh UI
                         this.refreshMcpServersList();
                         delete this.mcpServerStatus[serverName];
                     }

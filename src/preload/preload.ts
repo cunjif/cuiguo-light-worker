@@ -35,6 +35,10 @@ async function initializeMcpServer(serverName: string, serverConfig: any): Promi
   return await ipcRenderer.invoke('initialize-mcp-server', serverName, serverConfig);
 }
 
+async function deleteMcpServer(serverName: string): Promise<any> {
+  return await ipcRenderer.invoke('delete-mcp-server', serverName);
+}
+
 async function exposeAPIs() {
   const clients = await listClients();
   const api: MCPAPI = {};
@@ -66,14 +70,108 @@ async function exposeAPIs() {
   contextBridge.exposeInMainWorld('mcpServers', api);
 }
 
-async function refreshMcpServersAPI() {
-  console.log('Refreshing MCP Servers API...');
-  await exposeAPIs();
-  console.log('MCP Servers API refreshed');
+async function updateMcpServersAPI() {
+  console.log('Updating MCP Servers API...');
+  const clients = await listClients();
+  const win = window as any;
+  
+  console.log('Clients from list-clients:', clients);
+  
+  // Ensure win.mcpServers exists
+  if (!win.mcpServers || typeof win.mcpServers !== 'object') {
+    console.warn('win.mcpServers not initialized, creating new object');
+    win.mcpServers = {};
+  }
+  
+  const createAPIMethods = (methods: Record<string, string>) => {
+    const result: Record<string, (...args: any) => Promise<any>> = {};
+    Object.keys(methods).forEach(key => {
+      const methodName = methods[key];
+      result[key] = (...args: any) => ipcRenderer.invoke(methodName, ...args);
+    });
+    return result;
+  };
+
+  clients.forEach((client: any) => {
+    const { name, tools, prompts, resources, type, url } = client;
+    
+    console.log(`Processing client ${name}:`, {
+      type,
+      has_tools: !!tools,
+      has_url: !!url,
+      tools_type: typeof tools,
+      tools_value: tools,
+      full_client: client
+    });
+    
+    if (type === 'http' && url) {
+      // For HTTP servers, create wrapper functions that make HTTP requests
+      console.log(`Setting up HTTP server ${name}`);
+      win.mcpServers[name] = {
+        tools: {
+          list: async () => {
+            try {
+              const response = await fetch(`${url}/tools/list`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              return await response.json();
+            } catch (error) {
+              console.error(`Error calling tools.list on ${name}:`, error);
+              return { tools: [] };
+            }
+          },
+          call: async (params: any) => {
+            try {
+              const response = await fetch(`${url}/tools/call`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+              });
+              return await response.json();
+            } catch (error) {
+              console.error(`Error calling tools.call on ${name}:`, error);
+              throw error;
+            }
+          }
+        }
+      };
+    } else if (tools && typeof tools === 'object') {
+      // For local servers, use IPC methods
+      console.log(`Setting up local server ${name} with tools:`, tools);
+      if (!win.mcpServers[name]) {
+        win.mcpServers[name] = {};
+      }
+      win.mcpServers[name]['tools'] = createAPIMethods(tools);
+      console.log(`Tools setup for ${name} completed`);
+    } else {
+      console.warn(`No tools found for ${name}. tools=${tools}, type=${type}`);
+    }
+
+    if (prompts && type !== 'http' && typeof prompts === 'object') {
+      console.log(`Setting up prompts for ${name}`);
+      if (!win.mcpServers[name]) {
+        win.mcpServers[name] = {};
+      }
+      win.mcpServers[name]['prompts'] = createAPIMethods(prompts);
+    }
+
+    if (resources && type !== 'http' && typeof resources === 'object') {
+      console.log(`Setting up resources for ${name}`);
+      if (!win.mcpServers[name]) {
+        win.mcpServers[name] = {};
+      }
+      win.mcpServers[name]['resources'] = createAPIMethods(resources);
+    }
+  });
+  
+  console.log('MCP Servers API updated, window.mcpServers:', Object.keys(win.mcpServers), win.mcpServers);
 }
 
 contextBridge.exposeInMainWorld('initializeMcpServer', initializeMcpServer);
-contextBridge.exposeInMainWorld('refreshMcpServersAPI', refreshMcpServersAPI);
+contextBridge.exposeInMainWorld('deleteMcpServer', deleteMcpServer);
+contextBridge.exposeInMainWorld('updateMcpServersAPI', updateMcpServersAPI);
+contextBridge.exposeInMainWorld('listClients', listClients);
 
 exposeAPIs();
 
