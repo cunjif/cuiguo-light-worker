@@ -77,11 +77,9 @@ async function updateMcpServersAPI() {
   
   console.log('Clients from list-clients:', clients);
   
-  // Ensure win.mcpServers exists
-  if (!win.mcpServers || typeof win.mcpServers !== 'object') {
-    console.warn('win.mcpServers not initialized, creating new object');
-    win.mcpServers = {};
-  }
+  // Clear existing mcpServers and rebuild it
+  // Since window.mcpServers is exposed via contextBridge, we need to update its properties
+  // rather than replacing the entire object
   
   const createAPIMethods = (methods: Record<string, string>) => {
     const result: Record<string, (...args: any) => Promise<any>> = {};
@@ -92,6 +90,13 @@ async function updateMcpServersAPI() {
     return result;
   };
 
+  // First, clear all existing servers from window.mcpServers
+  const existingKeys = Object.keys(win.mcpServers || {});
+  for (const key of existingKeys) {
+    delete win.mcpServers[key];
+  }
+
+  // Now add all servers (both predefined and dynamic)
   clients.forEach((client: any) => {
     const { name, tools, prompts, resources, type, url } = client;
     
