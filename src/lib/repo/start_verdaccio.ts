@@ -145,6 +145,15 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
             console.error(`Verdaccio错误: ${data.toString().trim()}`);
         });
 
+        // 处理进程错误
+        verdaccioProcess.on('error', (error) => {
+            console.error(`Verdaccio进程错误: ${error.message}`);
+            if (error.code === 'EINVAL') {
+                console.error('EINVAL错误：通常是由于命令路径不正确或参数格式错误');
+            }
+            verdaccioProcess = null;
+        });
+
         // 处理进程退出
         verdaccioProcess.on('close', (code) => {
             console.log(`Verdaccio进程退出，代码: ${code}`);
