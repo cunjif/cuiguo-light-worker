@@ -9,7 +9,8 @@ import {
 import { initializeClient, manageRequests } from './client.js';
 
 import notifier from 'node-notifier';
-import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from '../lib/repo/repo.js';
+
+import { npmRegistry } from '../lib/repo/index.js';
 
 import path from 'path';
 import { dirname } from 'path';
@@ -147,9 +148,9 @@ async function createWindow() {
       label: '应用',
       submenu: [
         {
-          label: 'Verdaccio 管理器',
+          label: '内部npm仓库管理器',
           click: () => {
-            createVerdaccioWindow();
+            createRegistryWindow();
           }
         },
         { type: 'separator' },
@@ -183,12 +184,12 @@ async function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
-// 创建 Verdaccio 管理器窗口
-async function createVerdaccioWindow() {
-  const verdaccioWindow = new BrowserWindow({
+// 创建 内部npm仓库管理器 窗口
+async function createRegistryWindow() {
+  const registryWindow = new BrowserWindow({
     width: 900,
     height: 700,
-    title: 'Verdaccio 管理器',
+    title: '内部npm仓库管理器',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -196,11 +197,11 @@ async function createVerdaccioWindow() {
     }
   });
 
-  const verdaccioManagerPath = path.resolve(__dirname, '..', 'renderer', 'verdaccio-manager.html');
-  verdaccioWindow.loadFile(verdaccioManagerPath);
+  const registryManagerPath = path.resolve(__dirname, '..', 'renderer', 'registry-manager.html');
+  registryWindow.loadFile(registryManagerPath);
 
   // 可选：打开开发者工具
-  // verdaccioWindow.webContents.openDevTools();
+  // registryWindow.webContents.openDevTools();
 }
 
 let features: any[] = [];
@@ -255,25 +256,25 @@ function registerIpcHandlers(
 
 app.whenReady().then(async () => {
   
-  // 启动 Verdaccio 服务
-  console.log('正在启动 Verdaccio 服务...');
-  const verdaccioStarted = await startVerdaccio();
-  if (verdaccioStarted) {
-    console.log('✓ Verdaccio 服务启动成功');
+  // 启动内部npm仓库
+  console.log('正在启动内部npm仓库...');
+  const registryInitialized = await npmRegistry.initialize(4873);
+  if (registryInitialized) {
+    console.log('✓ 内部npm仓库启动成功');
     notifier.notify({
       appID: 'AIQL',
-      title: 'Verdaccio 服务已启动',
+      title: '内部npm仓库已启动',
       message: '私有 npm 仓库运行在 http://localhost:4873'
     });
   } else {
-    console.error('✗ Verdaccio 服务启动失败');
+    console.error('✗ 内部npm仓库启动失败');
     notifier.notify({
       appID: 'AIQL',
-      title: 'Verdaccio 启动失败',
+      title: '内部npm仓库启动失败',
       message: '私有 npm 仓库无法启动'
     });
   }
-
+  
   const clients = await initClient();
   
   // Register IPC handlers for all initialized clients and populate features array
@@ -293,31 +294,6 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('list-clients', () => {
     return features;
-  });
-
-  // Verdaccio 管理 IPC 接口
-  ipcMain.handle('verdaccio-status', () => {
-    return {
-      running: isVerdaccioRunning(),
-      url: 'http://localhost:4873'
-    };
-  });
-
-  ipcMain.handle('start-verdaccio', async () => {
-    const result = await startVerdaccio();
-    return {
-      success: result,
-      message: result ? 'Verdaccio 启动成功' : 'Verdaccio 启动失败',
-      url: result ? 'http://localhost:4873' : null
-    };
-  });
-
-  ipcMain.handle('stop-verdaccio', () => {
-    const result = stopVerdaccio();
-    return {
-      success: result,
-      message: result ? 'Verdaccio 已停止' : 'Verdaccio 停止失败'
-    };
   });
 
   // Handle dynamic MCP server initialization
@@ -466,6 +442,60 @@ app.whenReady().then(async () => {
     }
   });
 
+  // 内部npm仓库管理 IPC 接口
+  ipcMain.handle('registry-status', async () => {
+    return await npmRegistry.getStatus();
+  });
+
+  ipcMain.handle('registry-start', async () => {
+    const result = await npmRegistry.initialize();
+    return {
+      success: result,
+      message: result ? '内部npm仓库启动成功' : '内部npm仓库启动失败',
+      url: result ? 'http://localhost:4873' : null
+    };
+  });
+
+  ipcMain.handle('registry-stop', () => {
+    const result = npmRegistry.shutdown();
+    return {
+      success: result,
+      message: result ? '内部npm仓库已停止' : '内部npm仓库停止失败'
+    };
+  });
+
+  // 处理依赖包zip文件
+  ipcMain.handle('registry-process-dependencies', async (event, zipPath) => {
+    try {
+      const result = await npmRegistry.processDependenciesZip(zipPath);
+      return {
+        success: result,
+        message: result ? '依赖包处理成功' : '依赖包处理失败'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `依赖包处理失败: ${error.message}`
+      };
+    }
+  });
+
+  // 配置npm使用内部仓库
+  ipcMain.handle('registry-configure-npm', async () => {
+    try {
+      const result = await npmRegistry.configureNpm();
+      return {
+        success: result,
+        message: result ? 'npm配置成功' : 'npm配置失败'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `npm配置失败: ${error.message}`
+      };
+    }
+  });
+
   features = clients.map(({ name, client, capabilities }) => {
     console.log('Capabilities:', name, '\n', capabilities);
     return registerIpcHandlers(name, client, capabilities);
@@ -476,12 +506,10 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // 停止 Verdaccio 服务
-  if (isVerdaccioRunning()) {
-    console.log('正在停止 Verdaccio 服务...');
-    stopVerdaccio();
-    console.log('✓ Verdaccio 服务已停止');
-  }
+  // 停止内部npm仓库
+  console.log('正在停止内部npm仓库...');
+  npmRegistry.shutdown();
+  console.log('✓ 内部npm仓库已停止');
   
   if (process.platform !== 'darwin') app.quit();
 });

@@ -61,6 +61,7 @@
         "@cfworker/json-schema": "^4.1.1",
         "@modelcontextprotocol/sdk": "^1.13.2",
         "bazi-mcp": "^0.1.0",
+        "http-signature": "^1.4.0",
         "verdaccio": "^6.2.3"
     }
 }

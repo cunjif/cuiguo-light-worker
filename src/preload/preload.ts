@@ -178,5 +178,13 @@ contextBridge.exposeInMainWorld('deleteMcpServer', deleteMcpServer);
 contextBridge.exposeInMainWorld('updateMcpServersAPI', updateMcpServersAPI);
 contextBridge.exposeInMainWorld('listClients', listClients);
 
-exposeAPIs();
+// 暴露内部npm仓库管理器需要的API
+contextBridge.exposeInMainWorld('registryAPI', {
+  status: () => ipcRenderer.invoke('registry-status'),
+  start: () => ipcRenderer.invoke('registry-start'),
+  stop: () => ipcRenderer.invoke('registry-stop'),
+  processDependencies: (filePath: string) => ipcRenderer.invoke('registry-process-dependencies', filePath),
+  configureNpm: () => ipcRenderer.invoke('registry-configure-npm')
+});
 
+exposeAPIs();
