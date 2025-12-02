@@ -1,9 +1,46 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn, ChildProcess, execSync } from 'node:child_process';
+import * as os from 'node:os';
 
 // 存储Verdaccio进程引用
 let verdaccioProcess: ChildProcess | null = null;
+
+// 获取项目中的npm路径
+function getNpmPath(): string {
+    const isWindows = os.platform() === 'win32';
+    const projectRoot = process.cwd();
+    
+    // 检查项目中是否有env目录包含npm
+    const envNpmPath = isWindows 
+        ? path.join(projectRoot, 'env', 'Scripts', 'npm.cmd')
+        : path.join(projectRoot, 'env', 'bin', 'npm');
+    
+    if (fs.existsSync(envNpmPath)) {
+        return envNpmPath;
+    }
+    
+    // 回退到系统npm
+    return isWindows ? 'npm.cmd' : 'npm';
+}
+
+// 获取项目中的npx路径
+function getNpxPath(): string {
+    const isWindows = os.platform() === 'win32';
+    const projectRoot = process.cwd();
+    
+    // 检查项目中是否有env目录包含npx
+    const envNpxPath = isWindows 
+        ? path.join(projectRoot, 'env', 'Scripts', 'npx.cmd')
+        : path.join(projectRoot, 'env', 'bin', 'npx');
+    
+    if (fs.existsSync(envNpxPath)) {
+        return envNpxPath;
+    }
+    
+    // 回退到系统npx
+    return isWindows ? 'npx.cmd' : 'npx';
+}
 
 /**
  * 检查本地npm仓库是否运行
@@ -27,7 +64,8 @@ async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873'
 function isVerdaccioInstalled(): boolean {
     try {
         // 检查本地node_modules中是否有verdaccio
-        const result = execSync('npx verdaccio --version', { stdio: 'pipe' });
+        const npxPath = getNpxPath();
+        const result = execSync(`"${npxPath}" verdaccio --version`, { stdio: 'pipe' });
         console.log(`Verdaccio检查结果 ${result}`)
         return !(result.includes('Error') || result.includes('err') || result.includes('Require stack'));
     } catch (error) {
@@ -48,40 +86,38 @@ function createVerdaccioConfig(configPath: string): boolean {
             fs.mkdirSync(configDir, { recursive: true });
         }
 
-        const config = {
-            storage: path.join(configDir, 'storage'),
-            plugins: path.join(configDir, 'plugins'),
-            config: {
-                auth: {
-                    'htpasswd': {
-                        file: path.join(configDir, 'htpasswd')
-                    }
-                },
-                uplinks: {
-                    npmjs: {
-                        url: 'https://registry.npmjs.org/'
-                    }
-                },
-                packages: {
-                    '@*/*': {
-                        access: '$all',
-                        publish: '$all',
-                        proxy: 'npmjs'
-                    },
-                    '**': {
-                        access: '$all',
-                        publish: '$all',
-                        proxy: 'npmjs'
-                    }
-                },
-                server: {
-                    keepAliveTimeout: 60,
-                    allowHosts: ['localhost', '127.0.0.1', '::1']
-                }
-            }
-        };
+        // 创建YAML格式的配置文件
+        const config = `# Verdaccio configuration file
+storage: ${path.join(configDir, 'storage').replace(/\\/g, '/')}
+plugins: ${path.join(configDir, 'plugins').replace(/\\/g, '/')}
 
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+auth:
+  htpasswd:
+    file: ${path.join(configDir, 'htpasswd').replace(/\\/g, '/')}
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+
+packages:
+  '@*/*':
+    access: $all
+    publish: $all
+    proxy: npmjs
+  '**':
+    access: $all
+    publish: $all
+    proxy: npmjs
+
+server:
+  keepAliveTimeout: 60
+  allowHosts:
+    - localhost
+    - 127.0.0.1
+    - '::1'
+`;
+
+        fs.writeFileSync(configPath, config);
         return true;
     } catch (error) {
         console.error(`创建Verdaccio配置文件失败: ${error.message}`);
@@ -130,10 +166,12 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
         console.log(`正在启动Verdaccio服务，端口: ${port}...`);
 
         // 启动Verdaccio进程，使用npx
+        const npxPath = getNpxPath();
         const args = ['verdaccio', '--listen', `localhost:${port}`, '--config', configPath];
-        verdaccioProcess = spawn('npx', args, {
+        verdaccioProcess = spawn(npxPath, args, {
             stdio: 'pipe',
-            detached: false
+            detached: false,
+            shell: true  // 使用shell模式，特别是在Windows上
         });
 
         // 处理输出
@@ -144,7 +182,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
         verdaccioProcess.stderr?.on('data', (data) => {
             console.error(`Verdaccio错误: ${data.toString().trim()}`);
         });
-
+        
         // 处理进程退出
         verdaccioProcess.on('close', (code) => {
             console.log(`Verdaccio进程退出，代码: ${code}`);
@@ -181,7 +219,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
  */
 export function stopVerdaccio(): boolean {
     try {
-        if (verdaccioProcess) {
+        if (!!verdaccioProcess) {
             verdaccioProcess.kill();
             verdaccioProcess = null;
             console.log('Verdaccio服务已停止');
