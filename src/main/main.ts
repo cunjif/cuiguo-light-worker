@@ -456,8 +456,8 @@ app.whenReady().then(async () => {
     };
   });
 
-  ipcMain.handle('registry-stop', () => {
-    const result = npmRegistry.shutdown();
+  ipcMain.handle('registry-stop', async () => {
+    const result = await npmRegistry.shutdown();
     return {
       success: result,
       message: result ? '内部npm仓库已停止' : '内部npm仓库停止失败'
@@ -505,11 +505,19 @@ app.whenReady().then(async () => {
 
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   // 停止内部npm仓库
   console.log('正在停止内部npm仓库...');
-  npmRegistry.shutdown();
+  await npmRegistry.shutdown();
   console.log('✓ 内部npm仓库已停止');
   
   if (process.platform !== 'darwin') app.quit();
+});
+
+// 确保在应用退出前停止内部npm仓库
+app.on('before-quit', async () => {
+  // 停止内部npm仓库
+  console.log('应用即将退出，正在停止内部npm仓库...');
+  await npmRegistry.shutdown();
+  console.log('✓ 内部npm仓库已停止');
 });

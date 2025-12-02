@@ -135,11 +135,11 @@ export class InternalNpmRegistry {
 
     /**
      * 关闭内部npm仓库
-     * @returns boolean 关闭是否成功
+     * @returns Promise<boolean> 关闭是否成功
      */
-    shutdown(): boolean {
+    async shutdown(): Promise<boolean> {
         try {
-            const stopped = stopVerdaccio();
+            const stopped = await stopVerdaccio();
             this.isInitialized = false;
             return stopped;
         } catch (error) {
