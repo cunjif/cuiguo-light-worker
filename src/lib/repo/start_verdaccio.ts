@@ -28,9 +28,11 @@ function isVerdaccioInstalled(): boolean {
     try {
         const { execSync } = require('child_process');
         // 检查本地node_modules中是否有verdaccio
-        const result = execSync('npm list verdaccio', { stdio: 'pipe' });
+        const result = execSync('npx verdaccio --version', { stdio: 'pipe' });
+        console.error(result);
         return result.includes('verdaccio');
     } catch (error) {
+        console.error(`检查Verdaccio失败: ${error}`)
         return false;
     }
 }
@@ -110,7 +112,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
 
         // 检查Verdaccio是否已安装
         if (!isVerdaccioInstalled()) {
-            console.error('Verdaccio未安装，请先运行: npm install verdaccio');
+            console.error('Verdaccio未安装');
             return false;
         }
 

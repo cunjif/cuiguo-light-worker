@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
-    <title>内部npm仓库管理�?/title>
+    <title>MCP工具管理</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -101,31 +101,31 @@
 </head>
 <body>
     <div class="container">
-        <h1>内部npm仓库管理�?/h1>
+        <h1>内部npm仓库管理</h1>
         
         <div id="notification" class="notification hidden"></div>
         
         <div class="section">
-            <h2>仓库状�?/h2>
+            <h2>仓库状态</h2>
             <div id="status-card" class="status-card">
-                <div id="status-text">正在检查状�?..</div>
+                <div id="status-text">正在检查状态...</div>
                 <div id="status-url"></div>
             </div>
             <div>
                 <button id="start-btn" class="button button-success">启动仓库</button>
                 <button id="stop-btn" class="button button-danger">停止仓库</button>
-                <button id="refresh-btn" class="button">刷新状�?/button>
+                <button id="refresh-btn" class="button">刷新状态</button>
             </div>
         </div>
         
         <div class="section">
-            <h2>依赖包管�?/h2>
+            <h2>依赖包管理</h2>
             <div class="file-input">
-                <label for="zip-file">选择包含.tgz文件的zip压缩包：</label>
+                <label for="zip-file">选择包含.tgz文件的zip压缩包: </label>
                 <input type="file" id="zip-file" accept=".zip">
             </div>
             <div>
-                <button id="process-btn" class="button">处理依赖�?/button>
+                <button id="process-btn" class="button">处理依赖包</button>
                 <button id="configure-btn" class="button">配置npm使用内部仓库</button>
             </div>
         </div>
@@ -138,7 +138,7 @@
 
     <script>
         // 使用通过preload暴露的API
-        const registryAPI = window.registryAPI;
+        var registryAPI = window.registryAPI;
         
         // DOM元素
         const notification = document.getElementById('notification');
@@ -171,29 +171,29 @@
             }, 5000);
         }
         
-        // 更新仓库状�?
+        // 更新仓库状
         async function updateStatus() {
             try {
                 const status = await registryAPI.status();
                 
                 if (status.running) {
-                    statusText.textContent = '运行�?;
+                    statusText.textContent = '运行中';
                     statusUrl.textContent = `URL: ${status.url}`;
                     statusCard.className = 'status-card status-running';
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
                 } else {
-                    statusText.textContent = '已停�?;
+                    statusText.textContent = '已停止';
                     statusUrl.textContent = '';
                     statusCard.className = 'status-card status-stopped';
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
                 }
                 
-                addLog(`状态更�? ${status.running ? '运行�? : '已停�?}`);
+                addLog(`状态更新 ${status.running ? '运行中' : '已停止'}`);
             } catch (error) {
-                addLog(`获取状态失�? ${error.message}`);
-                showNotification('获取仓库状态失�?, false);
+                addLog(`获取状态失败 ${error.message}`);
+                showNotification('获取仓库状态失败', false);
             }
         }
         
@@ -215,8 +215,8 @@
                 
                 await updateStatus();
             } catch (error) {
-                addLog(`启动仓库时出�? ${error.message}`);
-                showNotification('启动仓库时出�?, false);
+                addLog(`启动仓库时出错: ${error.message}`);
+                showNotification('启动仓库时出错', false);
                 startBtn.disabled = false;
             }
         }
@@ -230,8 +230,8 @@
                 const result = await registryAPI.stop();
                 
                 if (result.success) {
-                    addLog('内部npm仓库已停�?);
-                    showNotification('内部npm仓库已停�?);
+                    addLog('内部npm仓库已停止');
+                    showNotification('内部npm仓库已停止');
                 } else {
                     addLog(`停止内部npm仓库失败: ${result.message}`);
                     showNotification('停止内部npm仓库失败', false);
@@ -239,13 +239,13 @@
                 
                 await updateStatus();
             } catch (error) {
-                addLog(`停止仓库时出�? ${error.message}`);
-                showNotification('停止仓库时出�?, false);
+                addLog(`停止仓库时出错: ${error.message}`);
+                showNotification('停止仓库时出错', false);
                 stopBtn.disabled = false;
             }
         }
         
-        // 处理依赖�?
+        // 处理依赖�?
         async function processDependencies() {
             const filePath = zipFile.files[0]?.path;
             
@@ -255,17 +255,17 @@
             }
             
             try {
-                addLog(`正在处理依赖�? ${filePath}`);
+                addLog(`正在处理依赖�? ${filePath}`);
                 processBtn.disabled = true;
                 
                 const result = await registryAPI.processDependencies(filePath);
                 
                 if (result.success) {
-                    addLog('依赖包处理成�?);
-                    showNotification('依赖包处理成�?);
+                    addLog('依赖包处理成功');
+                    showNotification('依赖包处理成功');
                 } else {
-                    addLog(`依赖包处理失�? ${result.message}`);
-                    showNotification('依赖包处理失�?, false);
+                    addLog(`依赖包处理失败: ${result.message}`);
+                    showNotification('依赖包处理失败', false);
                 }
             } catch (error) {
                 addLog(`处理依赖包时出错: ${error.message}`);
@@ -291,21 +291,21 @@
                     showNotification('npm配置失败', false);
                 }
             } catch (error) {
-                addLog(`配置npm时出�? ${error.message}`);
-                showNotification('配置npm时出�?, false);
+                addLog(`配置npm时出错: ${error.message}`);
+                showNotification('配置npm时出错', false);
             } finally {
                 configureBtn.disabled = false;
             }
         }
         
-        // 事件监听�?
+        // 事件监听�?
         startBtn.addEventListener('click', startRegistry);
         stopBtn.addEventListener('click', stopRegistry);
         refreshBtn.addEventListener('click', updateStatus);
         processBtn.addEventListener('click', processDependencies);
         configureBtn.addEventListener('click', configureNpm);
         
-        // 初始�?
+        // 初始�?
         document.addEventListener('DOMContentLoaded', () => {
             addLog('内部npm仓库管理器已加载');
             updateStatus();
