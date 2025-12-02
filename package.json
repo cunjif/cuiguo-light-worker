@@ -59,8 +59,6 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.13.2",
-        "bazi-mcp": "^0.1.0",
-        "mcp-filesystem": "file:mcp-filesystem-0.0.3.tgz",
-        "playwright": "^1.56.1"
+        "bazi-mcp": "^0.1.0"
     }
 }

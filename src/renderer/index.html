@@ -1240,36 +1240,52 @@
                 listTools: async function () {
                     const mcpServers = this.getServers
                     if (!mcpServers) {
+                        console.warn('No MCP servers available');
                         return null
                     }
                     const mcpKeys = Object.keys(mcpServers)
+                    console.log(`[listTools] Found ${mcpKeys.length} servers: ${mcpKeys.join(', ')}`);
+                    
                     const mcpTools = []
                     for (const key of mcpKeys) {
-                        const toolsListFunction = mcpServers[key]?.tools?.list;
+                        const server = mcpServers[key];
+                        const toolsListFunction = server?.tools?.list;
+                        
+                        console.log(`[listTools] Processing server "${key}":`, {
+                            has_tools: !!server?.tools,
+                            is_function: typeof toolsListFunction === 'function',
+                            toolsListFunction: toolsListFunction?.toString?.()?.substring(0, 100)
+                        });
+                        
                         if (typeof toolsListFunction === 'function') {
-                            const tools = await toolsListFunction();
-                            // console.log(await mcpServers[key]?.prompts?.list())
-                            // console.log(await mcpServers[key]?.resources['templates/list']())
-                            // console.log(await mcpServers[key]?.resources?.list())
-                            if (tools && Array.isArray(tools.tools)) {
-                                for (const tool of tools.tools) {
-                                    mcpTools.push({
-                                        type: 'function',
-                                        function: {
-                                            name: tool.name,
-                                            description: tool.description,
-                                            parameters: tool.inputSchema,
-                                            // strict: true
-                                        }
-                                    });
+                            try {
+                                const tools = await toolsListFunction();
+                                console.log(`[listTools] Server "${key}" returned tools:`, tools);
+                                
+                                if (tools && Array.isArray(tools.tools)) {
+                                    console.log(`[listTools] Server "${key}" has ${tools.tools.length} tools`);
+                                    for (const tool of tools.tools) {
+                                        mcpTools.push({
+                                            type: 'function',
+                                            function: {
+                                                name: tool.name,
+                                                description: tool.description,
+                                                parameters: tool.inputSchema,
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    console.warn(`[listTools] Server "${key}" returned invalid tools format:`, tools);
                                 }
+                            } catch (error) {
+                                console.error(`[listTools] Error calling tools.list() on server "${key}":`, error);
                             }
                         } else {
-                            // Server is in config but not yet initialized in main process
-                            // This happens when a server is added dynamically
-                            console.log(`Server "${key}" is configured but not initialized. Restart the application to use this server.`);
+                            console.warn(`[listTools] Server "${key}" tools.list is not a function. Type: ${typeof toolsListFunction}, Value: ${toolsListFunction}`);
                         }
                     }
+                    
+                    console.log(`[listTools] Total tools collected: ${mcpTools.length}`, mcpTools);
                     return mcpTools
                 },
                 getTool: async function (tool_name) {
@@ -1851,30 +1867,54 @@
                 async initializeServersAndRefresh(serversToInitialize) {
                     try {
                         console.log('Initializing servers dynamically:', serversToInitialize);
+                        const snackbarStore = useSnackbarStore();
                         
-                        // Initialize each server
+                        // Track how many servers were actually initialized
+                        let successCount = 0;
+                        let skipCount = 0;
+                        
+                        // Initialize each server in the main process
                         for (const serverInfo of serversToInitialize) {
                             try {
                                 const result = await window.initializeMcpServer(serverInfo.name, serverInfo.config);
                                 if (result.success) {
                                     console.log(`Server ${serverInfo.name} initialized successfully`, result);
+                                    successCount++;
                                 } else {
-                                    console.error(`Failed to initialize server ${serverInfo.name}:`, result.message);
+                                    // Check if it's a "already exists" error - that's okay, just skip
+                                    if (result.message && result.message.includes('already exists')) {
+                                        console.log(`Server ${serverInfo.name} already initialized, skipping`);
+                                        skipCount++;
+                                    } else {
+                                        console.error(`Failed to initialize server ${serverInfo.name}:`, result.message);
+                                    }
                                 }
                             } catch (error) {
                                 console.error(`Error initializing server ${serverInfo.name}:`, error);
                             }
                         }
                         
-                        console.log('All servers initialized, showing success message and reloading...');
-                        alert(`Successfully initialized ${serversToInitialize.length} MCP server(s)! The application will now reload to activate the new servers.`);
-                        
-                        // Reload the window to reinitialize all MCP APIs
-                        // This ensures the new servers are properly exposed through contextBridge
-                        window.location.reload();
+                        // If there were servers to initialize (either new or already existing)
+                        if (successCount > 0 || skipCount > 0) {
+                            // Show a brief success message and then reload
+                            console.log(`Initialization complete: ${successCount} new, ${skipCount} already existed. Reloading page to activate...`);
+                            let message = `Successfully registered ${successCount} MCP server(s)!`;
+                            if (skipCount > 0) {
+                                message = `${successCount} new and ${skipCount} existing MCP server(s) ready.`;
+                            }
+                            message += ' Reloading to activate...';
+                            snackbarStore.showSuccessMessage(message);
+                            
+                            // Add a small delay to let the snackbar display, then reload
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            snackbarStore.showWarningMessage('No servers to initialize');
+                        }
                     } catch (error) {
                         console.error('Error during server initialization:', error);
-                        alert(`Error initializing servers: ${error.message}`);
+                        snackbarStore.showErrorMessage(`Error initializing servers: ${error.message}`);
                     }
                 },
                 refreshMcpServersList() {
@@ -1996,6 +2036,45 @@
             },
         });
 
+        const useSnackbarStore = defineStore("snackbarStore", {
+            state: () => ({
+                isShow: false,
+                message: "",
+                type: "",
+            }),
+
+            actions: {
+                showMessage(message, type = "") {
+                    this.isShow = true;
+                    this.message = message;
+                    this.type = type;
+                },
+
+                showErrorMessage(message) {
+                    this.showMessage(message, "error");
+                },
+                showSuccessMessage(message) {
+                    this.showMessage(message, "success");
+                },
+                showInfoMessage(message) {
+                    this.showMessage(message, "info");
+                },
+                showWarningMessage(message) {
+                    this.showMessage(message, "warning");
+                },
+                getIcon() {
+                    const icon = {
+                        info: "mdi-information",
+                        success: "mdi-check-circle",
+                        error: "mdi-alert-circle",
+                        warning: "mdi-alert",
+                    };
+
+                    return icon[this.type];
+                },
+            },
+        });
+
         const usePromptStore = defineStore("promptStore", {
             state: () => ({
                 promptDialog: false,
@@ -2078,47 +2157,6 @@
                     this.promptSheet = false
 
                     return conversations
-                },
-            },
-        });
-
-
-
-        const useSnackbarStore = defineStore("snackbarStore", {
-            state: () => ({
-                isShow: false,
-                message: "",
-                type: "",
-            }),
-
-            actions: {
-                showMessage(message, type = "") {
-                    this.isShow = true;
-                    this.message = message;
-                    this.type = type;
-                },
-
-                showErrorMessage(message) {
-                    this.showMessage(message, "error");
-                },
-                showSuccessMessage(message) {
-                    this.showMessage(message, "success");
-                },
-                showInfoMessage(message) {
-                    this.showMessage(message, "info");
-                },
-                showWarningMessage(message) {
-                    this.showMessage(message, "warning");
-                },
-                getIcon() {
-                    const icon = {
-                        info: "mdi-information",
-                        success: "mdi-check-circle",
-                        error: "mdi-alert-circle",
-                        warning: "mdi-alert",
-                    };
-
-                    return icon[this.type];
                 },
             },
         });
