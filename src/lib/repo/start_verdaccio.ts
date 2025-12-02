@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { spawn, ChildProcess } from 'node:child_process';
+import { spawn, ChildProcess, execSync } from 'node:child_process';
 
 // 存储Verdaccio进程引用
 let verdaccioProcess: ChildProcess | null = null;
@@ -26,11 +26,10 @@ async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873'
  */
 function isVerdaccioInstalled(): boolean {
     try {
-        const { execSync } = require('child_process');
         // 检查本地node_modules中是否有verdaccio
         const result = execSync('npx verdaccio --version', { stdio: 'pipe' });
-        console.error(result);
-        return result.includes('verdaccio');
+        console.log(`Verdaccio检查结果 ${result}`)
+        return !(result.includes('Error') || result.includes('err') || result.includes('Require stack'));
     } catch (error) {
         console.error(`检查Verdaccio失败: ${error}`)
         return false;

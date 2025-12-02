@@ -55,13 +55,12 @@
         "electron-builder": "^26.2.0",
         "electron-debug": "^4.1.0",
         "node-notifier": "^10.0.1",
-        "typescript": "^5.7.3",
-        "verdaccio": "^6.2.3"
+        "typescript": "^5.7.3"
     },
     "dependencies": {
         "@cfworker/json-schema": "^4.1.1",
         "@modelcontextprotocol/sdk": "^1.13.2",
         "bazi-mcp": "^0.1.0",
-        "http-signature": "^1.4.0"
+        "verdaccio": "^6.2.3"
     }
 }

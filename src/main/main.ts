@@ -10,7 +10,7 @@ import { initializeClient, manageRequests } from './client.js';
 
 import notifier from 'node-notifier';
 
-import { npmRegistry } from '../lib/repo/index.js';
+import { npmRegistry } from '../lib/repo/internal_repo.js';
 
 import path from 'path';
 import { dirname } from 'path';

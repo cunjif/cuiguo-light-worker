@@ -1,0 +1,36 @@
+{
+  "storage": "C:\\Users\\james\\codehub\\chat-mcp\\.verdaccio\\storage",
+  "plugins": "C:\\Users\\james\\codehub\\chat-mcp\\.verdaccio\\plugins",
+  "config": {
+    "auth": {
+      "htpasswd": {
+        "file": "C:\\Users\\james\\codehub\\chat-mcp\\.verdaccio\\htpasswd"
+      }
+    },
+    "uplinks": {
+      "npmjs": {
+        "url": "https://registry.npmjs.org/"
+      }
+    },
+    "packages": {
+      "@*/*": {
+        "access": "$all",
+        "publish": "$all",
+        "proxy": "npmjs"
+      },
+      "**": {
+        "access": "$all",
+        "publish": "$all",
+        "proxy": "npmjs"
+      }
+    },
+    "server": {
+      "keepAliveTimeout": 60,
+      "allowHosts": [
+        "localhost",
+        "127.0.0.1",
+        "::1"
+      ]
+    }
+  }
+}
