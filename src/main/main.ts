@@ -157,7 +157,11 @@ async function createWindow() {
         {
           label: '退出',
           click: () => {
-            app.quit();
+            console.log('应用即将退出，正在停止内部npm仓库...');
+            npmRegistry.shutdown().then(() => {
+              console.log('✓ 内部npm仓库已停止');
+              app.quit();
+            });
           }
         }
       ]
