@@ -13,6 +13,8 @@ import notifier from 'node-notifier';
 import { npmRegistry } from '../lib/repo/internal_repo.js';
 
 import path from 'path';
+import os from 'os';
+import * as fs from 'node:fs';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, writeFileSync } from 'fs';
@@ -469,12 +471,46 @@ app.whenReady().then(async () => {
   });
 
   // 处理依赖包zip文件
-  ipcMain.handle('registry-process-dependencies', async (event, zipPath) => {
+  ipcMain.handle('registry-process-dependencies', async (event, fileData) => {
     try {
-      const result = await npmRegistry.processDependenciesZip(zipPath);
+      // 如果传入的是字符串，则认为是文件路径
+      if (typeof fileData === 'string') {
+        const result = await npmRegistry.processDependenciesZip(fileData);
+        return {
+          success: result,
+          message: result ? '依赖包处理成功' : '依赖包处理失败'
+        };
+      }
+      
+      // 如果传入的是对象，则包含文件名和数据
+      if (typeof fileData === 'object' && fileData.name && fileData.data) {
+        // 创建临时文件
+        const tempDir = os.tmpdir();
+        const tempFilePath = path.join(tempDir, fileData.name);
+        
+        // 将数据写入临时文件
+        const buffer = Buffer.from(fileData.data);
+        writeFileSync(tempFilePath, buffer);
+        
+        // 处理依赖包
+        const result = await npmRegistry.processDependenciesZip(tempFilePath);
+        
+        // 清理临时文件
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (err) {
+          console.warn('清理临时文件失败:', err.message);
+        }
+        
+        return {
+          success: result,
+          message: result ? '依赖包处理成功' : '依赖包处理失败'
+        };
+      }
+      
       return {
-        success: result,
-        message: result ? '依赖包处理成功' : '依赖包处理失败'
+        success: false,
+        message: '无效的文件数据'
       };
     } catch (error) {
       return {

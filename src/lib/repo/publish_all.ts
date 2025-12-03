@@ -1,7 +1,11 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { extractZip } from './extract_zip.js';
+import { loginToRegistry } from './internal_repo.js';
+
+const execAsync = promisify(exec);
 
 /**
  * 解压包含.tgz文件的zip压缩包
@@ -29,6 +33,52 @@ async function extractDependencies(zipPath: string, extractDir: string): Promise
 }
 
 /**
+ * 检查是否已登录到指定的npm仓库
+ * @param registryUrl npm仓库URL
+ * @returns Promise<boolean> 是否已登录
+ */
+async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
+    try {
+        // 获取当前配置的registry
+        const { stdout: currentRegistry } = await execAsync('npx npm config get registry');
+        if (currentRegistry.trim() !== registryUrl) {
+            // 如果当前registry不匹配，设置它
+            await execAsync(`npx npm set registry ${registryUrl}`);
+        }
+        
+        // 尝试获取用户信息
+        await execAsync('npx npm whoami');
+        return true;
+    } catch (error) {
+        // 如果出现错误，说明未登录或登录已过期
+        return false;
+    }
+}
+
+/**
+ * 登录到本地npm仓库（使用默认凭证）
+ * @param registryUrl npm仓库URL
+ * @returns Promise<boolean> 登录是否成功
+ */
+// async function loginToRegistry(registryUrl: string): Promise<boolean> {
+//     try {
+//         // 设置 npm 仓库为本地 verdaccio
+//         await execAsync(`npx npm set registry ${registryUrl}`);
+        
+//         // 使用默认凭证登录（对于本地verdaccio，通常不需要密码）
+//         // 这里我们使用一个简单的用户名，因为verdaccio默认允许任何用户发布
+//         await execAsync('npx npm adduser --registry ' + registryUrl, {
+//             input: 'verdaccio\nverdaccio\nverdaccio@example.com\n'
+//         });
+        
+//         return true;
+//     } catch (error) {
+//         console.error(`登录到npm仓库失败: ${error.message}`);
+//         return false;
+//     }
+// }
+
+/**
  * 将.tgz文件发布到本地npm仓库
  * @param dir 包含.tgz文件的目录
  * @param registryUrl npm仓库URL
@@ -46,8 +96,20 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             return false;
         }
 
+        // 检查是否已登录到仓库
+        let loggedIn = await isLoggedInToRegistry(registryUrl);
+        if (!loggedIn) {
+            console.log('未登录到npm仓库，正在尝试自动登录...');
+            loggedIn = await loginToRegistry(registryUrl);
+            if (!loggedIn) {
+                console.error('自动登录失败，请手动登录到npm仓库');
+                return false;
+            }
+            console.log('已成功登录到npm仓库');
+        }
+
         // 设置 npm 仓库为本地 verdaccio
-        execSync(`npx npm set registry ${registryUrl}`);
+        await execAsync(`npx npm set registry ${registryUrl}`);
 
         // 逐个发布包
         for (let i = 0; i < files.length; i++) {
@@ -56,7 +118,7 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             
             try {
                 console.log(`[${i + 1}/${files.length}] 发布 ${file}...`);
-                execSync(`npx npm publish ${filePath}`, { stdio: 'inherit' });
+                await execAsync(`npx npm publish ${filePath}`);
                 console.log(`✓ ${file} 发布成功`);
             } catch (error) {
                 console.error(`✗ 发布 ${file} 失败:`, error.message);
@@ -120,10 +182,22 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
  */
 async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873'): Promise<boolean> {
     try {
-        const url = new URL(registryUrl);
-        const response = await fetch(`${registryUrl}/-/ping`);
-        return response.ok;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+        
+        try {
+            const response = await fetch(`${registryUrl}/-/ping`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return response.ok;
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            console.warn(`检查仓库状态失败: ${fetchError.message}`);
+            return false;
+        }
     } catch (error) {
+        console.warn(`检查仓库状态时发生错误: ${error.message}`);
         return false;
     }
 }

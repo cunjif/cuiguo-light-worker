@@ -1,7 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { spawn, ChildProcess, execSync } from 'node:child_process';
+import { spawn, ChildProcess, execSync, exec } from 'node:child_process';
 import * as os from 'node:os';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 
 // 存储Verdaccio进程引用
 let verdaccioProcess: ChildProcess | null = null;
@@ -59,13 +62,14 @@ async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873'
 
 /**
  * 检查Verdaccio是否已安装
- * @returns boolean 是否已安装
+ * @returns Promise<boolean> 是否已安装
  */
-function isVerdaccioInstalled(): boolean {
+async function isVerdaccioInstalled(): Promise<boolean> {
     try {
         // 检查本地node_modules中是否有verdaccio
         const npxPath = getNpxPath();
-        const result = execSync(`"${npxPath}" verdaccio --version`, { stdio: 'pipe' });
+        const { stdout, stderr } = await execAsync(`"${npxPath}" verdaccio --version`);
+        const result = stdout + stderr;
         console.log(`Verdaccio检查结果 ${result}`)
         return !(result.includes('Error') || result.includes('err') || result.includes('Require stack'));
     } catch (error) {
@@ -146,7 +150,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
         }
 
         // 检查Verdaccio是否已安装
-        if (!isVerdaccioInstalled()) {
+        if (!(await isVerdaccioInstalled())) {
             console.error('Verdaccio未安装');
             return false;
         }
@@ -215,7 +219,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
 
 /**
  * 停止Verdaccio服务
- * @returns boolean 是否停止成功
+ * @returns Promise<boolean> 是否停止成功
  */
 export async function stopVerdaccio(): Promise<boolean> {
     try {
@@ -237,7 +241,7 @@ export async function stopVerdaccio(): Promise<boolean> {
                 if (process.platform === 'win32') {
                     try {
                         // 查找占用4873端口的进程ID
-                        const netstatResult = execSync('netstat -ano | findstr :4873', { encoding: 'utf8' });
+                        const { stdout: netstatResult } = await execAsync('netstat -ano | findstr :4873', { encoding: 'utf8' });
                         const lines = netstatResult.split('\n').filter(line => line.trim() !== '');
 
                         let foundProcess = false;
@@ -251,8 +255,8 @@ export async function stopVerdaccio(): Promise<boolean> {
                                     if (pid && !isNaN(parseInt(pid))) {
                                         console.log(`找到占用端口的进程ID: ${pid}`);
                                         try {
-                                            execSync(`taskkill /F /PID ${pid}`, { encoding: 'utf8' });
-                                            console.log('已终止占用端口的进程');
+                                            const { stdout, stderr } = await execAsync(`taskkill /F /PID ${pid}`, { encoding: 'utf8' });
+                                            console.log('已终止占用端口的进程', stdout, stderr);
                                             foundProcess = true;
                                             return true;
                                         } catch (killError) {
@@ -270,8 +274,8 @@ export async function stopVerdaccio(): Promise<boolean> {
                         console.error(`执行netstat命令失败: ${netstatError.message}`);
                         // 尝试备选方案：直接终止所有可能的Verdaccio进程
                         try {
-                            execSync('taskkill /F /IM verdaccio.exe /T', { encoding: 'utf8' });
-                            console.log('已终止所有Verdaccio进程');
+                            const { stdout, stderr } = await execAsync('taskkill /F /IM verdaccio.exe /T', { encoding: 'utf8' });
+                            console.log('已终止所有Verdaccio进程', stdout, stderr);
                             return true;
                         } catch (backupError) {
                             console.error(`备选方案也失败了: ${backupError.message}`);
@@ -280,7 +284,7 @@ export async function stopVerdaccio(): Promise<boolean> {
                 } else {
                     // 在Unix系统上使用lsof和kill
                     try {
-                        const lsofResult = execSync('lsof -ti:4873', { encoding: 'utf8' });
+                        const { stdout: lsofResult } = await execAsync('lsof -ti:4873', { encoding: 'utf8' });
                         const pids = lsofResult.trim().split('\n').filter(pid => pid.trim() !== '');
 
                         let foundProcess = false;
@@ -288,8 +292,8 @@ export async function stopVerdaccio(): Promise<boolean> {
                             if (pid && !isNaN(parseInt(pid))) {
                                 console.log(`找到占用端口的进程ID: ${pid}`);
                                 try {
-                                    execSync(`kill -9 ${pid}`, { encoding: 'utf8' });
-                                    console.log('已终止占用端口的进程');
+                                    const { stdout, stderr } = await execAsync(`kill -9 ${pid}`, { encoding: 'utf8' });
+                                    console.log('已终止占用端口的进程', stdout, stderr);
                                     foundProcess = true;
                                 } catch (killError) {
                                     console.error(`终止进程失败: ${killError.message}`);
@@ -323,7 +327,7 @@ export async function stopVerdaccio(): Promise<boolean> {
 
 /**
  * 获取Verdaccio进程状态
- * @returns boolean 是否正在运行
+ * @returns Promise<boolean> 是否正在运行
  */
 export async function isVerdaccioRunning(): Promise<boolean> {
     // 首先检查进程引用

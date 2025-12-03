@@ -330,18 +330,26 @@
 
         // 处理依赖包
         async function processDependencies() {
-            const filePath = zipFile.files[0]?.path;
-
-            if (!filePath) {
+            const file = zipFile.files[0];
+            
+            if (!file) {
                 showNotification('请选择一个zip文件', false);
                 return;
             }
 
             try {
-                addLog(`正在处理依赖包 ${filePath}`);
+                addLog(`正在处理依赖包 ${file.name}`);
                 processBtn.disabled = true;
 
-                const result = await registryAPI.processDependencies(filePath);
+                // 使用FileReader读取文件内容并保存到临时文件
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                
+                // 调用主进程API保存文件并获取路径
+                const result = await registryAPI.processDependencies({
+                    name: file.name,
+                    data: Array.from(uint8Array)
+                });
 
                 if (result.success) {
                     addLog('依赖包处理成功');

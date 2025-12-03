@@ -4,7 +4,56 @@ import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
 import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verdaccio.js';
 import { isZipFile } from './extract_zip.js';
-import { execSync } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
+
+/**
+ * 检查是否已登录到指定的npm仓库
+ * @param registryUrl npm仓库URL
+ * @returns Promise<boolean> 是否已登录
+ */
+async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
+    try {
+        // 获取当前配置的registry
+        const { stdout: currentRegistry } = await execAsync('npm config get registry');
+        if (currentRegistry.trim() !== registryUrl) {
+            // 如果当前registry不匹配，设置它
+            await execAsync(`npm set registry ${registryUrl}`);
+        }
+
+        // 尝试获取用户信息
+        await execAsync('npm whoami');
+        return true;
+    } catch (error) {
+        // 如果出现错误，说明未登录或登录已过期
+        return false;
+    }
+}
+
+/**
+ * 登录到本地npm仓库（使用默认凭证）
+ * @param registryUrl npm仓库URL
+ * @returns Promise<boolean> 登录是否成功
+ */
+export async function loginToRegistry(registryUrl: string): Promise<boolean> {
+    try {
+        // 设置 npm 仓库为本地 verdaccio
+        await execAsync(`npm set registry ${registryUrl}`);
+
+        // 使用默认凭证登录（对于本地verdaccio，通常不需要密码）
+        // 这里我们使用一个简单的用户名，因为verdaccio默认允许任何用户发布
+        await execSync('npm adduser --registry ' + registryUrl, {
+            input: 'verdaccio\nverdaccio\nverdaccio@example.com\n'
+        });
+
+        return true;
+    } catch (error) {
+        console.error(`登录到npm仓库失败: ${error.message}`);
+        return false;
+    }
+}
 
 /**
  * 内部npm仓库管理器
@@ -19,7 +68,7 @@ export class InternalNpmRegistry {
         // 获取应用数据目录
         const userDataPath = app.getPath('userData');
         this.tempDir = path.join(userDataPath, 'npm-registry-temp');
-        
+
         // 确保临时目录存在
         if (!fs.existsSync(this.tempDir)) {
             fs.mkdirSync(this.tempDir, { recursive: true });
@@ -86,10 +135,10 @@ export class InternalNpmRegistry {
 
             // 创建临时解压目录
             const extractDir = path.join(this.tempDir, 'extracted');
-            
+
             // 处理依赖包
             const success = await processDependencies(zipPath, extractDir, this.registryUrl);
-            
+
             // 清理临时目录
             try {
                 if (fs.existsSync(extractDir)) {
@@ -98,7 +147,7 @@ export class InternalNpmRegistry {
             } catch (error) {
                 console.warn(`清理临时目录失败: ${error.message}`);
             }
-            
+
             return success;
         } catch (error) {
             console.error(`处理依赖包失败: ${error.message}`);
@@ -110,7 +159,7 @@ export class InternalNpmRegistry {
      * 获取仓库状态
      * @returns Promise<Object> 仓库状态信息
      */
-    async getStatus(): Promise<{url: string, running: boolean, initialized: boolean}> {
+    async getStatus(): Promise<{ url: string, running: boolean, initialized: boolean }> {
         return {
             url: this.registryUrl,
             running: await checkRegistryStatus(this.registryUrl),
@@ -124,7 +173,19 @@ export class InternalNpmRegistry {
      */
     async configureNpm(): Promise<boolean> {
         try {
-            execSync(`npm set registry ${this.registryUrl}`);
+            // 检查是否已登录到仓库
+            let loggedIn = await isLoggedInToRegistry(this.registryUrl);
+            if (!loggedIn) {
+                console.log('未登录到npm仓库，正在尝试自动登录...');
+                loggedIn = await loginToRegistry(this.registryUrl);
+                if (!loggedIn) {
+                    console.error('自动登录失败，请手动登录到npm仓库');
+                    return false;
+                }
+                console.log('已成功登录到npm仓库');
+            }
+
+            await execAsync(`npm set registry ${this.registryUrl}`);
             console.log(`npm registry已设置为: ${this.registryUrl}`);
             return true;
         } catch (error) {
