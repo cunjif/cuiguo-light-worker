@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { extractZip } from './extract_zip.js';
 import { loginToRegistry } from './internal_repo.js';
 
+
 const execAsync = promisify(exec);
 
 /**
@@ -51,6 +52,7 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
         return true;
     } catch (error) {
         // 如果出现错误，说明未登录或登录已过期
+        console.log(`未登录到npm仓库或登录已过期: ${error.message}`);
         return false;
     }
 }

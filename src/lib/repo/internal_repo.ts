@@ -6,6 +6,7 @@ import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verda
 import { isZipFile } from './extract_zip.js';
 import { exec, execSync, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { stdout } from 'node:process';
 
 const execAsync = promisify(exec);
 
@@ -32,57 +33,7 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
     }
 }
 
-/**
- * 登录到本地npm仓库（使用默认凭证）
- * @param registryUrl npm仓库URL
- * @returns Promise<boolean> 登录是否成功
- */
-export async function loginToRegistry(registryUrl: string): Promise<boolean> {
-    try {
-        // 设置 npm 仓库为本地 verdaccio
-        await execAsync(`npm set registry ${registryUrl}`);
-        
-        // 对于本地verdaccio，通常不需要严格的认证
-        // 我们可以尝试添加一个测试用户，但如果失败了，我们仍然可以尝试发布
-        try {
-           // 使用 spawn 执行 npm adduser 并传递输入
-            const child = spawn('npm', ['adduser', '--registry', registryUrl], {
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
-            
-            // 向子进程写入用户名、密码和邮箱
-            child.stdin.write('verdaccio\n');
-            child.stdin.write('verdaccio\n');
-            child.stdin.write('verdaccio@example.com\n');
-            child.stdin.end();
-            
-            // 等待子进程完成
-            await new Promise<void>((resolve, reject) => {
-                child.on('close', (code) => {
-                    if (code === 0) {
-                        resolve();
-                    } else {
-                        reject(new Error(`npm adduser exited with code ${code}`));
-                    }
-                });
-                
-                child.on('error', (err) => {
-                    reject(err);
-                });
-            });
-            
-            console.log('已成功添加npm用户');
-            return true;
-        } catch (loginError) {
-            console.warn(`添加npm用户失败，但这可能不会阻止发布: ${loginError.message}`);
-            // 即使登录失败，我们也返回true，因为本地verdaccio通常允许匿名发布
-            return true;
-        }
-    } catch (error) {
-        console.error(`设置npm registry失败: ${error.message}`);
-        return false;
-    }
-}
+
 
 /**
  * 内部npm仓库管理器
@@ -236,6 +187,35 @@ export class InternalNpmRegistry {
             console.error(`关闭内部npm仓库失败: ${error.message}`);
             return false;
         }
+    }
+}
+
+/**
+ * 登录到本地npm仓库（使用默认凭证）
+ * @param registryUrl npm仓库URL
+ * @returns Promise<boolean> 登录是否成功
+ */
+export async function loginToRegistry(registryUrl: string): Promise<boolean> {
+    try {
+        // 设置 npm 仓库为本地 verdaccio
+        await execAsync(`npx npm set registry ${registryUrl}`);
+
+        // 对于本地verdaccio，通常不需要严格的认证
+        // 我们可以尝试添加一个测试用户，但如果失败了，我们仍然可以尝试发布
+        try {
+            // 增加用户
+            await execAsync(`npx npm adduser --registry ${registryUrl} verdaccio\nverdaccio\nverdaccio@example.com\n`);
+
+            console.log('已成功添加npm用户');
+            return true;
+        } catch (loginError) {
+            console.warn(`添加npm用户失败，但这可能不会阻止发布: ${loginError.message}`);
+            // 即使登录失败，我们也返回true，因为本地verdaccio通常允许匿名发布
+            return true;
+        }
+    } catch (error) {
+        console.error(`设置npm registry失败: ${error.message}`);
+        return false;
     }
 }
 
