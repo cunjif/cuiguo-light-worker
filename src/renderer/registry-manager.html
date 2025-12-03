@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
     <title>MCP工具管理</title>
     <style>
         body {
@@ -12,6 +14,7 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+
         .container {
             max-width: 800px;
             margin: 0 auto;
@@ -20,10 +23,12 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 20px;
         }
+
         h1 {
             color: #333;
             margin-top: 0;
         }
+
         .status-card {
             background-color: #f8f9fa;
             border-radius: 6px;
@@ -31,12 +36,15 @@
             margin-bottom: 20px;
             border-left: 4px solid #007bff;
         }
+
         .status-running {
             border-left-color: #28a745;
         }
+
         .status-stopped {
             border-left-color: #dc3545;
         }
+
         .button {
             background-color: #007bff;
             color: white;
@@ -47,27 +55,35 @@
             margin-right: 10px;
             margin-bottom: 10px;
         }
+
         .button:hover {
             background-color: #0069d9;
         }
+
         .button-danger {
             background-color: #dc3545;
         }
+
         .button-danger:hover {
             background-color: #c82333;
         }
+
         .button-success {
             background-color: #28a745;
         }
+
         .button-success:hover {
             background-color: #218838;
         }
+
         .section {
             margin-bottom: 30px;
         }
+
         .file-input {
             margin-bottom: 15px;
         }
+
         .log {
             background-color: #f8f9fa;
             border: 1px solid #dee2e6;
@@ -79,32 +95,37 @@
             font-size: 12px;
             white-space: pre-wrap;
         }
+
         .notification {
             padding: 10px;
             margin-bottom: 10px;
             border-radius: 4px;
         }
+
         .notification-success {
             background-color: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
+
         .notification-error {
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+
         .hidden {
             display: none;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>内部npm仓库管理</h1>
-        
+
         <div id="notification" class="notification hidden"></div>
-        
+
         <div class="section">
             <h2>仓库状态</h2>
             <div id="status-card" class="status-card">
@@ -117,7 +138,7 @@
                 <button id="refresh-btn" class="button">刷新状态</button>
             </div>
         </div>
-        
+
         <div class="section">
             <h2>依赖包管理</h2>
             <div class="file-input">
@@ -129,7 +150,7 @@
                 <button id="configure-btn" class="button">配置npm使用内部仓库</button>
             </div>
         </div>
-        
+
         <div class="section">
             <h2>操作日志</h2>
             <div id="log" class="log"></div>
@@ -139,7 +160,7 @@
     <script>
         // 使用通过preload暴露的API
         var registryAPI = window.registryAPI;
-        
+
         // DOM元素
         const notification = document.getElementById('notification');
         const statusCard = document.getElementById('status-card');
@@ -152,59 +173,63 @@
         const processBtn = document.getElementById('process-btn');
         const configureBtn = document.getElementById('configure-btn');
         const log = document.getElementById('log');
-        
+
         // 日志函数
         function addLog(message) {
             const timestamp = new Date().toLocaleTimeString();
             log.textContent += `[${timestamp}] ${message}\n`;
             log.scrollTop = log.scrollHeight;
         }
-        
+
         // 显示通知
         function showNotification(message, isSuccess = true) {
             notification.textContent = message;
             notification.className = `notification ${isSuccess ? 'notification-success' : 'notification-error'}`;
             notification.classList.remove('hidden');
-            
+
             setTimeout(() => {
                 notification.classList.add('hidden');
             }, 5000);
         }
-        
+
         // 更新仓库状
         async function updateStatus() {
             try {
                 const status = await registryAPI.status();
-                
+
                 if (status.running) {
                     statusText.textContent = '运行中';
                     statusUrl.textContent = `URL: ${status.url}`;
                     statusCard.className = 'status-card status-running';
                     startBtn.disabled = true;
+                    startBtn.title = '仓库已在运行中';
                     stopBtn.disabled = false;
+                    stopBtn.title = '';
                 } else {
                     statusText.textContent = '已停止';
                     statusUrl.textContent = '';
                     statusCard.className = 'status-card status-stopped';
                     startBtn.disabled = false;
+                    startBtn.title = '';
                     stopBtn.disabled = true;
+                    stopBtn.title = '仓库未运行';
                 }
-                
+
                 addLog(`状态更新 ${status.running ? '运行中' : '已停止'}`);
             } catch (error) {
                 addLog(`获取状态失败 ${error.message}`);
                 showNotification('获取仓库状态失败', false);
             }
         }
-        
+
         // 启动仓库
         async function startRegistry() {
             try {
                 addLog('正在启动内部npm仓库...');
                 startBtn.disabled = true;
-                
+
                 const result = await registryAPI.start();
-                
+
                 if (result.success) {
                     addLog('内部npm仓库启动成功');
                     showNotification('内部npm仓库启动成功');
@@ -212,7 +237,7 @@
                     addLog(`内部npm仓库启动失败: ${result.message}`);
                     showNotification('内部npm仓库启动失败', false);
                 }
-                
+
                 await updateStatus();
             } catch (error) {
                 addLog(`启动仓库时出错: ${error.message}`);
@@ -220,13 +245,13 @@
                 startBtn.disabled = false;
             }
         }
-        
+
         // 停止仓库
         async function stopRegistry() {
             try {
                 addLog('正在停止内部npm仓库...');
                 stopBtn.disabled = true;
-                
+
                 const result = await registryAPI.stop();
                 
                 if (result.success) {
@@ -238,28 +263,30 @@
                 }
                 
                 await updateStatus();
+                startBtn.disabled = false;
+
             } catch (error) {
                 addLog(`停止仓库时出错: ${error.message}`);
                 showNotification('停止仓库时出错', false);
                 stopBtn.disabled = false;
             }
         }
-        
-        // 处理依赖�?
+
+        // 处理依赖包
         async function processDependencies() {
             const filePath = zipFile.files[0]?.path;
-            
+
             if (!filePath) {
                 showNotification('请选择一个zip文件', false);
                 return;
             }
-            
+
             try {
-                addLog(`正在处理依赖�? ${filePath}`);
+                addLog(`正在处理依赖包 ${filePath}`);
                 processBtn.disabled = true;
-                
+
                 const result = await registryAPI.processDependencies(filePath);
-                
+
                 if (result.success) {
                     addLog('依赖包处理成功');
                     showNotification('依赖包处理成功');
@@ -274,15 +301,15 @@
                 processBtn.disabled = false;
             }
         }
-        
+
         // 配置npm
         async function configureNpm() {
             try {
                 addLog('正在配置npm使用内部仓库...');
                 configureBtn.disabled = true;
-                
+
                 const result = await registryAPI.configureNpm();
-                
+
                 if (result.success) {
                     addLog('npm配置成功');
                     showNotification('npm配置成功');
@@ -297,14 +324,14 @@
                 configureBtn.disabled = false;
             }
         }
-        
+
         // 事件监听�?
         startBtn.addEventListener('click', startRegistry);
         stopBtn.addEventListener('click', stopRegistry);
         refreshBtn.addEventListener('click', updateStatus);
         processBtn.addEventListener('click', processDependencies);
         configureBtn.addEventListener('click', configureNpm);
-        
+
         // 初始�?
         document.addEventListener('DOMContentLoaded', () => {
             addLog('内部npm仓库管理器已加载');
@@ -312,4 +339,5 @@
         });
     </script>
 </body>
+
 </html>

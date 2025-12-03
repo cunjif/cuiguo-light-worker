@@ -464,7 +464,7 @@ app.whenReady().then(async () => {
     const result = await npmRegistry.shutdown();
     return {
       success: result,
-      message: result ? '内部npm仓库已停止' : '内部npm仓库停止失败'
+      message: !!result ? '内部npm仓库已停止' : '内部npm仓库停止失败'
     };
   });
 
