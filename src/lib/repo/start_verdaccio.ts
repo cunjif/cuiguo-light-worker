@@ -10,16 +10,16 @@ let verdaccioProcess: ChildProcess | null = null;
 function getNpmPath(): string {
     const isWindows = os.platform() === 'win32';
     const projectRoot = process.cwd();
-    
+
     // 检查项目中是否有env目录包含npm
-    const envNpmPath = isWindows 
+    const envNpmPath = isWindows
         ? path.join(projectRoot, 'env', 'Scripts', 'npm.cmd')
         : path.join(projectRoot, 'env', 'bin', 'npm');
-    
+
     if (fs.existsSync(envNpmPath)) {
         return envNpmPath;
     }
-    
+
     // 回退到系统npm
     return isWindows ? 'npm.cmd' : 'npm';
 }
@@ -28,16 +28,16 @@ function getNpmPath(): string {
 function getNpxPath(): string {
     const isWindows = os.platform() === 'win32';
     const projectRoot = process.cwd();
-    
+
     // 检查项目中是否有env目录包含npx
-    const envNpxPath = isWindows 
+    const envNpxPath = isWindows
         ? path.join(projectRoot, 'env', 'Scripts', 'npx.cmd')
         : path.join(projectRoot, 'env', 'bin', 'npx');
-    
+
     if (fs.existsSync(envNpxPath)) {
         return envNpxPath;
     }
-    
+
     // 回退到系统npx
     return isWindows ? 'npx.cmd' : 'npx';
 }
@@ -155,7 +155,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
         if (!configPath) {
             const configDir = path.join(process.cwd(), '.verdaccio');
             configPath = path.join(configDir, 'config.yaml');
-            
+
             if (!fs.existsSync(configPath)) {
                 if (!createVerdaccioConfig(configPath)) {
                     return false;
@@ -182,7 +182,7 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
         verdaccioProcess.stderr?.on('data', (data) => {
             console.error(`Verdaccio错误: ${data.toString().trim()}`);
         });
-        
+
         // 处理进程退出
         verdaccioProcess.on('close', (code) => {
             console.log(`Verdaccio进程退出，代码: ${code}`);
@@ -196,12 +196,12 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
 
         while (attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, checkInterval));
-            
+
             if (await checkRegistryStatus(`http://localhost:${port}`)) {
                 console.log(`Verdaccio服务已成功启动，地址: http://localhost:${port}`);
                 return true;
             }
-            
+
             attempts++;
         }
 
@@ -223,100 +223,97 @@ export async function stopVerdaccio(): Promise<boolean> {
         if (!!verdaccioProcess) {
             verdaccioProcess.kill();
             verdaccioProcess = null;
-            console.log('Verdaccio服务已停止');
-            return true;
-        } else {
-            // 如果没有进程引用，检查端口上是否有服务在运行
-            const isRunning = await checkRegistryStatus();
-            if (isRunning) {
-                console.log('检测到Verdaccio服务在运行，但没有进程引用');
-                
-                // 尝试通过系统命令查找并终止占用端口的进程
-                try {
-                    const { execSync } = await import('child_process');
-                    
-                    // 在Windows上使用netstat和taskkill
-                    if (process.platform === 'win32') {
-                        try {
-                            // 查找占用4873端口的进程ID
-                            const netstatResult = execSync('netstat -ano | findstr :4873', { encoding: 'utf8' });
-                            const lines = netstatResult.split('\n').filter(line => line.trim() !== '');
-                            
-                            let foundProcess = false;
-                            for (const line of lines) {
-                                // 更灵活地解析netstat输出
-                                if (line.includes(':4873')) {
-                                    // 使用正则表达式提取PID
-                                    const pidMatch = line.match(/(\d+)\s*$/);
-                                    if (pidMatch && pidMatch[1]) {
-                                        const pid = pidMatch[1];
-                                        if (pid && !isNaN(parseInt(pid))) {
-                                            console.log(`找到占用端口的进程ID: ${pid}`);
-                                            try {
-                                                execSync(`taskkill /F /PID ${pid}`, { encoding: 'utf8' });
-                                                console.log('已终止占用端口的进程');
-                                                foundProcess = true;
-                                                return true;
-                                            } catch (killError) {
-                                                console.error(`终止进程失败: ${killError.message}`);
-                                            }
+        }
+        
+        const isRunning = await checkRegistryStatus();
+        if (isRunning) {
+            console.log('检测到Verdaccio服务在运行，但没有进程引用');
+
+            // 尝试通过系统命令查找并终止占用端口的进程
+            try {
+                const { execSync } = await import('child_process');
+
+                // 在Windows上使用netstat和taskkill
+                if (process.platform === 'win32') {
+                    try {
+                        // 查找占用4873端口的进程ID
+                        const netstatResult = execSync('netstat -ano | findstr :4873', { encoding: 'utf8' });
+                        const lines = netstatResult.split('\n').filter(line => line.trim() !== '');
+
+                        let foundProcess = false;
+                        for (const line of lines) {
+                            // 更灵活地解析netstat输出
+                            if (line.includes(':4873')) {
+                                // 使用正则表达式提取PID
+                                const pidMatch = line.match(/(\d+)\s*$/);
+                                if (pidMatch && pidMatch[1]) {
+                                    const pid = pidMatch[1];
+                                    if (pid && !isNaN(parseInt(pid))) {
+                                        console.log(`找到占用端口的进程ID: ${pid}`);
+                                        try {
+                                            execSync(`taskkill /F /PID ${pid}`, { encoding: 'utf8' });
+                                            console.log('已终止占用端口的进程');
+                                            foundProcess = true;
+                                            return true;
+                                        } catch (killError) {
+                                            console.error(`终止进程失败: ${killError.message}`);
                                         }
                                     }
                                 }
                             }
-                            
-                            if (!foundProcess) {
-                                console.log('未找到占用端口的进程');
-                            }
-                        } catch (netstatError) {
-                            console.error(`执行netstat命令失败: ${netstatError.message}`);
-                            // 尝试备选方案：直接终止所有可能的Verdaccio进程
-                            try {
-                                execSync('taskkill /F /IM verdaccio.exe /T', { encoding: 'utf8' });
-                                console.log('已终止所有Verdaccio进程');
-                                return true;
-                            } catch (backupError) {
-                                console.error(`备选方案也失败了: ${backupError.message}`);
-                            }
                         }
-                    } else {
-                        // 在Unix系统上使用lsof和kill
+
+                        if (!foundProcess) {
+                            console.log('未找到占用端口的进程');
+                        }
+                    } catch (netstatError) {
+                        console.error(`执行netstat命令失败: ${netstatError.message}`);
+                        // 尝试备选方案：直接终止所有可能的Verdaccio进程
                         try {
-                            const lsofResult = execSync('lsof -ti:4873', { encoding: 'utf8' });
-                            const pids = lsofResult.trim().split('\n').filter(pid => pid.trim() !== '');
-                            
-                            let foundProcess = false;
-                            for (const pid of pids) {
-                                if (pid && !isNaN(parseInt(pid))) {
-                                    console.log(`找到占用端口的进程ID: ${pid}`);
-                                    try {
-                                        execSync(`kill -9 ${pid}`, { encoding: 'utf8' });
-                                        console.log('已终止占用端口的进程');
-                                        foundProcess = true;
-                                    } catch (killError) {
-                                        console.error(`终止进程失败: ${killError.message}`);
-                                    }
-                                }
-                            }
-                            
-                            if (foundProcess) {
-                                return true;
-                            } else {
-                                console.log('未找到占用端口的进程');
-                            }
-                        } catch (lsofError) {
-                            console.error(`执行lsof命令失败: ${lsofError.message}`);
+                            execSync('taskkill /F /IM verdaccio.exe /T', { encoding: 'utf8' });
+                            console.log('已终止所有Verdaccio进程');
+                            return true;
+                        } catch (backupError) {
+                            console.error(`备选方案也失败了: ${backupError.message}`);
                         }
                     }
-                } catch (error) {
-                    console.error(`通过系统命令终止进程失败: ${error.message}`);
+                } else {
+                    // 在Unix系统上使用lsof和kill
+                    try {
+                        const lsofResult = execSync('lsof -ti:4873', { encoding: 'utf8' });
+                        const pids = lsofResult.trim().split('\n').filter(pid => pid.trim() !== '');
+
+                        let foundProcess = false;
+                        for (const pid of pids) {
+                            if (pid && !isNaN(parseInt(pid))) {
+                                console.log(`找到占用端口的进程ID: ${pid}`);
+                                try {
+                                    execSync(`kill -9 ${pid}`, { encoding: 'utf8' });
+                                    console.log('已终止占用端口的进程');
+                                    foundProcess = true;
+                                } catch (killError) {
+                                    console.error(`终止进程失败: ${killError.message}`);
+                                }
+                            }
+                        }
+
+                        if (foundProcess) {
+                            return true;
+                        } else {
+                            console.log('未找到占用端口的进程');
+                        }
+                    } catch (lsofError) {
+                        console.error(`执行lsof命令失败: ${lsofError.message}`);
+                    }
                 }
-                
-                return false;
-            } else {
-                console.log('没有运行的Verdaccio进程');
-                return false;
+            } catch (error) {
+                console.error(`通过系统命令终止进程失败: ${error.message}`);
             }
+
+            return false;
+        } else {
+            console.log('没有运行的Verdaccio进程');
+            return true; // 没有运行的进程也算作成功停止
         }
     } catch (error) {
         console.error(`停止Verdaccio失败: ${error.message}`);
@@ -333,7 +330,7 @@ export async function isVerdaccioRunning(): Promise<boolean> {
     if (verdaccioProcess !== null && !verdaccioProcess.killed) {
         return true;
     }
-    
+
     // 如果进程引用不可用，检查端口状态
     return await checkRegistryStatus();
 }

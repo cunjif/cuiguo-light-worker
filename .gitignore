@@ -94,6 +94,7 @@ out
 .nuxt
 dist/*
 deps.txt
+deps*
 
 # Gatsby files
 .cache/

@@ -4,6 +4,7 @@ import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
 import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verdaccio.js';
 import { isZipFile } from './extract_zip.js';
+import { execSync } from 'node:child_process';
 
 /**
  * 内部npm仓库管理器
@@ -123,7 +124,6 @@ export class InternalNpmRegistry {
      */
     async configureNpm(): Promise<boolean> {
         try {
-            const { execSync } = require('child_process');
             execSync(`npm set registry ${this.registryUrl}`);
             console.log(`npm registry已设置为: ${this.registryUrl}`);
             return true;
