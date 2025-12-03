@@ -87,10 +87,7 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
         //     } else {
         //         console.log('已成功登录到npm仓库');
         //     }
-        // }
-        var _registry = `http://localhost:4873/
-//localhost:4873/:_aithToken=fake`;
-        await execSync(`npm config set registry=${_registry}`);
+
 
         // 逐个发布包
         for (let i = 0; i < files.length; i++) {
@@ -195,7 +192,12 @@ async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873/
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
         
         try {
-            const response = await fetch(`${registryUrl}-/ping`, {
+            // 确保URL格式正确，在registryUrl和ping路径之间添加斜杠
+            const pingUrl = registryUrl.endsWith('/') 
+                ? `${registryUrl}-/ping` 
+                : `${registryUrl}/-/ping`;
+            
+            const response = await fetch(pingUrl, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);

@@ -1,13 +1,12 @@
-import * as fs from 'node:fs';
+// 重定向到最小化npm仓库实现
 import * as path from 'node:path';
-import { spawn, ChildProcess, execSync, exec } from 'node:child_process';
 import * as os from 'node:os';
+import * as fs from 'node:fs';
+import { startMinimalRegistry, stopMinimalRegistry, isMinimalRegistryRunning } from './minimal_npm_registry.js';
+import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
-
-// 存储Verdaccio进程引用
-let verdaccioProcess: ChildProcess | null = null;
 
 // 获取项目中的npm路径
 function getNpmPath(): string {
@@ -142,85 +141,9 @@ server:
  * @returns Promise<boolean> 是否启动成功
  */
 export async function startVerdaccio(port: number = 4873, configPath?: string): Promise<boolean> {
-    try {
-        // 检查Verdaccio是否已经在运行
-        if (await checkRegistryStatus(`http://localhost:${port}`)) {
-            console.log(`Verdaccio已在端口 ${port} 上运行`);
-            return true;
-        }
-
-        // 如果已有进程，先终止它
-        if (verdaccioProcess) {
-            verdaccioProcess.kill();
-            verdaccioProcess = null;
-        }
-
-        // 检查Verdaccio是否已安装
-        if (!(await isVerdaccioInstalled())) {
-            console.error('Verdaccio未安装');
-            return false;
-        }
-
-        // 如果没有提供配置文件路径，创建默认配置
-        if (!configPath) {
-            const configDir = path.join(process.cwd(), '.verdaccio');
-            configPath = path.join(configDir, 'config.yaml');
-
-            if (!fs.existsSync(configPath)) {
-                if (!createVerdaccioConfig(configPath)) {
-                    return false;
-                }
-            }
-        }
-
-        console.log(`正在启动Verdaccio服务，端口: ${port}...`);
-
-        // 启动Verdaccio进程，使用npx
-        const npxPath = getNpxPath();
-        const args = ['verdaccio', '--listen', `localhost:${port}`, '--config', configPath];
-        verdaccioProcess = spawn(npxPath, args, {
-            stdio: 'pipe',
-            detached: false,
-            shell: true  // 使用shell模式，特别是在Windows上
-        });
-
-        // 处理输出
-        verdaccioProcess.stdout?.on('data', (data) => {
-            console.log(`Verdaccio: ${data.toString().trim()}`);
-        });
-
-        verdaccioProcess.stderr?.on('data', (data) => {
-            console.error(`Verdaccio错误: ${data.toString().trim()}`);
-        });
-
-        // 处理进程退出
-        verdaccioProcess.on('close', (code) => {
-            console.log(`Verdaccio进程退出，代码: ${code}`);
-            verdaccioProcess = null;
-        });
-
-        // 等待服务启动
-        let attempts = 0;
-        const maxAttempts = 10;
-        const checkInterval = 1000; // 1秒
-
-        while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, checkInterval));
-
-            if (await checkRegistryStatus(`http://localhost:${port}`)) {
-                console.log(`Verdaccio服务已成功启动，地址: http://localhost:${port}`);
-                return true;
-            }
-
-            attempts++;
-        }
-
-        console.error(`Verdaccio服务启动超时`);
-        return false;
-    } catch (error) {
-        console.error(`启动Verdaccio失败: ${error.message}`);
-        return false;
-    }
+    console.log(`正在启动最小化npm仓库，端口: ${port}...`);
+    // 直接调用最小化仓库的启动函数
+    return await startMinimalRegistry(port);
 }
 
 /**
@@ -228,107 +151,8 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
  * @returns Promise<boolean> 是否停止成功
  */
 export async function stopVerdaccio(): Promise<boolean> {
-    try {
-        // 首先尝试使用保存的进程引用
-        if (!!verdaccioProcess) {
-            verdaccioProcess.kill();
-            verdaccioProcess = null;
-        }
-        
-        const isRunning = await checkRegistryStatus();
-        if (isRunning) {
-            console.log('检测到Verdaccio服务在运行，但没有进程引用');
-
-            // 尝试通过系统命令查找并终止占用端口的进程
-            try {
-                const { execSync } = await import('child_process');
-
-                // 在Windows上使用netstat和taskkill
-                if (process.platform === 'win32') {
-                    try {
-                        // 查找占用4873端口的进程ID
-                        const { stdout: netstatResult } = await execAsync('netstat -ano | findstr :4873', { encoding: 'utf8' });
-                        const lines = netstatResult.split('\n').filter(line => line.trim() !== '');
-
-                        let foundProcess = false;
-                        for (const line of lines) {
-                            // 更灵活地解析netstat输出
-                            if (line.includes(':4873')) {
-                                // 使用正则表达式提取PID
-                                const pidMatch = line.match(/(\d+)\s*$/);
-                                if (pidMatch && pidMatch[1]) {
-                                    const pid = pidMatch[1];
-                                    if (pid && !isNaN(parseInt(pid))) {
-                                        console.log(`找到占用端口的进程ID: ${pid}`);
-                                        try {
-                                            const { stdout, stderr } = await execAsync(`taskkill /F /PID ${pid}`, { encoding: 'utf8' });
-                                            console.log('已终止占用端口的进程', stdout, stderr);
-                                            foundProcess = true;
-                                            return true;
-                                        } catch (killError) {
-                                            console.error(`终止进程失败: ${killError.message}`);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!foundProcess) {
-                            console.log('未找到占用端口的进程');
-                        }
-                    } catch (netstatError) {
-                        console.error(`执行netstat命令失败: ${netstatError.message}`);
-                        // 尝试备选方案：直接终止所有可能的Verdaccio进程
-                        try {
-                            const { stdout, stderr } = await execAsync('taskkill /F /IM verdaccio.exe /T', { encoding: 'utf8' });
-                            console.log('已终止所有Verdaccio进程', stdout, stderr);
-                            return true;
-                        } catch (backupError) {
-                            console.error(`备选方案也失败了: ${backupError.message}`);
-                        }
-                    }
-                } else {
-                    // 在Unix系统上使用lsof和kill
-                    try {
-                        const { stdout: lsofResult } = await execAsync('lsof -ti:4873', { encoding: 'utf8' });
-                        const pids = lsofResult.trim().split('\n').filter(pid => pid.trim() !== '');
-
-                        let foundProcess = false;
-                        for (const pid of pids) {
-                            if (pid && !isNaN(parseInt(pid))) {
-                                console.log(`找到占用端口的进程ID: ${pid}`);
-                                try {
-                                    const { stdout, stderr } = await execAsync(`kill -9 ${pid}`, { encoding: 'utf8' });
-                                    console.log('已终止占用端口的进程', stdout, stderr);
-                                    foundProcess = true;
-                                } catch (killError) {
-                                    console.error(`终止进程失败: ${killError.message}`);
-                                }
-                            }
-                        }
-
-                        if (foundProcess) {
-                            return true;
-                        } else {
-                            console.log('未找到占用端口的进程');
-                        }
-                    } catch (lsofError) {
-                        console.error(`执行lsof命令失败: ${lsofError.message}`);
-                    }
-                }
-            } catch (error) {
-                console.error(`通过系统命令终止进程失败: ${error.message}`);
-            }
-
-            return false;
-        } else {
-            console.log('没有运行的Verdaccio进程');
-            return true; // 没有运行的进程也算作成功停止
-        }
-    } catch (error) {
-        console.error(`停止Verdaccio失败: ${error.message}`);
-        return false;
-    }
+    // 直接调用最小化仓库的停止函数
+    return await stopMinimalRegistry();
 }
 
 /**
@@ -336,11 +160,6 @@ export async function stopVerdaccio(): Promise<boolean> {
  * @returns Promise<boolean> 是否正在运行
  */
 export async function isVerdaccioRunning(): Promise<boolean> {
-    // 首先检查进程引用
-    if (verdaccioProcess !== null && !verdaccioProcess.killed) {
-        return true;
-    }
-
-    // 如果进程引用不可用，检查端口状态
-    return await checkRegistryStatus();
+    // 直接调用最小化仓库的状态检查函数
+    return await isMinimalRegistryRunning();
 }

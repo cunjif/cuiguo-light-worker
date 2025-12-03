@@ -2,11 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
-import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verdaccio.js';
+import { startMinimalRegistry, stopMinimalRegistry, isMinimalRegistryRunning } from './minimal_npm_registry.js';
 import { isZipFile } from './extract_zip.js';
-import { exec, execSync, spawn } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { stdout } from 'node:process';
 
 const execAsync = promisify(exec);
 
@@ -72,8 +71,8 @@ export class InternalNpmRegistry {
             // 检查仓库是否已运行
             const isRunning = await checkRegistryStatus(this.registryUrl);
             if (!isRunning) {
-                // 启动Verdaccio服务
-                const started = await startVerdaccio(port);
+                // 启动最小化npm仓库服务
+                const started = await startMinimalRegistry(port);
                 if (!started) {
                     console.error('启动内部npm仓库失败');
                     return false;
@@ -153,19 +152,11 @@ export class InternalNpmRegistry {
      */
     async configureNpm(): Promise<boolean> {
         try {
-            // 检查是否已登录到仓库
-            let loggedIn = await isLoggedInToRegistry(this.registryUrl);
-            if (!loggedIn) {
-                console.log('未登录到npm仓库，正在尝试自动登录...');
-                loggedIn = await loginToRegistry(this.registryUrl);
-                if (!loggedIn) {
-                    console.error('自动登录失败，请手动登录到npm仓库');
-                    return false;
-                }
-                console.log('已成功登录到npm仓库');
-            }
-
-            await execAsync(`npm set registry ${this.registryUrl}`);
+            // 对于最小化npm仓库，我们简化认证逻辑
+            // 设置registry并使用一个假的token
+            const registryConfig = `${this.registryUrl}
+${this.registryUrl.replace('http://', '//')}:_authToken=fake`;
+            await execAsync(`npm config set registry=${registryConfig}`);
             console.log(`npm registry已设置为: ${this.registryUrl}`);
             return true;
         } catch (error) {
@@ -180,7 +171,7 @@ export class InternalNpmRegistry {
      */
     async shutdown(): Promise<boolean> {
         try {
-            const stopped = await stopVerdaccio();
+            const stopped = await stopMinimalRegistry();
             this.isInitialized = false;
             return stopped;
         } catch (error) {
@@ -197,22 +188,13 @@ export class InternalNpmRegistry {
  */
 export async function loginToRegistry(registryUrl: string): Promise<boolean> {
     try {
-        // 设置 npm 仓库为本地 verdaccio
-        await execSync(`npm set registry ${registryUrl}`);
-
-        // 对于本地verdaccio，通常不需要严格的认证
-        // 我们可以尝试添加一个测试用户，但如果失败了，我们仍然可以尝试发布
-        try {
-            // 增加用户
-            await execSync(`npm adduser --registry ${registryUrl}`);
-
-            console.log('已成功添加npm用户');
-            return true;
-        } catch (loginError) {
-            console.warn(`添加npm用户失败，但这可能不会阻止发布: ${loginError.message}`);
-            // 即使登录失败，我们也返回true，因为本地verdaccio通常允许匿名发布
-            return true;
-        }
+        // 对于最小化npm仓库，我们简化认证逻辑
+        // 直接设置registry和假token
+        const registryConfig = `${registryUrl}
+${registryUrl.replace('http://', '//')}:_authToken=fake`;
+        await execSync(`npm config set registry=${registryConfig}`);
+        console.log('已配置npm仓库认证');
+        return true;
     } catch (error) {
         console.error(`设置npm registry失败: ${error.message}`);
         return false;
