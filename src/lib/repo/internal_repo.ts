@@ -4,7 +4,7 @@ import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
 import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verdaccio.js';
 import { isZipFile } from './extract_zip.js';
-import { exec, execSync } from 'node:child_process';
+import { exec, execSync, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
@@ -40,15 +40,37 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
 export async function loginToRegistry(registryUrl: string): Promise<boolean> {
     try {
         // 设置 npm 仓库为本地 verdaccio
-        await execSync(`npm set registry ${registryUrl}`);
+        await execAsync(`npm set registry ${registryUrl}`);
         
         // 对于本地verdaccio，通常不需要严格的认证
         // 我们可以尝试添加一个测试用户，但如果失败了，我们仍然可以尝试发布
         try {
-            // 使用默认凭证登录
-            await execSync('npm adduser --registry ' + registryUrl, {
-                input: 'verdaccio\nverdaccio\nverdaccio@example.com\n'
+           // 使用 spawn 执行 npm adduser 并传递输入
+            const child = spawn('npm', ['adduser', '--registry', registryUrl], {
+                stdio: ['pipe', 'pipe', 'pipe']
             });
+            
+            // 向子进程写入用户名、密码和邮箱
+            child.stdin.write('verdaccio\n');
+            child.stdin.write('verdaccio\n');
+            child.stdin.write('verdaccio@example.com\n');
+            child.stdin.end();
+            
+            // 等待子进程完成
+            await new Promise<void>((resolve, reject) => {
+                child.on('close', (code) => {
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error(`npm adduser exited with code ${code}`));
+                    }
+                });
+                
+                child.on('error', (err) => {
+                    reject(err);
+                });
+            });
+            
             console.log('已成功添加npm用户');
             return true;
         } catch (loginError) {
