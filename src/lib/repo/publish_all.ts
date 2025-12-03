@@ -77,17 +77,20 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
         }
 
         // 检查是否已登录到仓库
-        let loggedIn = await isLoggedInToRegistry(registryUrl);
-        if (!loggedIn) {
-            console.log('未登录到npm仓库，正在尝试自动登录...');
-            loggedIn = await loginToRegistry(registryUrl);
-            if (!loggedIn) {
-                console.error('自动登录失败，请手动登录到npm仓库');
-                // 即使自动登录失败，我们也继续尝试发布，因为本地verdaccio可能允许匿名发布
-            } else {
-                console.log('已成功登录到npm仓库');
-            }
-        }
+        // let loggedIn = await isLoggedInToRegistry(registryUrl);
+        // if (!loggedIn) {
+        //     console.log('未登录到npm仓库，正在尝试自动登录...');
+        //     loggedIn = await loginToRegistry(registryUrl);
+        //     if (!loggedIn) {
+        //         console.error('自动登录失败，请手动登录到npm仓库');
+        //         // 即使自动登录失败，我们也继续尝试发布，因为本地verdaccio可能允许匿名发布
+        //     } else {
+        //         console.log('已成功登录到npm仓库');
+        //     }
+        // }
+        var _registry = `http://localhost:4873/
+//localhost:4873/:_aithToken=fake`;
+        await execSync(`npm config set registry=${_registry}`);
 
         // 逐个发布包
         for (let i = 0; i < files.length; i++) {
@@ -186,13 +189,13 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
  * @param registryUrl npm仓库URL
  * @returns Promise<boolean> 仓库是否运行
  */
-async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873'): Promise<boolean> {
+async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873/'): Promise<boolean> {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
         
         try {
-            const response = await fetch(`${registryUrl}/-/ping`, {
+            const response = await fetch(`${registryUrl}-/ping`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);

@@ -43,7 +43,7 @@ export class InternalNpmRegistry {
     private tempDir: string;
     private isInitialized: boolean = false;
 
-    constructor(registryUrl: string = 'http://localhost:4873') {
+    constructor(registryUrl: string = 'http://localhost:4873/') {
         this.registryUrl = registryUrl;
         // 获取应用数据目录
         const userDataPath = app.getPath('userData');
@@ -198,13 +198,13 @@ export class InternalNpmRegistry {
 export async function loginToRegistry(registryUrl: string): Promise<boolean> {
     try {
         // 设置 npm 仓库为本地 verdaccio
-        await execAsync(`npx npm set registry ${registryUrl}`);
+        await execSync(`npm set registry ${registryUrl}`);
 
         // 对于本地verdaccio，通常不需要严格的认证
         // 我们可以尝试添加一个测试用户，但如果失败了，我们仍然可以尝试发布
         try {
             // 增加用户
-            await execAsync(`npx npm adduser --registry ${registryUrl} verdaccio\nverdaccio\nverdaccio@example.com\n`);
+            await execSync(`npm adduser --registry ${registryUrl}`);
 
             console.log('已成功添加npm用户');
             return true;

@@ -98,6 +98,7 @@ plugins: ${path.join(configDir, 'plugins').replace(/\\/g, '/')}
 auth:
   htpasswd:
     file: ${path.join(configDir, 'htpasswd').replace(/\\/g, '/')}
+    max_users: -1
 
 uplinks:
   npmjs:
@@ -105,13 +106,18 @@ uplinks:
 
 packages:
   '@*/*':
-    access: $all
-    publish: $all
+    access: $anonymous
+    publish: $anonymous     
+    unpublish: $anonymous   
     proxy: npmjs
   '**':
-    access: $all
-    publish: $all
+    access: $anonymous
+    publish: $anonymous     
+    unpublish: $anonymous 
     proxy: npmjs
+
+logs:
+  - { type: stdout, format: pretty, level: http }
 
 server:
   keepAliveTimeout: 60
