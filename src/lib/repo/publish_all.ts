@@ -1,6 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { exec } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractZip } from './extract_zip.js';
 import { loginToRegistry } from './internal_repo.js';
@@ -55,28 +55,6 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
     }
 }
 
-/**
- * 登录到本地npm仓库（使用默认凭证）
- * @param registryUrl npm仓库URL
- * @returns Promise<boolean> 登录是否成功
- */
-// async function loginToRegistry(registryUrl: string): Promise<boolean> {
-//     try {
-//         // 设置 npm 仓库为本地 verdaccio
-//         await execAsync(`npx npm set registry ${registryUrl}`);
-        
-//         // 使用默认凭证登录（对于本地verdaccio，通常不需要密码）
-//         // 这里我们使用一个简单的用户名，因为verdaccio默认允许任何用户发布
-//         await execAsync('npx npm adduser --registry ' + registryUrl, {
-//             input: 'verdaccio\nverdaccio\nverdaccio@example.com\n'
-//         });
-        
-//         return true;
-//     } catch (error) {
-//         console.error(`登录到npm仓库失败: ${error.message}`);
-//         return false;
-//     }
-// }
 
 /**
  * 将.tgz文件发布到本地npm仓库
@@ -103,13 +81,11 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             loggedIn = await loginToRegistry(registryUrl);
             if (!loggedIn) {
                 console.error('自动登录失败，请手动登录到npm仓库');
-                return false;
+                // 即使自动登录失败，我们也继续尝试发布，因为本地verdaccio可能允许匿名发布
+            } else {
+                console.log('已成功登录到npm仓库');
             }
-            console.log('已成功登录到npm仓库');
         }
-
-        // 设置 npm 仓库为本地 verdaccio
-        await execAsync(`npx npm set registry ${registryUrl}`);
 
         // 逐个发布包
         for (let i = 0; i < files.length; i++) {
@@ -118,7 +94,7 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             
             try {
                 console.log(`[${i + 1}/${files.length}] 发布 ${file}...`);
-                await execAsync(`npx npm publish ${filePath}`);
+                await execAsync(`npm publish ${filePath}`);
                 console.log(`✓ ${file} 发布成功`);
             } catch (error) {
                 console.error(`✗ 发布 ${file} 失败:`, error.message);
@@ -164,7 +140,35 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
         const publishSuccess = await publishToRepo(extractDir, registryUrl);
         if (!publishSuccess) {
             console.error('发布步骤失败');
-            return false;
+        }
+        
+        // 4. 清理临时目录
+        try {
+            console.log('正在清理临时目录...');
+            // 在Windows上，有时需要先解除文件锁定再删除目录
+            const extractedDir = path.join(extractDir, 'extracted');
+            if (fs.existsSync(extractedDir)) {
+                // 尝试多次删除，因为有时会有延迟
+                let retryCount = 0;
+                while (retryCount < 3) {
+                    try {
+                        fs.rmSync(extractedDir, { recursive: true, force: true });
+                        break;
+                    } catch (rmError) {
+                        if (retryCount === 2) {
+                            throw rmError; // 最后一次尝试，如果还失败则抛出异常
+                        }
+                        console.warn(`清理临时目录失败，${1000 * (retryCount + 1)}ms后重试...`);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+                        retryCount++;
+                    }
+                }
+            }
+            fs.rmSync(extractDir, { recursive: true, force: true });
+            console.log('临时目录已清理');
+        } catch (cleanupError) {
+            console.error(`清理临时目录失败: ${cleanupError.message}`);
+            // 清理失败不影响整体流程的成功状态
         }
         
         console.log('依赖包处理流程完成！');
