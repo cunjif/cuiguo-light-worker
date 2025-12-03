@@ -97,9 +97,17 @@
         }
 
         .notification {
-            padding: 10px;
-            margin-bottom: 10px;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 20px;
             border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            min-width: 300px;
+            text-align: center;
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
 
         .notification-success {
@@ -136,6 +144,7 @@
                 <button id="start-btn" class="button button-success">启动仓库</button>
                 <button id="stop-btn" class="button button-danger">停止仓库</button>
                 <button id="refresh-btn" class="button">刷新状态</button>
+                <button id="configure-btn" class="button">配置npm使用内部仓库</button>
             </div>
         </div>
 
@@ -143,11 +152,10 @@
             <h2>依赖包管理</h2>
             <div class="file-input">
                 <label for="zip-file">选择包含.tgz文件的zip压缩包: </label>
-                <input type="file" id="zip-file" accept=".zip">
             </div>
             <div>
+                <input type="file" id="zip-file" accept=".zip">
                 <button id="process-btn" class="button">处理依赖包</button>
-                <button id="configure-btn" class="button">配置npm使用内部仓库</button>
             </div>
         </div>
 
