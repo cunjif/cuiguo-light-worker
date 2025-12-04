@@ -473,9 +473,15 @@ app.whenReady().then(async () => {
   // 处理依赖包zip文件
   ipcMain.handle('registry-process-dependencies', async (event, fileData) => {
     try {
+      // 创建进度回调函数
+      const progressCallback = (percent: number, message: string) => {
+        // 发送进度更新到渲染进程
+        event.sender.send('registry-process-progress', { percent, message });
+      };
+      
       // 如果传入的是字符串，则认为是文件路径
       if (typeof fileData === 'string') {
-        const result = await npmRegistry.processDependenciesZip(fileData);
+        const result = await npmRegistry.processDependenciesZip(fileData, progressCallback);
         return {
           success: result,
           message: result ? '依赖包处理成功' : '依赖包处理失败'
@@ -493,7 +499,7 @@ app.whenReady().then(async () => {
         writeFileSync(tempFilePath, buffer);
         
         // 处理依赖包
-        const result = await npmRegistry.processDependenciesZip(tempFilePath);
+        const result = await npmRegistry.processDependenciesZip(tempFilePath, progressCallback);
         
         // 清理临时文件
         try {

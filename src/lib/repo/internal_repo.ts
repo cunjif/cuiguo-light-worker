@@ -92,9 +92,10 @@ export class InternalNpmRegistry {
     /**
      * 处理依赖包zip文件
      * @param zipPath zip文件路径
+     * @param progressCallback 进度回调函数 (percent: number, message: string) => void
      * @returns Promise<boolean> 处理是否成功
      */
-    async processDependenciesZip(zipPath: string): Promise<boolean> {
+    async processDependenciesZip(zipPath: string, progressCallback?: (percent: number, message: string) => void): Promise<boolean> {
         try {
             if (!this.isInitialized) {
                 console.error('内部npm仓库未初始化，请先调用initialize方法');
@@ -117,7 +118,7 @@ export class InternalNpmRegistry {
             const extractDir = path.join(this.tempDir, 'extracted');
 
             // 处理依赖包
-            const success = await processDependencies(zipPath, extractDir, this.registryUrl);
+            const success = await processDependencies(zipPath, extractDir, this.registryUrl, progressCallback);
 
             // 清理临时目录
             // try {

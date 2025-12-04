@@ -184,7 +184,13 @@ contextBridge.exposeInMainWorld('registryAPI', {
   start: () => ipcRenderer.invoke('registry-start'),
   stop: () => ipcRenderer.invoke('registry-stop'),
   processDependencies: (filePath: string) => ipcRenderer.invoke('registry-process-dependencies', filePath),
-  configureNpm: () => ipcRenderer.invoke('registry-configure-npm')
+  configureNpm: () => ipcRenderer.invoke('registry-configure-npm'),
+  onRegistryProcessProgress: (callback: (progress: { percent: number, message: string }) => void) => {
+    ipcRenderer.on('registry-process-progress', (event: Electron.IpcRendererEvent, progress: { percent: number, message: string }) => callback(progress));
+  },
+  removeRegistryProcessProgressListener: () => {
+    ipcRenderer.removeAllListeners('registry-process-progress');
+  }
 });
 
 exposeAPIs();

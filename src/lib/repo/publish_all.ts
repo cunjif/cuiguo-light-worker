@@ -15,11 +15,17 @@ const execAsync = promisify(exec);
  * 解压包含.tgz文件的zip压缩包
  * @param zipPath zip文件路径
  * @param extractDir 解压目标目录
+ * @param progressCallback 进度回调函数 (percent: number, message: string) => void
  * @returns Promise<boolean> 解压是否成功
  */
-async function extractDependencies(zipPath: string, extractDir: string): Promise<boolean> {
+async function extractDependencies(
+    zipPath: string, 
+    extractDir: string,
+    progressCallback?: (percent: number, message: string) => void
+): Promise<boolean> {
     try {
         console.log(`正在解压依赖包: ${zipPath}`);
+        if (progressCallback) progressCallback(15, '正在解压依赖包...');
 
         // 确保目标目录存在
         if (!fs.existsSync(extractDir)) {
@@ -29,6 +35,7 @@ async function extractDependencies(zipPath: string, extractDir: string): Promise
         // 解压zip文件
         await extractZip(zipPath, extractDir);
         console.log(`依赖包已成功解压到: ${extractDir}`);
+        if (progressCallback) progressCallback(45, '依赖包解压完成');
         return true;
     } catch (error) {
         console.error(`解压依赖包失败: ${error.message}`);
@@ -65,9 +72,14 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
  * 将.tgz文件发布到本地npm仓库
  * @param dir 包含.tgz文件的目录
  * @param registryUrl npm仓库URL
+ * @param progressCallback 进度回调函数 (percent: number, message: string) => void
  * @returns Promise<boolean> 发布是否成功
  */
-async function publishToRepo(dir: string, registryUrl: string = 'http://localhost:4873'): Promise<boolean> {
+async function publishToRepo(
+    dir: string, 
+    registryUrl: string = 'http://localhost:4873',
+    progressCallback?: (percent: number, message: string) => void
+): Promise<boolean> {
     try {
         await npmRegistry.configureNpm();
         // 读取所有 .tgz 文件
@@ -84,6 +96,12 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const filePath = path.join(dir, file);
+            
+            if (progressCallback) {
+                const progress = 60 + (i / files.length) * 25; // 60-85%
+                progressCallback(progress, `正在发布: ${file} (${i + 1}/${files.length})`);
+            }
+            
             try {
                 const pkgJson = await readPackageJsonFromTgz(filePath);
                 await execAsync(`npm unpublish ${pkgJson.name}@${pkgJson.version} --registry ${registryUrl}`);
@@ -110,21 +128,33 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
  * @param zipPath 包含.tgz文件的zip压缩包路径
  * @param tempDir 临时解压目录
  * @param registryUrl npm仓库URL
+ * @param progressCallback 进度回调函数 (percent: number, message: string) => void
  * @returns Promise<boolean> 整个流程是否成功
  */
-async function processDependencies(zipPath: string, tempDir?: string, registryUrl: string = 'http://localhost:4873'): Promise<boolean> {
+async function processDependencies(
+    zipPath: string, 
+    tempDir?: string, 
+    registryUrl: string = 'http://localhost:4873',
+    progressCallback?: (percent: number, message: string) => void
+): Promise<boolean> {
     try {
         // 如果没有指定临时目录，使用默认目录
         const extractDir = tempDir || path.join(path.dirname(zipPath), 'temp_deps');
+        
+        // 初始进度
+        if (progressCallback) progressCallback(5, '准备解压文件...');
 
         // 1. 解压zip文件
-        const extractSuccess = await extractDependencies(zipPath, extractDir);
+        if (progressCallback) progressCallback(10, '正在解压依赖包...');
+        const extractSuccess = await extractDependencies(zipPath, extractDir, progressCallback);
         if (!extractSuccess) {
             console.error('解压步骤失败，终止流程');
+            if (progressCallback) progressCallback(0, '解压失败');
             return false;
         }
 
         // 2. 检查本地npm仓库状态
+        if (progressCallback) progressCallback(50, '检查本地npm仓库状态...');
         console.log('检查本地npm仓库状态...');
         const isRunning = await checkRegistryStatus(registryUrl);
         if (!isRunning) {
@@ -132,12 +162,15 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
         }
 
         // 3. 发布.tgz文件到本地仓库
-        const publishSuccess = await publishToRepo(extractDir, registryUrl);
+        if (progressCallback) progressCallback(60, '正在发布包到本地仓库...');
+        const publishSuccess = await publishToRepo(extractDir, registryUrl, progressCallback);
         if (!publishSuccess) {
             console.error('发布步骤失败');
+            if (progressCallback) progressCallback(0, '发布失败');
         }
 
         // 4. 清理临时目录
+        if (progressCallback) progressCallback(90, '正在清理临时文件...');
         try {
             console.log('正在清理临时目录...');
             // 在Windows上，有时需要先解除文件锁定再删除目录
@@ -167,9 +200,11 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
         }
 
         console.log('依赖包处理流程完成！');
+        if (progressCallback) progressCallback(100, '处理完成');
         return true;
     } catch (error) {
         console.error(`依赖包处理流程失败: ${error.message}`);
+        if (progressCallback) progressCallback(0, '处理失败');
         return false;
     }
 }

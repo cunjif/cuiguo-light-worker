@@ -143,6 +143,31 @@
         .hidden {
             display: none;
         }
+
+        .progress-container {
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 
@@ -183,6 +208,12 @@
         <div class="section">
             <h2>操作日志</h2>
             <div id="log" class="log"></div>
+            <div id="progress-container" class="progress-container hidden">
+                <div class="progress-bar">
+                    <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                </div>
+                <div id="progress-text" class="progress-text">处理中...</div>
+            </div>
         </div>
     </div>
 
@@ -204,12 +235,54 @@
         const processBtn = document.getElementById('process-btn');
         const configureBtn = document.getElementById('configure-btn');
         const log = document.getElementById('log');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const progressText = document.getElementById('progress-text');
+
+        // 监听来自主进程的进度更新
+        if (window.registryAPI && window.registryAPI.onRegistryProcessProgress) {
+            window.registryAPI.onRegistryProcessProgress((progress) => {
+                updateProgress(progress.percent, progress.message);
+                addLog(progress.message, 'info');
+            });
+        }
+
+        // 监听来自主进程的仓库状态更新
+        if (window.registryAPI && window.registryAPI.onRegistryStatusUpdated) {
+            window.registryAPI.onRegistryStatusUpdated((status) => {
+                updateStatus();
+            });
+        }
+
+        // 监听来自主进程的进度更新
+        if (window.registryAPI && window.registryAPI.onRegistryProcessProgress) {
+            window.registryAPI.onRegistryProcessProgress((progress) => {
+                updateProgress(progress.percent, progress.message);
+                addLog(`进度: ${progress.percent}% - ${progress.message}`, 'info');
+            });
+        }
 
         // 日志函数
-        function addLog(message) {
+        function addLog(message, type = 'log') {
             const timestamp = new Date().toLocaleTimeString();
-            log.textContent += `[${timestamp}] ${message}\n`;
+            const typePrefix = type === 'info' ? '[信息]' : type === 'error' ? '[错误]' : '[日志]';
+            log.textContent += `[${timestamp}] ${typePrefix} ${message}\n`;
             log.scrollTop = log.scrollHeight;
+        }
+
+        // 进度更新函数
+        function updateProgress(percent, message) {
+            progressBarFill.style.width = `${percent}%`;
+            progressText.textContent = message;
+            
+            if (percent > 0 && percent < 100) {
+                progressContainer.classList.remove('hidden');
+            } else if (percent >= 100) {
+                // 进度完成后，延迟隐藏进度条
+                setTimeout(() => {
+                    progressContainer.classList.add('hidden');
+                }, 2000);
+            }
         }
 
         // 显示通知
@@ -248,10 +321,10 @@
             }, 300);
         }
 
-        // 更新仓库状
+        // 更新仓库状态
         async function updateStatus() {
             try {
-                const status = await registryAPI.status();
+                const status = await window.registryAPI.status();
 
                 if (status.running) {
                     statusText.textContent = '运行中';
@@ -284,7 +357,7 @@
                 addLog('正在启动内部npm仓库...');
                 startBtn.disabled = true;
 
-                const result = await registryAPI.start();
+                const result = await window.registryAPI.start();
 
                 if (result.success) {
                     addLog('内部npm仓库启动成功');
@@ -308,7 +381,7 @@
                 addLog('正在停止内部npm仓库...');
                 stopBtn.disabled = true;
 
-                const result = await registryAPI.stop();
+                const result = await window.registryAPI.stop();
                 
                 if (result.success) {
                     addLog('内部npm仓库已停止');
@@ -340,27 +413,34 @@
             try {
                 addLog(`正在处理依赖包 ${file.name}`);
                 processBtn.disabled = true;
+                
+                // 显示进度条
+                updateProgress(5, '准备处理依赖包...');
 
                 // 使用FileReader读取文件内容并保存到临时文件
                 const arrayBuffer = await file.arrayBuffer();
                 const uint8Array = new Uint8Array(arrayBuffer);
                 
                 // 调用主进程API保存文件并获取路径
-                const result = await registryAPI.processDependencies({
+                updateProgress(10, '正在上传文件...');
+                const result = await window.registryAPI.processDependencies({
                     name: file.name,
                     data: Array.from(uint8Array)
                 });
 
                 if (result.success) {
+                    updateProgress(100, '依赖包处理完成');
                     addLog('依赖包处理成功');
                     showNotification('依赖包处理成功');
                 } else {
                     addLog(`依赖包处理失败: ${result.message}`);
                     showNotification('依赖包处理失败', false);
+                    updateProgress(0, '处理失败');
                 }
             } catch (error) {
                 addLog(`处理依赖包时出错: ${error.message}`);
                 showNotification('处理依赖包时出错', false);
+                updateProgress(0, '处理出错');
             } finally {
                 processBtn.disabled = false;
             }
@@ -372,7 +452,7 @@
                 addLog('正在配置npm使用内部仓库...');
                 configureBtn.disabled = true;
 
-                const result = await registryAPI.configureNpm();
+                const result = await window.registryAPI.configureNpm();
 
                 if (result.success) {
                     addLog('npm配置成功');
