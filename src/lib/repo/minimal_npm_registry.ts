@@ -157,25 +157,37 @@ class MinimalNpmRegistryServer {
     }
 
     /**
-     * 提取tgz文件中的package.json并返回版本
+     * 提取或解析package.json并返回版本
      */
-    private async extractPackageJson(tgzBuffer: Buffer): Promise<{ packageJson: any, version: string }> {
+    private async extractPackageJson(dataBuffer: Buffer): Promise<{ packageJson: any, version: string }> {
+        // 首先尝试直接解析为JSON（如果上传的是package.json内容）
+        try {
+            const jsonStr = dataBuffer.toString('utf-8');
+            const packageJson = JSON.parse(jsonStr);
+            if (packageJson.name && packageJson.version) {
+                return { packageJson, version: packageJson.version };
+            }
+        } catch (jsonError) {
+            // 不是JSON，继续尝试tar提取
+        }
+
+        // 尝试作为tar文件提取
         const tempDir = path.join(this.storageDir, 'temp_extract_' + Date.now());
         if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
         }
 
         try {
-            // 保存tgz到临时文件
-            const tempTgzPath = path.join(tempDir, 'temp.tgz');
-            fs.writeFileSync(tempTgzPath, tgzBuffer);
+            // 保存数据到临时文件
+            const tempFilePath = path.join(tempDir, 'temp_data');
+            fs.writeFileSync(tempFilePath, dataBuffer);
 
             // 尝试提取package.json，先尝试作为gzipped tar
             let extracted = false;
-            
+
             try {
                 // 使用同步方法解压
-                const gunzipped = zlib.gunzipSync(tgzBuffer);
+                const gunzipped = zlib.gunzipSync(dataBuffer);
                 // 将解压后的数据写入临时文件
                 const tempTarPath = path.join(tempDir, 'temp.tar');
                 fs.writeFileSync(tempTarPath, gunzipped);
@@ -194,7 +206,7 @@ class MinimalNpmRegistryServer {
                 try {
                     await new Promise<void>((resolve, reject) => {
                         tar.extract({
-                            file: tempTgzPath,
+                            file: tempFilePath,
                             cwd: tempDir,
                             filter: (p: string) => p === 'package.json'
                         }).then(() => resolve()).catch(reject);
@@ -255,8 +267,25 @@ class MinimalNpmRegistryServer {
 
         req.on('end', async () => {
             try {
-                // 提取package.json和版本
-                const { packageJson, version } = await this.extractPackageJson(body);
+                let packageJson: any;
+                let version: string;
+
+                try {
+                    // 尝试提取package.json和版本
+                    const result = await this.extractPackageJson(body);
+                    packageJson = result.packageJson;
+                    version = result.version;
+                } catch (extractError) {
+                    console.log('无法提取package.json，使用默认信息');
+                    // 回退到创建默认的package.json
+                    version = '1.0.0';
+                    packageJson = {
+                        name: packageName,
+                        version: version,
+                        description: '自动从上传数据创建的包信息',
+                        main: 'index.js'
+                    };
+                }
 
                 // 创建版本目录
                 const versionDir = path.join(this.storageDir, packageName, version);
@@ -264,9 +293,9 @@ class MinimalNpmRegistryServer {
                     fs.mkdirSync(versionDir, { recursive: true });
                 }
 
-                // 保存tgz文件，保持原始文件名
-                const tgzFilePath = path.join(versionDir, originalFilename);
-                fs.writeFileSync(tgzFilePath, body);
+                // 保存上传的文件，保持原始文件名
+                const filePath = path.join(versionDir, originalFilename);
+                fs.writeFileSync(filePath, body);
 
                 // 保存package.json
                 fs.writeFileSync(
