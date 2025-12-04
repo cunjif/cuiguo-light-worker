@@ -62,6 +62,8 @@
         "@modelcontextprotocol/sdk": "^1.13.2",
         "@types/tar": "^6.1.13",
         "bazi-mcp": "^0.1.0",
+        "compress": "^0.99.0",
+        "compressing": "^2.0.0",
         "verdaccio": "^6.2.3"
     }
 }

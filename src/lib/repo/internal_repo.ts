@@ -120,13 +120,13 @@ export class InternalNpmRegistry {
             const success = await processDependencies(zipPath, extractDir, this.registryUrl);
 
             // 清理临时目录
-            try {
-                if (fs.existsSync(extractDir)) {
-                    fs.rmSync(extractDir, { recursive: true, force: true });
-                }
-            } catch (error) {
-                console.warn(`清理临时目录失败: ${error.message}`);
-            }
+            // try {
+            //     if (fs.existsSync(extractDir)) {
+            //         fs.rmSync(extractDir, { recursive: true, force: true });
+            //     }
+            // } catch (error) {
+            //     console.warn(`清理临时目录失败: ${error.message}`);
+            // }
 
             return success;
         } catch (error) {

@@ -1,8 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as http from 'node:http';
-import * as zlib from 'node:zlib';
-import * as tar from 'tar';
+import * as compressing from 'compressing';
 
 /**
  * 最小可用的npm仓库服务
@@ -171,7 +170,7 @@ class MinimalNpmRegistryServer {
             // 不是JSON，继续尝试tar提取
         }
 
-        // 尝试作为tar文件提取
+        // 创建临时目录
         const tempDir = path.join(this.storageDir, 'temp_extract_' + Date.now());
         if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
@@ -182,38 +181,22 @@ class MinimalNpmRegistryServer {
             const tempFilePath = path.join(tempDir, 'temp_data');
             fs.writeFileSync(tempFilePath, dataBuffer);
 
-            // 尝试提取package.json，先尝试作为gzipped tar
+            // 尝试使用compressing库解压
             let extracted = false;
 
             try {
-                // 使用同步方法解压
-                const gunzipped = zlib.gunzipSync(dataBuffer);
-                // 将解压后的数据写入临时文件
-                const tempTarPath = path.join(tempDir, 'temp.tar');
-                fs.writeFileSync(tempTarPath, gunzipped);
-                // 提取package.json
-                await new Promise<void>((resolve, reject) => {
-                    tar.extract({
-                        file: tempTarPath,
-                        cwd: tempDir,
-                        filter: (p: string) => p === 'package.json'
-                    }).then(() => resolve()).catch(reject);
-                });
+                // 首先尝试作为gzip压缩的tar文件
+                await compressing.tgz.uncompress(tempFilePath, tempDir);
                 extracted = true;
-            } catch (error: any) {
-                console.log('尝试使用gzip解压失败:', error.message);
-                // 如果不是gzipped，尝试直接作为tar提取
+            } catch (tgzError) {
+                console.log('尝试使用gzip解压失败:', (tgzError as Error).message, tgzError);
+                
                 try {
-                    await new Promise<void>((resolve, reject) => {
-                        tar.extract({
-                            file: tempFilePath,
-                            cwd: tempDir,
-                            filter: (p: string) => p === 'package.json'
-                        }).then(() => resolve()).catch(reject);
-                    });
+                    // 如果不是gzip压缩的，尝试作为未压缩的tar文件
+                    await compressing.tar.uncompress(tempFilePath, tempDir);
                     extracted = true;
-                } catch (tarError: any) {
-                    throw new Error(`提取失败: ${tarError.message}`);
+                } catch (tarError) {
+                    throw new Error(`提取失败: ${(tarError as Error).message}, ${tarError}`);
                 }
             }
 
@@ -260,13 +243,56 @@ class MinimalNpmRegistryServer {
         const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
         const originalFilename = filenameMatch ? filenameMatch[1] : `${packageName}.tgz`;
 
-        let body = Buffer.alloc(0);
+        // 获取内容长度
+        const contentLength = req.headers['content-length'];
+        if (!contentLength) {
+            console.warn('警告: 请求缺少content-length头');
+        }
+
+        // 创建临时文件来存储上传的数据
+        const tempDir = path.join(this.storageDir, 'temp_upload_' + Date.now());
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const tempFilePath = path.join(tempDir, originalFilename);
+        const writeStream = fs.createWriteStream(tempFilePath);
+        
+        // 用于跟踪接收的字节数
+        let receivedBytes = 0;
+
+        // 处理数据块
         req.on('data', (chunk) => {
-            body = Buffer.concat([body, chunk]);
+            // 写入临时文件而不是内存
+            writeStream.write(chunk);
+            receivedBytes += chunk.length;
         });
 
         req.on('end', async () => {
+            // 关闭写入流
+            writeStream.end();
+            
+            // 等待文件写入完成
+            await new Promise<void>((resolve) => {
+                writeStream.on('finish', () => resolve());
+            });
+
             try {
+                // 验证文件大小
+                if (contentLength && receivedBytes !== parseInt(contentLength)) {
+                    console.warn(`警告: 接收到的文件大小(${receivedBytes})与content-length(${contentLength})不匹配`);
+                }
+
+                console.log(`接收到文件: ${originalFilename}, 大小: ${receivedBytes} 字节`);
+
+                // 读取临时文件内容
+                let body: Buffer;
+                try {
+                    body = fs.readFileSync(tempFilePath);
+                } catch (readError) {
+                    throw new Error(`无法读取临时文件: ${(readError as Error).message}`);
+                }
+
                 let packageJson: any;
                 let version: string;
 
@@ -293,9 +319,15 @@ class MinimalNpmRegistryServer {
                     fs.mkdirSync(versionDir, { recursive: true });
                 }
 
-                // 保存上传的文件，保持原始文件名
-                const filePath = path.join(versionDir, originalFilename);
-                fs.writeFileSync(filePath, body);
+                // 移动临时文件到最终位置，而不是重新写入
+                const finalFilePath = path.join(versionDir, originalFilename);
+                try {
+                    fs.renameSync(tempFilePath, finalFilePath);
+                } catch (renameError) {
+                    // 如果重命名失败，尝试复制
+                    fs.copyFileSync(tempFilePath, finalFilePath);
+                    fs.unlinkSync(tempFilePath); // 删除临时文件
+                }
 
                 // 保存package.json
                 fs.writeFileSync(
@@ -316,6 +348,33 @@ class MinimalNpmRegistryServer {
                 console.error('发布包失败', error);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: '发布包失败' }));
+            } finally {
+                // 清理临时目录
+                try {
+                    if (fs.existsSync(tempDir)) {
+                        fs.rmSync(tempDir, { recursive: true, force: true });
+                    }
+                } catch (cleanupError) {
+                    console.error('清理临时目录失败:', cleanupError);
+                }
+            }
+        });
+
+        // 处理可能的错误
+        req.on('error', (error) => {
+            console.error('请求处理错误:', error);
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '请求处理失败' }));
+            }
+            
+            // 清理临时目录
+            try {
+                if (fs.existsSync(tempDir)) {
+                    fs.rmSync(tempDir, { recursive: true, force: true });
+                }
+            } catch (cleanupError) {
+                console.error('清理临时目录失败:', cleanupError);
             }
         });
     }
