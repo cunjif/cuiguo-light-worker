@@ -82,24 +82,33 @@ async function initClient(): Promise<ClientObj[]> {
 
     try {
       const clients = await Promise.all(
-        Object.entries(config.mcpServers).map(async ([name, serverConfig]) => {
-          console.log(`Initializing client for ${name} with config:`, serverConfig);
+        Object.entries(config.mcpServers)
+          .filter(([name, serverConfig]) => {
+            // Skip URL-based servers during initialization
+            if (serverConfig.url) {
+              console.log(`Skipping initialization for URL-based server ${name}`);
+              return false;
+            }
+            return true;
+          })
+          .map(async ([name, serverConfig]) => {
+            console.log(`Initializing client for ${name} with config:`, serverConfig);
 
-          const timeoutPromise = new Promise<Client>((resolve, reject) => {
-            setTimeout(() => {
-              reject(new Error(`Initialization of client for ${name} timed out after 30 seconds`));
-            }, 30000); // 30 seconds
-          });
+            const timeoutPromise = new Promise<Client>((resolve, reject) => {
+              setTimeout(() => {
+                reject(new Error(`Initialization of client for ${name} timed out after 30 seconds`));
+              }, 30000); // 30 seconds
+            });
 
-          const client = await Promise.race([
-            initializeClient(name, serverConfig),
-            timeoutPromise,
-          ]);
+            const client = await Promise.race([
+              initializeClient(name, serverConfig),
+              timeoutPromise,
+            ]);
 
-          console.log(`${name} initialized.`);
-          const capabilities = client.getServerCapabilities();
-          return { name, client, capabilities };
-        })
+            console.log(`${name} initialized.`);
+            const capabilities = client.getServerCapabilities();
+            return { name, client, capabilities };
+          })
       );
 
       console.log('All clients initialized.');
@@ -255,7 +264,9 @@ function registerIpcHandlers(
     }
   }
 
-  console.log(`[DEBUG] registerIpcHandlers for ${name}: capabilities=${JSON.stringify(capabilities)}, feature=${JSON.stringify(Object.keys(feature))}`);
+  // Safely handle capabilities - ensure it's always an object
+  const safeCapabilities = capabilities || {};
+  console.log(`[DEBUG] registerIpcHandlers for ${name}: capabilities=${JSON.stringify(safeCapabilities)}, feature=${JSON.stringify(Object.keys(feature))}`);
 
   return feature;
 }
@@ -289,6 +300,23 @@ app.whenReady().then(async () => {
     feature.type = 'local'; // Mark startup clients as local
     return feature;
   });
+
+  // Add URL-based servers from config to features array
+  const config = readConfig(configPath);
+  if (config && config.mcpServers) {
+    for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+      if (serverConfig.url && !features.find(f => f.name === name)) {
+        console.log(`Adding URL-based server ${name} to features array`);
+        features.push({
+          name: name,
+          type: 'http',
+          url: serverConfig.url,
+          config: serverConfig,
+          message: 'HTTP/SSE server - access via HTTP directly'
+        });
+      }
+    }
+  }
   
   console.log('Features initialized:', features.length, features);
 
