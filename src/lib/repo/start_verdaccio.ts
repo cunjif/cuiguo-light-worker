@@ -100,10 +100,6 @@ auth:
     file: ${path.join(configDir, 'htpasswd').replace(/\\/g, '/')}
     max_users: -1
 
-uplinks:
-  npmjs:
-    url: http://127.0.0.1:4873
-
 packages:
   '@*/*':
     access: $anonymous

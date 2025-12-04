@@ -19,7 +19,7 @@ const execAsync = promisify(exec);
  * @returns Promise<boolean> 解压是否成功
  */
 async function extractDependencies(
-    zipPath: string, 
+    zipPath: string,
     extractDir: string,
     progressCallback?: (percent: number, message: string) => void
 ): Promise<boolean> {
@@ -76,7 +76,7 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
  * @returns Promise<boolean> 发布是否成功
  */
 async function publishToRepo(
-    dir: string, 
+    dir: string,
     registryUrl: string = 'http://localhost:4873',
     progressCallback?: (percent: number, message: string) => void
 ): Promise<boolean> {
@@ -96,15 +96,20 @@ async function publishToRepo(
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const filePath = path.join(dir, file);
-            
+
             if (progressCallback) {
                 const progress = 60 + (i / files.length) * 25; // 60-85%
                 progressCallback(progress, `正在发布: ${file} (${i + 1}/${files.length})`);
             }
-            
+
             try {
                 const pkgJson = await readPackageJsonFromTgz(filePath);
                 await execAsync(`npm unpublish ${pkgJson.name}@${pkgJson.version} --registry ${registryUrl}`);
+            } catch (error) {
+                console.warn("unpublish 失败，跳过");
+            }
+            
+            try {
                 console.log(`[${i + 1}/${files.length}] 发布 ${file}...`);
                 await execAsync(`npm publish --tag legacy ${filePath} --registry ${registryUrl}`);
                 console.log(`✓ ${file} 发布成功`);
@@ -132,15 +137,15 @@ async function publishToRepo(
  * @returns Promise<boolean> 整个流程是否成功
  */
 async function processDependencies(
-    zipPath: string, 
-    tempDir?: string, 
+    zipPath: string,
+    tempDir?: string,
     registryUrl: string = 'http://localhost:4873',
     progressCallback?: (percent: number, message: string) => void
 ): Promise<boolean> {
     try {
         // 如果没有指定临时目录，使用默认目录
         const extractDir = tempDir || path.join(path.dirname(zipPath), 'temp_deps');
-        
+
         // 初始进度
         if (progressCallback) progressCallback(5, '准备解压文件...');
 
