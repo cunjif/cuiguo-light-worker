@@ -75,20 +75,7 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             console.warn('没有找到.tgz文件');
             return false;
         }
-
-        // 检查是否已登录到仓库
-        // let loggedIn = await isLoggedInToRegistry(registryUrl);
-        // if (!loggedIn) {
-        //     console.log('未登录到npm仓库，正在尝试自动登录...');
-        //     loggedIn = await loginToRegistry(registryUrl);
-        //     if (!loggedIn) {
-        //         console.error('自动登录失败，请手动登录到npm仓库');
-        //         // 即使自动登录失败，我们也继续尝试发布，因为本地verdaccio可能允许匿名发布
-        //     } else {
-        //         console.log('已成功登录到npm仓库');
-        //     }
-
-
+        
         // 逐个发布包
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -96,7 +83,7 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             
             try {
                 console.log(`[${i + 1}/${files.length}] 发布 ${file}...`);
-                await execAsync(`npm publish ${filePath}`);
+                await execAsync(`npm publish ${filePath} --registry ${registryUrl}`);
                 console.log(`✓ ${file} 发布成功`);
             } catch (error) {
                 console.error(`✗ 发布 ${file} 失败:`, error.message);

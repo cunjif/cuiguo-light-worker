@@ -44,7 +44,7 @@ class MinimalNpmRegistryServer {
                                 // 确保包信息符合PackageInfo接口要求
                                 const validPkgInfo: PackageInfo = {
                                     name: pkgInfo.name || pkg,
-                                    version: pkgInfo.version || '1.0.0',
+                                    version: pkgInfo.version,
                                     ...pkgInfo
                                 };
                                 this.packages.set(pkg, validPkgInfo);
@@ -151,6 +151,7 @@ class MinimalNpmRegistryServer {
      * 处理包发布请求(接收tgz文件并解压)
      */
     private handlePackagePublish(req: http.IncomingMessage, res: http.ServerResponse): void {
+        console.log("处理上传的包")
         const packageName = req.url?.substring(1) || '';
 
         if (!packageName) {

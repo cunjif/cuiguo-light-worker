@@ -49,11 +49,11 @@ export async function extractTgzWithVersion(tgzPath: string, baseOutputDir: stri
             fs.mkdirSync(versionDir, { recursive: true });
         }
 
-        // 将整个tgz解压到版本目录
+        // 将package.json解压到版本目录
         await new Promise<void>((resolve, reject) => {
             fs.createReadStream(tgzPath)
                 .pipe(zlib.createGunzip())
-                .pipe(tar.extract({ cwd: versionDir }))
+                .pipe(tar.extract({ cwd: versionDir, filter: (p) => p === 'package.json' }))
                 .on('finish', resolve)
                 .on('error', reject);
         });
