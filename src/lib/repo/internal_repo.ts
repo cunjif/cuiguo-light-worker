@@ -4,6 +4,7 @@ import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
 import { startMinimalRegistry, stopMinimalRegistry, isMinimalRegistryRunning } from './minimal_npm_registry.js';
 import { isZipFile } from './extract_zip.js';
+import { NpmAuthHelper } from './npm_auth_helper.js';
 import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -152,15 +153,59 @@ export class InternalNpmRegistry {
      */
     async configureNpm(): Promise<boolean> {
         try {
-            // 对于最小化npm仓库，我们简化认证逻辑
-            // 设置registry并使用一个假的token
-            const registryConfig = `${this.registryUrl}
-${this.registryUrl.replace('http://', '//')}:_authToken=fake`;
-            await execAsync(`npm config set registry=${registryConfig}`);
-            console.log(`npm registry已设置为: ${this.registryUrl}`);
-            return true;
+            // 使用NpmAuthHelper配置npm客户端，不需要认证
+            const authHelper = new NpmAuthHelper(this.registryUrl);
+            const result = await authHelper.configureNpmNoAuth();
+
+            if (result) {
+                console.log(`npm registry已设置为: ${this.registryUrl}`);
+                console.log('已禁用npm客户端认证要求');
+            }
+
+            return result;
         } catch (error) {
             console.error(`设置npm registry失败: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * 重置npm配置
+     * @returns Promise<boolean> 重置是否成功
+     */
+    async unconfigureNpm(): Promise<boolean> {
+        try {
+            const authHelper = new NpmAuthHelper(this.registryUrl);
+            const result = await authHelper.resetNpmConfig();
+            if (result) {
+                console.log('重置NPM客户端成功');
+            }
+
+            return result;
+        } catch (error) {
+            console.error(`重置npm客户端失败: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * 为项目创建.npmrc文件
+     * @param projectPath 项目路径
+     * @returns Promise<boolean> 创建是否成功
+     */
+    async createProjectNpmrc(projectPath: string): Promise<boolean> {
+        try {
+            // 使用NpmAuthHelper为项目创建.npmrc文件
+            const authHelper = new NpmAuthHelper(this.registryUrl);
+            const result = await authHelper.createProjectNpmrc(projectPath);
+
+            if (result) {
+                console.log(`已为项目 ${projectPath} 创建 .npmrc 文件`);
+            }
+
+            return result;
+        } catch (error) {
+            console.error(`创建项目 .npmrc 文件失败: ${error.message}`);
             return false;
         }
     }

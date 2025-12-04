@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractZip } from './extract_zip.js';
-import { loginToRegistry } from './internal_repo.js';
+import { loginToRegistry, npmRegistry } from './internal_repo.js';
 
 
 const execAsync = promisify(exec);
@@ -66,6 +66,7 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
  */
 async function publishToRepo(dir: string, registryUrl: string = 'http://localhost:4873'): Promise<boolean> {
     try {
+        await npmRegistry.configureNpm();
         // 读取所有 .tgz 文件
         const files = fs.readdirSync(dir).filter((f: string) => f.endsWith('.tgz'));
 
@@ -92,6 +93,7 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
         }
         
         console.log(`发布完成！仓库地址: ${registryUrl}`);
+        await npmRegistry.unconfigureNpm();
         return true;
     } catch (error) {
         console.error(`发布过程中发生错误: ${error.message}`);

@@ -536,6 +536,22 @@ app.whenReady().then(async () => {
     }
   });
 
+  // 为项目创建.npmrc文件
+  ipcMain.handle('registry-create-project-npmrc', async (_, projectPath: string) => {
+    try {
+      const result = await npmRegistry.createProjectNpmrc(projectPath);
+      return {
+        success: result,
+        message: result ? '项目.npmrc文件创建成功' : '项目.npmrc文件创建失败'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `项目.npmrc文件创建失败: ${error.message}`
+      };
+    }
+  });
+
   features = clients.map(({ name, client, capabilities }) => {
     console.log('Capabilities:', name, '\n', capabilities);
     return registerIpcHandlers(name, client, capabilities);
