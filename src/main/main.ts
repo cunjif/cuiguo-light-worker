@@ -1,7 +1,7 @@
 // main.ts
 import { app, BrowserWindow, ipcMain, Menu, MenuItem } from 'electron';
 import {
-  Client, McpServersConfig,
+  Client, McpServersConfig, HttpClient,
   ListToolsResultSchema, CallToolResultSchema,
   ListPromptsResultSchema, GetPromptResultSchema,
   ListResourcesResultSchema, ReadResourceResultSchema, ListResourceTemplatesResultSchema
@@ -43,7 +43,7 @@ const indexPath = path.resolve(__dirname, '..', 'renderer', 'index.html');
 
 interface ClientObj {
   name: string;
-  client: Client;
+  client: Client | HttpClient;
   capabilities: Record<string, any> | undefined;
 }
 
@@ -83,18 +83,10 @@ async function initClient(): Promise<ClientObj[]> {
     try {
       const clients = await Promise.all(
         Object.entries(config.mcpServers)
-          .filter(([name, serverConfig]) => {
-            // Skip URL-based servers during initialization
-            if (serverConfig.url) {
-              console.log(`Skipping initialization for URL-based server ${name}`);
-              return false;
-            }
-            return true;
-          })
           .map(async ([name, serverConfig]) => {
             console.log(`Initializing client for ${name} with config:`, serverConfig);
 
-            const timeoutPromise = new Promise<Client>((resolve, reject) => {
+            const timeoutPromise = new Promise<Client | HttpClient>((resolve, reject) => {
               setTimeout(() => {
                 reject(new Error(`Initialization of client for ${name} timed out after 30 seconds`));
               }, 30000); // 30 seconds
@@ -112,10 +104,15 @@ async function initClient(): Promise<ClientObj[]> {
       );
 
       console.log('All clients initialized.');
+
+      // Count different types of servers
+      const localServers = clients.filter(c => c.client instanceof Client).length;
+      const httpServers = clients.filter(c => c.client instanceof HttpClient).length;
+
       notifier.notify({
         appID: 'CUIGUO',
         title: "MCP Servers are ready",
-        message: "All Clients initialized."
+        message: `${localServers} local, ${httpServers} HTTP servers initialized.`
       });
 
       return clients;
@@ -124,10 +121,11 @@ async function initClient(): Promise<ClientObj[]> {
       notifier.notify({
         appID: 'CUIGUO',
         title: 'Client initialization failed',
-        message: "Cannot start with current config, " +  error?.message,
+        message: "Cannot start with current config, " + error?.message,
       });
 
-      process.exit(1);
+      // Instead of process.exit(1), throw the error to be handled by caller
+      throw new Error(`Client initialization failed: ${error?.message}`);
     }
   } else {
     console.log('NO clients configured.');
@@ -224,7 +222,7 @@ let features: any[] = [];
 // Register IPC handlers for a MCP server
 function registerIpcHandlers(
   name: string,
-  client: Client,
+  client: Client | HttpClient,
   capabilities: Record<string, any> | undefined) {
 
   const feature: { [key: string]: any } = { name };
@@ -272,7 +270,7 @@ function registerIpcHandlers(
 }
 
 app.whenReady().then(async () => {
-  
+
   // 启动内部npm仓库
   console.log('正在启动内部npm仓库...');
   const registryInitialized = await npmRegistry.initialize(4873);
@@ -291,33 +289,31 @@ app.whenReady().then(async () => {
       message: '私有 npm 仓库无法启动'
     });
   }
-  
-  const clients = await initClient();
-  
+
+  let clients: ClientObj[] = [];
+  try {
+    clients = await initClient();
+  } catch (error) {
+    console.error('Failed to initialize clients:', error?.message);
+    // Continue with empty clients array instead of crashing
+    clients = [];
+  }
+
   // Register IPC handlers for all initialized clients and populate features array
   features = clients.map(clientObj => {
     const feature = registerIpcHandlers(clientObj.name, clientObj.client, clientObj.capabilities);
-    feature.type = 'local'; // Mark startup clients as local
+
+    // Determine the type based on the client instance
+    if (clientObj.client instanceof HttpClient) {
+      feature.type = 'http';
+      feature.url = (clientObj.client as HttpClient).getUrl(); // Add URL for HTTP clients
+    } else {
+      feature.type = 'local'; // Mark startup clients as local
+    }
+
     return feature;
   });
 
-  // Add URL-based servers from config to features array
-  const config = readConfig(configPath);
-  if (config && config.mcpServers) {
-    for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-      if (serverConfig.url && !features.find(f => f.name === name)) {
-        console.log(`Adding URL-based server ${name} to features array`);
-        features.push({
-          name: name,
-          type: 'http',
-          url: serverConfig.url,
-          config: serverConfig,
-          message: 'HTTP/SSE server - access via HTTP directly'
-        });
-      }
-    }
-  }
-  
   console.log('Features initialized:', features.length, features);
 
   createWindow();
@@ -342,40 +338,9 @@ app.whenReady().then(async () => {
         return { success: false, message: 'Server already exists' };
       }
 
-      // For HTTP/SSE servers, we don't need to initialize them in the main process
-      // They will be accessed directly from the renderer via HTTP
-      if (serverConfig.type === 'http') {
-        console.log(`HTTP/SSE server ${serverName} detected. Skipping main process initialization.`);
-        console.log(`Server will be accessible via: ${serverConfig.url}`);
-        
-        // Create a feature entry for HTTP servers with full config
-        const httpFeature = {
-          name: serverName,
-          type: 'http',
-          url: serverConfig.url,
-          config: serverConfig,
-          message: 'HTTP/SSE server - access via HTTP directly'
-        };
-        
-        features.push(httpFeature);
-        
-        // Save the server config (without the type field)
-        const config = readConfig(configPath);
-        if (config) {
-          config.mcpServers[serverName] = cleanServerConfig(serverConfig);
-          saveConfig(configPath, config);
-        }
-
-        return {
-          success: true,
-          message: `HTTP/SSE server ${serverName} registered successfully`,
-          feature: httpFeature
-        };
-      }
-
-      // For local command servers, initialize normally
-      if (serverConfig.type === 'local') {
-        const timeoutPromise = new Promise<Client>((resolve, reject) => {
+      // Initialize both local and HTTP servers using the unified initializeClient function
+      try {
+        const timeoutPromise = new Promise<Client | HttpClient>((resolve, reject) => {
           setTimeout(() => {
             reject(new Error(`Initialization of client for ${serverName} timed out after 30 seconds`));
           }, 30000);
@@ -389,17 +354,23 @@ app.whenReady().then(async () => {
         console.log(`${serverName} initialized dynamically.`);
         const capabilities = client.getServerCapabilities();
         console.log(`[DEBUG] Capabilities for ${serverName}:`, capabilities);
-        
+
         // Register IPC handlers for the new server
         const newServerFeature = registerIpcHandlers(serverName, client, capabilities);
         console.log(`[DEBUG] Feature object for ${serverName}:`, newServerFeature);
-        
-        // Add config information to feature
-        newServerFeature.type = 'local';
+
+        // Add config information to feature based on client type
+        if (client instanceof HttpClient) {
+          newServerFeature.type = 'http';
+          newServerFeature.url = (client as HttpClient).getUrl();
+        } else {
+          newServerFeature.type = 'local';
+          newServerFeature.command = serverConfig.command;
+          newServerFeature.args = serverConfig.args;
+        }
+
         newServerFeature.config = serverConfig;
-        newServerFeature.command = serverConfig.command;
-        newServerFeature.args = serverConfig.args;
-        
+
         features.push(newServerFeature);
         console.log(`[DEBUG] Features array now contains:`, features.map(f => ({ name: f.name, type: f.type, has_tools: !!f.tools })));
 
@@ -417,10 +388,16 @@ app.whenReady().then(async () => {
           }
         }
 
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: `Server ${serverName} initialized successfully`,
           feature: newServerFeature
+        };
+      } catch (error) {
+        console.error(`Error initializing server ${serverName}:`, error?.message);
+        return {
+          success: false,
+          message: `Failed to initialize server: ${error?.message}`
         };
       }
 
@@ -430,9 +407,9 @@ app.whenReady().then(async () => {
       };
     } catch (error) {
       console.error(`Error initializing MCP server ${serverName}:`, error?.message);
-      return { 
-        success: false, 
-        message: `Failed to initialize server: ${error?.message}` 
+      return {
+        success: false,
+        message: `Failed to initialize server: ${error?.message}`
       };
     }
   });
@@ -463,15 +440,15 @@ app.whenReady().then(async () => {
         }
       }
 
-      return { 
-        success: true, 
-        message: `Server ${serverName} deleted successfully` 
+      return {
+        success: true,
+        message: `Server ${serverName} deleted successfully`
       };
     } catch (error) {
       console.error(`Error deleting MCP server ${serverName}:`, error?.message);
-      return { 
-        success: false, 
-        message: `Failed to delete server: ${error?.message}` 
+      return {
+        success: false,
+        message: `Failed to delete server: ${error?.message}`
       };
     }
   });
@@ -506,7 +483,7 @@ app.whenReady().then(async () => {
         // 发送进度更新到渲染进程
         event.sender.send('registry-process-progress', { percent, message });
       };
-      
+
       // 如果传入的是字符串，则认为是文件路径
       if (typeof fileData === 'string') {
         const result = await npmRegistry.processDependenciesZip(fileData, progressCallback);
@@ -515,33 +492,33 @@ app.whenReady().then(async () => {
           message: result ? '依赖包处理成功' : '依赖包处理失败'
         };
       }
-      
+
       // 如果传入的是对象，则包含文件名和数据
       if (typeof fileData === 'object' && fileData.name && fileData.data) {
         // 创建临时文件
         const tempDir = os.tmpdir();
         const tempFilePath = path.join(tempDir, fileData.name);
-        
+
         // 将数据写入临时文件
         const buffer = Buffer.from(fileData.data);
         writeFileSync(tempFilePath, buffer);
-        
+
         // 处理依赖包
         const result = await npmRegistry.processDependenciesZip(tempFilePath, progressCallback);
-        
+
         // 清理临时文件
         try {
           fs.unlinkSync(tempFilePath);
         } catch (err) {
           console.warn('清理临时文件失败:', err.message);
         }
-        
+
         return {
           success: result,
           message: result ? '依赖包处理成功' : '依赖包处理失败'
         };
       }
-      
+
       return {
         success: false,
         message: '无效的文件数据'
@@ -600,7 +577,7 @@ app.on('window-all-closed', async () => {
   console.log('正在停止内部npm仓库...');
   await npmRegistry.shutdown();
   console.log('✓ 内部npm仓库已停止');
-  
+
   if (process.platform !== 'darwin') app.quit();
 });
 

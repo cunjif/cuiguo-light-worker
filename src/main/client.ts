@@ -1,58 +1,163 @@
 // client.ts
 import { Client, StdioClientTransport, CreateMessageRequestSchema, ServerConfig } from './types.js';
 
-export async function initializeClient(name: String, config: ServerConfig) {
-    // Check if this is a URL-based server (HTTP/SSE)
-    if (config.url) {
-        console.log(`Skipping initialization for URL-based server ${name} - will be accessed directly via HTTP`);
-        // Return a mock client for URL-based servers
-        return {
-            getServerCapabilities: () => ({}),
-            request: async (requestObject: any, schema: any) => {
-                throw new Error(`URL-based server ${name} should be accessed directly via HTTP, not through this client`);
-            },
-            setRequestHandler: () => {}
-        } as any;
-    }
+/**
+ * HTTP/SSE Client for URL-based MCP servers
+ */
+export class HttpClient {
+  private url: string;
+  private name: string;
+  private capabilities: Record<string, any>;
 
-    // For command-based servers, create the transport
-    if (!config.command) {
-        throw new Error(`Server ${name} must have either 'url' or 'command' property`);
-    }
+  constructor(name: string, url: string) {
+    this.name = name;
+    this.url = url;
+    this.capabilities = {
+      tools: {},
+      prompts: {},
+      resources: {}
+    };
+  }
 
-    const transport = new StdioClientTransport({
-        ...config,
-    });
-    const client_name = `${name}-client`;
-    const client = new Client({
-        name: client_name,
-        version: "1.0.0",
-    }, {
-        capabilities: {
-            "sampling": {}
+  getServerCapabilities() {
+    return this.capabilities;
+  }
+
+  async request(requestObject: any, schema: any) {
+    const endpoint = `${this.url}/${requestObject.method}`;
+    console.log(`HTTP Client requesting: ${endpoint}`, requestObject.params);
+    
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestObject.params || {})
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`HTTP Client response from ${endpoint}:`, result);
+      return result;
+    } catch (error) {
+      console.error(`HTTP Client error for ${endpoint}:`, error);
+      throw error;
+    }
+  }
+
+  setRequestHandler(schema: any, handler: any) {
+    // HTTP clients don't handle sampling requests in the same way
+    console.log(`HTTP client ${this.name} setRequestHandler called (not implemented for HTTP clients)`);
+  }
+
+  async connect() {
+    console.log(`HTTP Client ${this.name} connected to ${this.url}`);
+    // Test connection by making a simple health check request
+    try {
+      // Try a simple GET request first to test basic connectivity
+      const response = await fetch(this.url);
+      // Accept any response (even 400) as long as the server is reachable
+      console.log(`HTTP Client ${this.name} connection test: server responded with status ${response.status}`);
+      
+      // For MCP servers, a 400 response might be normal for a simple GET
+      // since they expect POST requests with JSON-RPC payloads
+      if (response.status >= 500) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      console.log(`HTTP Client ${this.name} connection test successful`);
+    } catch (error) {
+      if (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
+        console.error(`HTTP Client ${this.name} connection test failed: Server not reachable at ${this.url}`);
+        throw new Error(`Cannot connect to HTTP server at ${this.url}: Server not reachable`);
+      }
+      console.error(`HTTP Client ${this.name} connection test failed:`, error);
+      throw error;
+    }
+  }
+
+  disconnect() {
+    console.log(`HTTP Client ${this.name} disconnected`);
+  }
+
+  getUrl(): string {
+    return this.url;
+  }
+}
+
+export async function initializeClient(name: string, config: ServerConfig): Promise<Client | HttpClient> {
+    console.log(`Initializing client for ${name} with config:`, config);
+    
+    // Determine server type based on configuration
+    const serverType = config.type || (config.url ? 'http' : 'local');
+    
+    if (serverType === 'http' || serverType === 'sse' || config.url) {
+        console.log(`Creating HTTP/SSE client for ${name} at ${config.url}`);
+        
+        if (!config.url) {
+            throw new Error(`HTTP/SSE server ${name} must have a 'url' property`);
         }
-    });
-    await client.connect(transport);
-    console.log(`${client_name} connected.`);
+        
+        const httpClient = new HttpClient(name, config.url);
+        await httpClient.connect();
+        
+        console.log(`HTTP/SSE client ${name} initialized successfully`);
+        return httpClient;
+    }
+    
+    // For local command-based servers
+    if (serverType === 'local' || config.command) {
+        console.log(`Creating local MCP client for ${name} with command: ${config.command}`);
+        
+        if (!config.command) {
+            throw new Error(`Local MCP server ${name} must have a 'command' property`);
+        }
 
-    client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
-        console.log('Sampling request received:\n', request)
-        return {
-            model: "test-sampling-model",
-            stopReason: "endTurn",
-            role: "assistant",
-            content: {
-                type: "text",
-                text: "This is a test message from the client used for sampling the LLM. If you receive this message, please stop further attempts, as the sampling test has been successful.",
+        const transport = new StdioClientTransport({
+            command: config.command,
+            args: config.args || [],
+            env: config.env || process.env,
+        });
+        
+        const client_name = `${name}-client`;
+        const client = new Client({
+            name: client_name,
+            version: "1.0.0",
+        }, {
+            capabilities: {
+                "sampling": {}
             }
-        };
-    });
+        });
+        
+        await client.connect(transport);
+        console.log(`${client_name} connected.`);
 
-    return client;
+        client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
+            console.log('Sampling request received:\n', request)
+            return {
+                model: "test-sampling-model",
+                stopReason: "endTurn",
+                role: "assistant",
+                content: {
+                    type: "text",
+                    text: "This is a test message from the client used for sampling the LLM. If you receive this message, please stop further attempts, as the sampling test has been successful.",
+                }
+            };
+        });
+
+        console.log(`Local MCP client ${name} initialized successfully`);
+        return client;
+    }
+    
+    throw new Error(`Server ${name} must have either 'url' or 'command' property, or specify 'type' as 'local' or 'http'`);
 }
 
 export async function manageRequests(
-    client: Client,
+    client: Client | HttpClient,
     method: string,
     schema: any,
     params?: any
