@@ -1,36 +1,3 @@
-<!--
-
-  @Component: Chatbot UI
-
-  @Github: https://github.com/AI-QL
-
-  @License: This project uses the following tools, each subject to its respective license restrictions.
-  Please refer to the license of each tool for detailed information:
-
-  - Vue3: https://github.com/vuejs
-  - Vuetify: https://github.com/vuetifyjs/vuetify
-  - Pinia: https://github.com/vuejs/pinia
-  - md-editor-v3: https://github.com/imzbf/md-editor-v3
-  - lottie-web: https://github.com/airbnb/lottie-web
-  - vuedraggable: https://github.com/SortableJS/vue.draggable.next
-  - mammoth: https://github.com/mwilliamson/mammoth.js
-
-   Copyright 2024 AIQL.COM
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
--->
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -38,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="AIQL provides a suite of tools designed to streamline the development and deployment of AI applications in a cloud-native environment.">
+        content="CUIGUO supplies a common offical workstation by mcp servers.">
     <title>Chatbot</title>
     <style>
         ::-webkit-scrollbar {
@@ -996,26 +963,20 @@
                 </v-card>
             </v-dialog>
 
-            <div v-if="settingStore.toolboxShow !== true" class="toolbox-button"
+            <!-- <div v-if="settingStore.toolboxShow !== true" class="toolbox-button"
                 @click="settingStore.toolboxShow = true">
                 <v-icon class="rotation text-white">mdi-tools</v-icon>
             </div>
             <v-card v-else elevation="10" class="d-flex flex-column toolbox">
-                <!-- ---------------------------------------------- -->
-                <!-- Reset -->
-                <!-- ---------------------------------------------- -->
                 <v-btn @click="resetALL()" variant="text" size="45">
                     <v-icon size="25" color="error">mdi-store-remove</v-icon>
                     <v-tooltip activator="parent" location="left" text="Reset All Config"></v-tooltip>
                 </v-btn>
-                <!-- ---------------------------------------------- -->
-                <!-- Close Btn -->
-                <!-- ---------------------------------------------- -->
                 <v-btn @click="settingStore.toolboxShow = false" variant="text" size="45" color="error">
                     <v-icon size="25">mdi-close</v-icon>
                     <v-tooltip activator="parent" location="left" text="Close Toolbox"></v-tooltip>
                 </v-btn>
-            </v-card>
+            </v-card> -->
         </v-app>
     </div>
 
@@ -1474,45 +1435,44 @@
                     }
 
                     const serverConfig = mcpServers[serverName];
-                    
+                    console.log(mcpServers);
+                    console.log(serverName);
                     try {
-                        if (serverConfig.type === 'http') {
-                            // Test HTTP/SSE server
-                            const url = serverConfig.url;
-                            if (!url) {
-                                return { available: false, message: 'No URL configured' };
+                        // 首先尝试测试本地MCP服务
+                        const toolsListFunction = serverConfig.tools?.list;
+                        if (typeof toolsListFunction === 'function') {
+                            try {
+                                const tools = await toolsListFunction();
+                                if (tools && Array.isArray(tools.tools)) {
+                                    return { available: true, message: `Local server available with ${tools.tools.length} tools` };
+                                }
+                            } catch (err) {
+                                console.log(`Local server test failed: ${err.message}`);
                             }
-
+                        }
+                        
+                        // 如果本地服务测试不通过，尝试测试HTTP服务
+                        const url = serverConfig.url;
+                        console.log(serverConfig)
+                        if (url) {
                             try {
                                 const response = await fetch(url, { 
                                     method: 'HEAD',
                                     timeout: 5000
                                 });
+                                console.log(response);
                                 if (response.ok || response.status === 404) {
-                                    return { available: true, message: 'Server is reachable' };
+                                    return { available: true, message: 'HTTP server is reachable' };
                                 } else {
-                                    return { available: false, message: `Server returned status ${response.status}` };
+                                    return { available: false, message: `HTTP server returned status ${response.status}` };
                                 }
                             } catch (err) {
-                                return { available: false, message: `Connection failed: ${err.message}` };
+                                console.log(`HTTP server test failed: ${err.message}`);
                             }
-                        } else if (serverConfig.type === 'local') {
-                            // For local servers, check if tools can be listed (indicates server is working)
-                            const toolsListFunction = serverConfig.tools?.list;
-                            if (typeof toolsListFunction === 'function') {
-                                try {
-                                    const tools = await toolsListFunction();
-                                    if (tools && Array.isArray(tools.tools)) {
-                                        return { available: true, message: `Server available with ${tools.tools.length} tools` };
-                                    }
-                                } catch (err) {
-                                    return { available: false, message: `Failed to list tools: ${err.message}` };
-                                }
-                            }
-                            return { available: false, message: 'Server not initialized' };
                         }
-
-                        return { available: false, message: 'Unknown server type' };
+                        
+                        // 两种测试都失败
+                        return { available: false, message: 'Server is not available (both local and HTTP tests failed)' };
                     } catch (error) {
                         console.error(`Error testing server ${serverName}:`, error);
                         return { available: false, message: `Error: ${error.message}` };
@@ -2545,23 +2505,15 @@
 
                 const useDefaultChoiceStore = defineStore("defaultChoiceStore", {
                     state: () => ({
-                        url: [
-                            "https://api.openai.com",
-                            "http://127.0.0.1",
-                            "https://api.deepinfra.com",
-                            "https://api.deepseek.com",
-                            "https://api.aiql.com"],
+                        url: [],
                         path: [
                             "/chat/completions",
-                            "/v1/chat/completions",
-                            "/v1/openai/chat/completions",
-                            "/openai/v1/chat/completions"],
+                            "/v1/chat/completions",],
                         model: [
                             "Qwen/Qwen3-32B",
                             "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo",
-                            "openai/gpt-oss-120b"
                         ],
-                        authPrefix: ["Bearer", "Base", "Token"],
+                        authPrefix: [],
                         max_tokens_type: ["max_tokens", "max_completion_tokens", "max_new_tokens"],
                         reasoning_efforts: ['false', 'none', 'low', 'medium', 'high']
                     }),
@@ -3075,7 +3027,7 @@
                 $vuetify: {
                     ...en,
                     dataIterator: {
-                        title: 'AI Query Layout',
+                        title: 'CUIGUO Workstattion',
                         q: { title: 'Query History' },
                         p: {
                             title: 'Prompts Template',
@@ -3120,106 +3072,11 @@
                     },
                 },
             },
-            it: {
-                $vuetify: {
-                    ...it,
-                    dataIterator: {
-                        title: 'Layout della Query AI',
-                        q: { title: 'Cronologia delle Query' },
-                        l: { title: 'Lingua' },
-                        a: { title: 'Prompts & MCP' },
-                        r: { title: 'Risorse' },
-                        i: {
-                            title: 'Integrazione Modelli',
-                            apikey: 'Chiave API',
-                            endpoint: 'Endpoint',
-                            url: 'URL',
-                            path: 'Path',
-                            model: 'Modello',
-                            advanced: 'Configurazione Avanzata',
-                            method: 'HTTP Metodo',
-                            stream: 'Stream',
-                            maxTokensPrefix: 'Max Tokens Prefix',
-                            temperature: 'Temperature',
-                            topP: 'Top P',
-                            contentType: 'Tipo di Contenuto',
-                            authPrefix: 'Auth Prefix',
-                            configFile: 'File di Configurazione'
-                        },
-                        snackbar: {
-                            addnew: 'Aggiunta nuova sessione.',
-                            addfail: 'Già in una nuova sessione.',
-                            stopped: 'Generazione interrotta.',
-                            parseStreamFail: 'Impossibile leggere il flusso.',
-                            parseConfigFail: 'Impossibile analizzare il file di configurazione.',
-                            copied: 'Copiato negli appunti.'
-                        }
-                    },
-                },
-            },
-            ja: {
-                $vuetify: {
-                    ...ja,
-                    dataIterator: {
-                        title: 'AI お問い合わせ',
-                        q: { title: '歴史' },
-                        l: { title: '言語設定' },
-                        a: { title: 'プロンプト&MCP' },
-                        r: { title: '資源' },
-                        i: {
-                            title: 'モデル統合',
-                            apikey: 'API キー',
-                            endpoint: '端点',
-                            contentType: 'コンテンツタイプ',
-                            authPrefix: 'リクエストヘッダー',
-                            configFile: 'プロファイル'
-                        },
-                        snackbar: {
-                            addnew: '新しいセッションが追加されました',
-                            addfail: 'すでに最新のセッションに参加しています',
-                            stopped: 'ビルドを停止します',
-                            parseStreamFail: 'データフローを解決できませんでした',
-                            parseConfigFail: '設定ファイルを解決できません',
-                            copied: 'クリップボードにコピーされました'
-                        }
-                    },
-                },
-            },
-            sv: {
-                $vuetify: {
-                    ...sv,
-                    dataIterator: {
-                        title: 'Layout för AI-frågor',
-                        q: { title: 'Frågehistorik' },
-                        l: { title: 'Språkinställning' },
-                        a: { title: 'Prompts & MCP' },
-                        r: { title: 'Resurser' },
-                        i: {
-                            title: 'Modellintegration',
-                            apikey: 'API Nyckel',
-                            endpoint: 'Slutpunkt',
-                            url: 'URL',
-                            path: 'Sökväg',
-                            model: 'Modell',
-                            stream: 'Strömma',
-                            configFile: 'Konfigurationsfil'
-                        },
-                        snackbar: {
-                            addnew: 'En ny session har lagts till.',
-                            addfail: 'Redan i en ny session.',
-                            stopped: 'Genereringen har stoppats.',
-                            parseStreamFail: 'Det går inte att läsa strömmen.',
-                            parseConfigFail: 'Det går inte att parsa konfigurationsfilen.',
-                            copied: 'Kopierad till urklipp.'
-                        }
-                    },
-                },
-            },
             zhHans: {
                 $vuetify: {
                     ...zhHans,
                     dataIterator: {
-                        title: 'AI 问询界面',
+                        title: '脆果办公桌',
                         q: { title: '历史记录' },
                         l: { title: '语言设置' },
                         p: {

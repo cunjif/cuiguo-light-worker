@@ -104,7 +104,7 @@ async function initClient(): Promise<ClientObj[]> {
 
       console.log('All clients initialized.');
       notifier.notify({
-        appID: 'AIQL',
+        appID: 'CUIGUO',
         title: "MCP Servers are ready",
         message: "All Clients initialized."
       });
@@ -113,7 +113,7 @@ async function initClient(): Promise<ClientObj[]> {
     } catch (error) {
       console.error('Error during client initialization:', error?.message);
       notifier.notify({
-        appID: 'AIQL',
+        appID: 'CUIGUO',
         title: 'Client initialization failed',
         message: "Cannot start with current config, " +  error?.message,
       });
@@ -123,7 +123,7 @@ async function initClient(): Promise<ClientObj[]> {
   } else {
     console.log('NO clients configured.');
     notifier.notify({
-      appID: 'AIQL',
+      appID: 'CUIGUO',
       title: 'NO clients configured',
       message: "NO MCP servers in config.json. You can add them dynamically through the UI.",
     });
@@ -150,7 +150,7 @@ async function createWindow() {
       label: '应用',
       submenu: [
         {
-          label: '内部npm仓库管理器',
+          label: '插件管理',
           click: () => {
             createRegistryWindow();
           }
@@ -195,7 +195,7 @@ async function createRegistryWindow() {
   const registryWindow = new BrowserWindow({
     width: 900,
     height: 700,
-    title: '内部npm仓库管理器',
+    title: '插件管理',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -268,8 +268,8 @@ app.whenReady().then(async () => {
   if (registryInitialized) {
     console.log('✓ 内部npm仓库启动成功');
     notifier.notify({
-      appID: 'AIQL',
-      title: '内部npm仓库已启动',
+      appID: 'CUIGUO',
+      title: '插件管理已启动',
       message: '私有 npm 仓库运行在 http://localhost:4873'
     });
   } else {
