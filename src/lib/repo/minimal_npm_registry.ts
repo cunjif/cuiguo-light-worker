@@ -1,9 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as http from 'node:http';
-import * as querystring from 'node:querystring';
-import { Readable } from 'node:stream';
-import { createGunzip } from 'node:zlib';
+import * as zlib from 'node:zlib';
+import * as tar from 'tar';
 
 /**
  * 最小可用的npm仓库服务
@@ -12,7 +11,7 @@ class MinimalNpmRegistryServer {
     private server: http.Server | null = null;
     private port: number;
     private storageDir: string;
-    private packages: Map<string, PackageInfo> = new Map();
+    private packages: Map<string, Map<string, PackageInfo>> = new Map();
 
     constructor(port: number = 4873, storageDir?: string) {
         this.port = port;
@@ -33,24 +32,34 @@ class MinimalNpmRegistryServer {
     private loadPackages(): void {
         try {
             if (fs.existsSync(this.storageDir)) {
-                const packages = fs.readdirSync(this.storageDir);
-                for (const pkg of packages) {
+                const packageDirs = fs.readdirSync(this.storageDir);
+                for (const pkg of packageDirs) {
                     const pkgDir = path.join(this.storageDir, pkg);
                     if (fs.statSync(pkgDir).isDirectory()) {
-                        const packageJsonPath = path.join(pkgDir, 'package.json');
-                        if (fs.existsSync(packageJsonPath)) {
-                            try {
-                                const pkgInfo = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-                                // 确保包信息符合PackageInfo接口要求
-                                const validPkgInfo: PackageInfo = {
-                                    name: pkgInfo.name || pkg,
-                                    version: pkgInfo.version,
-                                    ...pkgInfo
-                                };
-                                this.packages.set(pkg, validPkgInfo);
-                            } catch (error) {
-                                console.error(`加载包信息失败${pkg}:`, error);
+                        const versionDirs = fs.readdirSync(pkgDir);
+                        const versionMap = new Map<string, PackageInfo>();
+                        for (const version of versionDirs) {
+                            const versionDir = path.join(pkgDir, version);
+                            if (fs.statSync(versionDir).isDirectory()) {
+                                const packageJsonPath = path.join(versionDir, 'package.json');
+                                if (fs.existsSync(packageJsonPath)) {
+                                    try {
+                                        const pkgInfo = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                                        // 确保包信息符合PackageInfo接口要求
+                                        const validPkgInfo: PackageInfo = {
+                                            name: pkgInfo.name || pkg,
+                                            version: pkgInfo.version || version,
+                                            ...pkgInfo
+                                        };
+                                        versionMap.set(version, validPkgInfo);
+                                    } catch (error) {
+                                        console.error(`加载包信息失败${pkg}@${version}:`, error);
+                                    }
+                                }
                             }
+                        }
+                        if (versionMap.size > 0) {
+                            this.packages.set(pkg, versionMap);
                         }
                     }
                 }
@@ -148,9 +157,83 @@ class MinimalNpmRegistryServer {
     }
 
     /**
+     * 提取tgz文件中的package.json并返回版本
+     */
+    private async extractPackageJson(tgzBuffer: Buffer): Promise<{ packageJson: any, version: string }> {
+        const tempDir = path.join(this.storageDir, 'temp_extract_' + Date.now());
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        try {
+            // 保存tgz到临时文件
+            const tempTgzPath = path.join(tempDir, 'temp.tgz');
+            fs.writeFileSync(tempTgzPath, tgzBuffer);
+
+            // 尝试提取package.json，先尝试作为gzipped tar
+            let extracted = false;
+            
+            try {
+                // 使用同步方法解压
+                const gunzipped = zlib.gunzipSync(tgzBuffer);
+                // 将解压后的数据写入临时文件
+                const tempTarPath = path.join(tempDir, 'temp.tar');
+                fs.writeFileSync(tempTarPath, gunzipped);
+                // 提取package.json
+                await new Promise<void>((resolve, reject) => {
+                    tar.extract({
+                        file: tempTarPath,
+                        cwd: tempDir,
+                        filter: (p: string) => p === 'package.json'
+                    }).then(() => resolve()).catch(reject);
+                });
+                extracted = true;
+            } catch (error: any) {
+                console.log('尝试使用gzip解压失败:', error.message);
+                // 如果不是gzipped，尝试直接作为tar提取
+                try {
+                    await new Promise<void>((resolve, reject) => {
+                        tar.extract({
+                            file: tempTgzPath,
+                            cwd: tempDir,
+                            filter: (p: string) => p === 'package.json'
+                        }).then(() => resolve()).catch(reject);
+                    });
+                    extracted = true;
+                } catch (tarError: any) {
+                    throw new Error(`提取失败: ${tarError.message}`);
+                }
+            }
+
+            if (!extracted) {
+                throw new Error('无法提取package.json');
+            }
+
+            // 读取package.json
+            const packageJsonPath = path.join(tempDir, 'package.json');
+            if (!fs.existsSync(packageJsonPath)) {
+                throw new Error('文件中未找到package.json');
+            }
+
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+            const version = packageJson.version;
+            if (!version) {
+                throw new Error('package.json中未找到version字段');
+            }
+
+            return { packageJson, version };
+        } finally {
+            // 清理临时目录
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        }
+    }
+
+    /**
      * 处理包发布请求(接收tgz文件并解压)
      */
-    private handlePackagePublish(req: http.IncomingMessage, res: http.ServerResponse): void {
+    private async handlePackagePublish(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
         console.log("处理上传的包")
         const packageName = req.url?.substring(1) || '';
 
@@ -160,54 +243,43 @@ class MinimalNpmRegistryServer {
             return;
         }
 
+        // 获取原始文件名
+        const contentDisposition = req.headers['content-disposition'] || '';
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+        const originalFilename = filenameMatch ? filenameMatch[1] : `${packageName}.tgz`;
+
         let body = Buffer.alloc(0);
         req.on('data', (chunk) => {
             body = Buffer.concat([body, chunk]);
         });
 
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
-                const packageDir = path.join(this.storageDir, packageName);
-                if (!fs.existsSync(packageDir)) {
-                    fs.mkdirSync(packageDir, { recursive: true });
+                // 提取package.json和版本
+                const { packageJson, version } = await this.extractPackageJson(body);
+
+                // 创建版本目录
+                const versionDir = path.join(this.storageDir, packageName, version);
+                if (!fs.existsSync(versionDir)) {
+                    fs.mkdirSync(versionDir, { recursive: true });
                 }
 
-                const tgzFileName = `${packageName}.tgz`;
-                const tgzFilePath = path.join(packageDir, tgzFileName);
+                // 保存tgz文件，保持原始文件名
+                const tgzFilePath = path.join(versionDir, originalFilename);
                 fs.writeFileSync(tgzFilePath, body);
 
-                let version = '1.0.0';
-                const extractedTgzFileName = path.basename(tgzFilePath);
-                const versionMatch = extractedTgzFileName.match(/^(?:@[^/]+\/)?[^@]+@([\d.]+[\w\.-]*)/);
-                if (versionMatch) {
-                    version = versionMatch[1];
-                }
-
-                let packageData = {
-                    name: packageName,
-                    version: version,
-                    description: '自动从tgz文件创建的包信息',
-                    main: 'index.js'
-                };
-
-                console.log(`创建包信息 ${packageName}@${version}`);
-
-                // 保存包信息
+                // 保存package.json
                 fs.writeFileSync(
-                    path.join(packageDir, 'package.json'),
-                    JSON.stringify(packageData, null, 2)
+                    path.join(versionDir, 'package.json'),
+                    JSON.stringify(packageJson, null, 2)
                 );
 
-                // 确保packageData符合PackageInfo接口要求
-                const validPackageData: PackageInfo = {
-                    ...packageData,
-                    name: packageData.name || packageName,
-                    version: packageData.version || '1.0.0'
-                };
                 // 更新内存中的包信息
-                this.packages.set(packageName, validPackageData);
+                const versionMap = this.packages.get(packageName) || new Map<string, PackageInfo>();
+                versionMap.set(version, packageJson as PackageInfo);
+                this.packages.set(packageName, versionMap);
 
-                console.log(`成功发布 ${packageName}@${packageData.version}`);
+                console.log(`成功发布 ${packageName}@${version}`);
 
                 res.writeHead(201, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ ok: true }));
@@ -233,22 +305,32 @@ class MinimalNpmRegistryServer {
             return;
         }
 
-        const packageInfo = this.packages.get(packageName);
+        const versionMap = this.packages.get(packageName);
 
-        if (!packageInfo) {
+        if (!versionMap || versionMap.size === 0) {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: '包不存在' }));
             return;
         }
 
+        // 构造versions对象
+        const versions: { [key: string]: PackageInfo } = {};
+        let latestVersion = '';
+
+        versionMap.forEach((pkgInfo, version) => {
+            versions[version] = pkgInfo;
+            // 简单地取最新版本作为latest（可以改进为按时间）
+            if (version > latestVersion) {
+                latestVersion = version;
+            }
+        });
+
         // 构造符合npm规范的包信息响应
         const response = {
-            name: packageInfo.name,
-            versions: {
-                [packageInfo.version]: packageInfo
-            },
+            name: packageName,
+            versions: versions,
             'dist-tags': {
-                latest: packageInfo.version
+                latest: latestVersion
             }
         };
 
@@ -261,19 +343,39 @@ class MinimalNpmRegistryServer {
      */
     private handlePackageDownload(req: http.IncomingMessage, res: http.ServerResponse): void {
         try {
-            // 从URL中提取包名
+            // 从URL中提取包名和版本
+            // URL格式: /packageName/-/packageName-version.tgz
             const urlParts = req.url?.split('/') || [];
-            const packageName = urlParts[urlParts.length - 2] || '';
+            const filename = urlParts[urlParts.length - 1] || '';
+            const packageName = urlParts[urlParts.length - 3] || '';
 
-            if (!packageName) {
+            if (!packageName || !filename) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: '包名不能为空' }));
+                res.end(JSON.stringify({ error: '包名或文件名不能为空' }));
                 return;
             }
 
+            // 从文件名提取版本 (packageName-version.tgz)
+            const versionMatch = filename.match(new RegExp(`^${packageName}-(.+)\.tgz$`));
+            if (!versionMatch) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '文件名格式不正确' }));
+                return;
+            }
+            const version = versionMatch[1];
+
             // 构建tgz文件路径
-            const packageDir = path.join(this.storageDir, packageName);
-            const tgzFilePath = path.join(packageDir, `${packageName}.tgz`);
+            const versionDir = path.join(this.storageDir, packageName, version);
+
+            // 查找版本目录中的tgz文件（可能有多个，但通常一个）
+            const files = fs.readdirSync(versionDir).filter(f => f.endsWith('.tgz'));
+            if (files.length === 0) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '包文件不存在' }));
+                return;
+            }
+
+            const tgzFilePath = path.join(versionDir, files[0]); // 取第一个tgz文件
 
             // 检查文件是否存在
             if (fs.existsSync(tgzFilePath)) {
