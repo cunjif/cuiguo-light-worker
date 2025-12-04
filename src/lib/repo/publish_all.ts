@@ -4,6 +4,9 @@ import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractZip } from './extract_zip.js';
 import { loginToRegistry, npmRegistry } from './internal_repo.js';
+import * as zlib from 'node:zlib';
+import * as tar from 'tar';
+import { readPackageJsonFromTgz } from './read_package_json.js';
 
 
 const execAsync = promisify(exec);
@@ -17,12 +20,12 @@ const execAsync = promisify(exec);
 async function extractDependencies(zipPath: string, extractDir: string): Promise<boolean> {
     try {
         console.log(`正在解压依赖包: ${zipPath}`);
-        
+
         // 确保目标目录存在
         if (!fs.existsSync(extractDir)) {
             fs.mkdirSync(extractDir, { recursive: true });
         }
-        
+
         // 解压zip文件
         await extractZip(zipPath, extractDir);
         console.log(`依赖包已成功解压到: ${extractDir}`);
@@ -46,7 +49,7 @@ async function isLoggedInToRegistry(registryUrl: string): Promise<boolean> {
             // 如果当前registry不匹配，设置它
             await execAsync(`npx npm set registry ${registryUrl}`);
         }
-        
+
         // 尝试获取用户信息
         await execAsync('npx npm whoami');
         return true;
@@ -76,22 +79,23 @@ async function publishToRepo(dir: string, registryUrl: string = 'http://localhos
             console.warn('没有找到.tgz文件');
             return false;
         }
-        
+
         // 逐个发布包
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const filePath = path.join(dir, file);
-            
             try {
+                const pkgJson = await readPackageJsonFromTgz(filePath);
+                await execAsync(`npm unpublish ${pkgJson.name}@${pkgJson.version} --registry ${registryUrl}`);
                 console.log(`[${i + 1}/${files.length}] 发布 ${file}...`);
-                await execAsync(`npm publish ${filePath} --registry ${registryUrl}`);
+                await execAsync(`npm publish --tag legacy ${filePath} --registry ${registryUrl}`);
                 console.log(`✓ ${file} 发布成功`);
             } catch (error) {
                 console.error(`✗ 发布 ${file} 失败:`, error.message);
                 // 继续发布其他包，不中断整个流程
             }
         }
-        
+
         console.log(`发布完成！仓库地址: ${registryUrl}`);
         await npmRegistry.unconfigureNpm();
         return true;
@@ -112,27 +116,27 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
     try {
         // 如果没有指定临时目录，使用默认目录
         const extractDir = tempDir || path.join(path.dirname(zipPath), 'temp_deps');
-        
+
         // 1. 解压zip文件
         const extractSuccess = await extractDependencies(zipPath, extractDir);
         if (!extractSuccess) {
             console.error('解压步骤失败，终止流程');
             return false;
         }
-        
+
         // 2. 检查本地npm仓库状态
         console.log('检查本地npm仓库状态...');
         const isRunning = await checkRegistryStatus(registryUrl);
         if (!isRunning) {
             console.warn(`本地npm仓库(${registryUrl})未运行，请先启动仓库服务`);
         }
-        
+
         // 3. 发布.tgz文件到本地仓库
         const publishSuccess = await publishToRepo(extractDir, registryUrl);
         if (!publishSuccess) {
             console.error('发布步骤失败');
         }
-        
+
         // 4. 清理临时目录
         try {
             console.log('正在清理临时目录...');
@@ -161,7 +165,7 @@ async function processDependencies(zipPath: string, tempDir?: string, registryUr
             console.error(`清理临时目录失败: ${cleanupError.message}`);
             // 清理失败不影响整体流程的成功状态
         }
-        
+
         console.log('依赖包处理流程完成！');
         return true;
     } catch (error) {
@@ -179,13 +183,13 @@ async function checkRegistryStatus(registryUrl: string = 'http://localhost:4873/
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
-        
+
         try {
             // 确保URL格式正确，在registryUrl和ping路径之间添加斜杠
-            const pingUrl = registryUrl.endsWith('/') 
-                ? `${registryUrl}-/ping` 
+            const pingUrl = registryUrl.endsWith('/')
+                ? `${registryUrl}-/ping`
                 : `${registryUrl}/-/ping`;
-            
+
             const response = await fetch(pingUrl, {
                 signal: controller.signal
             });

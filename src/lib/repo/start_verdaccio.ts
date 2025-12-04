@@ -102,7 +102,7 @@ auth:
 
 uplinks:
   npmjs:
-    url: https://registry.npmjs.org/
+    url: http://127.0.0.1:4873
 
 packages:
   '@*/*':

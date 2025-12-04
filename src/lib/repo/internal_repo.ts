@@ -70,10 +70,10 @@ export class InternalNpmRegistry {
             console.log('正在初始化内部npm仓库...');
 
             // 检查仓库是否已运行
-            const isRunning = await checkRegistryStatus(this.registryUrl);
+            const isRunning = await isVerdaccioRunning();
             if (!isRunning) {
-                // 启动最小化npm仓库服务
-                const started = await startMinimalRegistry(port);
+                // 启动Verdaccio服务
+                const started = await startVerdaccio(port);
                 if (!started) {
                     console.error('启动内部npm仓库失败');
                     return false;
@@ -136,13 +136,30 @@ export class InternalNpmRegistry {
     }
 
     /**
+     * 停止内部npm仓库
+     * @returns Promise<boolean> 是否停止成功
+     */
+    async stop(): Promise<boolean> {
+        try {
+            const stopped = await stopVerdaccio();
+            if (stopped) {
+                console.log('内部npm仓库已停止');
+            }
+            return stopped;
+        } catch (error) {
+            console.error(`停止内部npm仓库失败: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
      * 获取仓库状态
      * @returns Promise<Object> 仓库状态信息
      */
     async getStatus(): Promise<{ url: string, running: boolean, initialized: boolean }> {
         return {
             url: this.registryUrl,
-            running: await checkRegistryStatus(this.registryUrl),
+            running: await isVerdaccioRunning(),
             initialized: this.isInitialized
         };
     }
@@ -216,7 +233,7 @@ export class InternalNpmRegistry {
      */
     async shutdown(): Promise<boolean> {
         try {
-            const stopped = await stopMinimalRegistry();
+            const stopped = await stopVerdaccio();
             this.isInitialized = false;
             return stopped;
         } catch (error) {
