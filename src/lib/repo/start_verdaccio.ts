@@ -1,12 +1,13 @@
-// 重定向到最小化npm仓库实现
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
-import { startMinimalRegistry, stopMinimalRegistry, isMinimalRegistryRunning } from './minimal_npm_registry.js';
-import { exec } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
+
+// 存储Verdaccio进程实例
+let verdaccioProcess: any = null;
 
 // 获取项目中的npm路径
 function getNpmPath(): string {
@@ -141,9 +142,89 @@ server:
  * @returns Promise<boolean> 是否启动成功
  */
 export async function startVerdaccio(port: number = 4873, configPath?: string): Promise<boolean> {
-    console.log(`正在启动最小化npm仓库，端口: ${port}...`);
-    // 直接调用最小化仓库的启动函数
-    return await startMinimalRegistry(port);
+    try {
+        // 检查Verdaccio是否已安装
+        const isInstalled = await isVerdaccioInstalled();
+        if (!isInstalled) {
+            console.error('Verdaccio未安装，请先安装: npm install -g verdaccio');
+            return false;
+        }
+
+        // 检查是否已在运行
+        const isRunning = await isVerdaccioRunning();
+        if (isRunning) {
+            console.log('Verdaccio已在运行中');
+            return true;
+        }
+
+        // 如果没有提供配置文件路径，创建默认配置
+        if (!configPath) {
+            const configDir = path.join(os.tmpdir(), 'verdaccio-config');
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+            }
+            configPath = path.join(configDir, 'config.yaml');
+            
+            // 创建默认配置文件
+            const configCreated = createVerdaccioConfig(configPath);
+            if (!configCreated) {
+                console.error('创建Verdaccio配置文件失败');
+                return false;
+            }
+        }
+
+        // 获取npx路径
+        const npxPath = getNpxPath();
+
+        // 启动Verdaccio
+        console.log(`正在启动Verdaccio，端口: ${port}...`);
+        
+        // 使用spawn启动Verdaccio进程，以便我们可以控制它
+        verdaccioProcess = spawn(`"${npxPath}"`, ['verdaccio', '-c', configPath, '-l', `${port}`], {
+            shell: true,
+            stdio: 'pipe',
+            detached: false
+        });
+
+        // 监听输出
+        verdaccioProcess.stdout.on('data', (data: Buffer) => {
+            console.log(`Verdaccio: ${data.toString()}`);
+        });
+
+        verdaccioProcess.stderr.on('data', (data: Buffer) => {
+            console.error(`Verdaccio错误: ${data.toString()}`);
+        });
+
+        verdaccioProcess.on('error', (error: Error) => {
+            console.error(`启动Verdaccio失败: ${error.message}`);
+            verdaccioProcess = null;
+        });
+
+        verdaccioProcess.on('close', (code: number) => {
+            console.log(`Verdaccio进程退出，代码: ${code}`);
+            verdaccioProcess = null;
+        });
+
+        // 等待一段时间让Verdaccio启动
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // 检查是否成功启动
+        const isRunningAfterStart = await isVerdaccioRunning();
+        if (isRunningAfterStart) {
+            console.log(`Verdaccio启动成功，地址: http://localhost:${port}`);
+            return true;
+        } else {
+            console.error('Verdaccio启动失败');
+            if (verdaccioProcess) {
+                verdaccioProcess.kill();
+                verdaccioProcess = null;
+            }
+            return false;
+        }
+    } catch (error) {
+        console.error(`启动Verdaccio失败: ${error.message}`);
+        return false;
+    }
 }
 
 /**
@@ -151,8 +232,73 @@ export async function startVerdaccio(port: number = 4873, configPath?: string): 
  * @returns Promise<boolean> 是否停止成功
  */
 export async function stopVerdaccio(): Promise<boolean> {
-    // 直接调用最小化仓库的停止函数
-    return await stopMinimalRegistry();
+    try {
+        if (verdaccioProcess) {
+            console.log('正在停止Verdaccio服务...');
+            verdaccioProcess.kill('SIGTERM');
+            
+            // 等待进程结束
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (!verdaccioProcess) {
+                        clearInterval(checkInterval);
+                        resolve(true);
+                    }
+                }, 500);
+                
+                // 强制超时
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    if (verdaccioProcess) {
+                        verdaccioProcess.kill('SIGKILL');
+                        verdaccioProcess = null;
+                    }
+                    resolve(true);
+                }, 5000);
+            });
+            
+            console.log('Verdaccio服务已停止');
+            return true;
+        } else {
+            // 检查是否有其他Verdaccio进程在运行
+            try {
+                const isRunning = await isVerdaccioRunning();
+                if (isRunning) {
+                    console.log('发现其他Verdaccio进程，尝试终止...');
+                    
+                    // 根据操作系统使用不同的命令
+                    const isWindows = os.platform() === 'win32';
+                    const killCommand = isWindows 
+                        ? `taskkill /F /IM node.exe /FI "WINDOWTITLE eq verdaccio*"` 
+                        : `pkill -f "verdaccio"`;
+                    
+                    await execAsync(killCommand);
+                    
+                    // 等待一段时间让进程结束
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // 再次检查
+                    const stillRunning = await isVerdaccioRunning();
+                    if (!stillRunning) {
+                        console.log('成功终止其他Verdaccio进程');
+                        return true;
+                    } else {
+                        console.warn('无法终止其他Verdaccio进程');
+                        return false;
+                    }
+                } else {
+                    console.log('没有运行中的Verdaccio进程');
+                    return true;
+                }
+            } catch (error) {
+                console.error(`停止Verdaccio进程失败: ${error.message}`);
+                return false;
+            }
+        }
+    } catch (error) {
+        console.error(`停止Verdaccio服务失败: ${error.message}`);
+        return false;
+    }
 }
 
 /**
@@ -160,6 +306,10 @@ export async function stopVerdaccio(): Promise<boolean> {
  * @returns Promise<boolean> 是否正在运行
  */
 export async function isVerdaccioRunning(): Promise<boolean> {
-    // 直接调用最小化仓库的状态检查函数
-    return await isMinimalRegistryRunning();
+    try {
+        const response = await fetch('http://localhost:4873/-/ping');
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
 }

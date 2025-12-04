@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
-import { startMinimalRegistry, stopMinimalRegistry, isMinimalRegistryRunning } from './minimal_npm_registry.js';
+import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verdaccio.js';
 import { isZipFile } from './extract_zip.js';
 import { NpmAuthHelper } from './npm_auth_helper.js';
 import { exec, execSync } from 'node:child_process';
