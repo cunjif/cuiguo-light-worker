@@ -24,25 +24,53 @@ export class HttpClient {
   }
 
   async request(requestObject: any, schema: any) {
-    const endpoint = `${this.url}/${requestObject.method}`;
-    console.log(`HTTP Client requesting: ${endpoint}`, requestObject.params);
+    // For MCP over HTTP, we need to send the full JSON-RPC request to the base URL
+    const endpoint = this.url;
+    console.log(`HTTP Client requesting: ${endpoint}`, requestObject);
+    
+    // Create proper JSON-RPC request
+    const jsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: Date.now(), // Simple ID generation
+      method: requestObject.method,
+      params: requestObject.params || {}
+    };
     
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
         },
-        body: JSON.stringify(requestObject.params || {})
+        body: JSON.stringify(jsonRpcRequest)
       });
 
+      // Log response details for debugging
+      console.log(`HTTP Client response status: ${response.status} ${response.statusText}`);
+      // Convert Headers object to a plain object for logging
+      const headersObj: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headersObj[key] = value;
+      });
+      console.log(`HTTP Client response headers:`, headersObj);
+      
       if (!response.ok) {
-        throw new Error(`HTTP request failed: ${response.status} ${response.statusText}`);
+        // Try to read the response body for more details on the error
+        const errorText = await response.text();
+        console.error(`HTTP Client error response body:`, errorText);
+        throw new Error(`HTTP request failed: ${response.status} ${response.statusText}. Response: ${errorText}`);
       }
 
       const result = await response.json();
       console.log(`HTTP Client response from ${endpoint}:`, result);
-      return result;
+      
+      // Return the result part of the JSON-RPC response
+      if (result.error) {
+        throw new Error(`JSON-RPC Error: ${result.error.message}`);
+      }
+      
+      return result.result;
     } catch (error) {
       console.error(`HTTP Client error for ${endpoint}:`, error);
       throw error;
