@@ -1,7 +1,31 @@
 {
   "mcpServers": {
     "playwright": {
-      "url": "http://localhost:8931/mcp"
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "filesystem": {
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/username/Desktop",
+      ],
+      "command": "npx"
+    },
+    "aigroup-mdtoword-mcp": {
+      "args": [
+        "-y",
+        "aigroup-mdtoword-mcp"
+      ],
+      "command": "npx"
+    },
+    "Bazi": {
+      "command": "npx",
+      "args": [
+        "bazi-mcp"
+      ]
     }
   }
 }

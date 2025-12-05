@@ -61,10 +61,13 @@
         "@cfworker/json-schema": "^4.1.1",
         "@modelcontextprotocol/sdk": "^1.13.2",
         "@types/tar": "^6.1.13",
+        "aigroup-mdtoword-mcp": "^4.0.1",
         "bazi-mcp": "^0.1.0",
-        "compress": "^0.99.0",
         "compressing": "^2.0.0",
+        "filesystem": "^1.0.1",
         "form-data": "^4.0.5",
+        "markdownify": "^0.1.0",
+        "playwright-mcp": "^0.0.13",
         "verdaccio": "^6.2.3"
     }
 }
