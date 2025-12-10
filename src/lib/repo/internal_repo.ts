@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
 import { processDependencies, checkRegistryStatus } from './publish_all.js';
-import { startVerdaccio, stopVerdaccio, isVerdaccioRunning } from './start_verdaccio.js';
+import { startMinimalRegistry, stopMinimalRegistry, isMinimalRegistryRunning } from './minimal_npm_registry.js';
 import { isZipFile } from './extract_zip.js';
 import { NpmAuthHelper } from './npm_auth_helper.js';
 import { exec, execSync } from 'node:child_process';
@@ -70,10 +70,10 @@ export class InternalNpmRegistry {
             console.log('正在初始化内部npm仓库...');
 
             // 检查仓库是否已运行
-            const isRunning = await isVerdaccioRunning();
+            const isRunning = await isMinimalRegistryRunning();
             if (!isRunning) {
-                // 启动Verdaccio服务
-                const started = await startVerdaccio(port);
+                // 启动最小化npm仓库服务
+                const started = await startMinimalRegistry(port);
                 if (!started) {
                     console.error('启动内部npm仓库失败');
                     return false;
@@ -142,7 +142,7 @@ export class InternalNpmRegistry {
      */
     async stop(): Promise<boolean> {
         try {
-            const stopped = await stopVerdaccio();
+            const stopped = await stopMinimalRegistry();
             if (stopped) {
                 console.log('内部npm仓库已停止');
             }
@@ -160,7 +160,7 @@ export class InternalNpmRegistry {
     async getStatus(): Promise<{ url: string, running: boolean, initialized: boolean }> {
         return {
             url: this.registryUrl,
-            running: await isVerdaccioRunning(),
+            running: await isMinimalRegistryRunning(),
             initialized: this.isInitialized
         };
     }
@@ -234,7 +234,7 @@ export class InternalNpmRegistry {
      */
     async shutdown(): Promise<boolean> {
         try {
-            const stopped = await stopVerdaccio();
+            const stopped = await stopMinimalRegistry();
             this.isInitialized = false;
             return stopped;
         } catch (error) {

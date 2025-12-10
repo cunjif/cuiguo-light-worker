@@ -1156,8 +1156,9 @@
 
             getters: {
                 getServers: () => {
-                    console.log('MCP:', window.mcpServers)
-                    return window.mcpServers
+                    var mcpServers = window.getServers()
+                    console.log('MCP:', Object.keys(mcpServers))
+                    return mcpServers;
                 },
             },
 
@@ -1200,6 +1201,7 @@
                 },
                 listTools: async function () {
                     const mcpServers = this.getServers
+                    console.log(`List MCP Servers: ${Object.keys(mcpServers)}`)
                     if (!mcpServers) {
                         console.warn('No MCP servers available');
                         return null
@@ -1251,6 +1253,7 @@
                 },
                 getTool: async function (tool_name) {
                     const mcpServers = this.getServers;
+                    console.log(`Get MCP Servers: ${Object.keys(mcpServers)}`)
                     const mcpKeys = Object.keys(mcpServers);
                     const result = await Promise.any(mcpKeys.map(async (key) => {
                         const toolsListFunction = mcpServers[key]?.tools?.list;
@@ -2348,8 +2351,10 @@
 
                         },
                         startInference: async function () {
+                            console.log('[startInference] begin');
                             this.clear();
                             await createCompletion(this.conversation);
+                            console.log('[startInference] after createCompletion');
                             await this.postToolCall()
                         },
                         postToolCall: async function () {
@@ -2579,6 +2584,7 @@
                 const languageStore = useLanguageStore();
 
                 const createCompletion = async (rawconversation) => {
+                    console.log('[createCompletion] called', { length: rawconversation?.length });
                     const conversation = rawconversation.reduce((newConversation, item) => {
                         if (item.role === "assistant") {
                             const { reasoning_content, ...rest } = item;
@@ -2630,10 +2636,19 @@
                         if (chatbotStore.top_p) {
                             body["top_p"] = parseFloat(chatbotStore.top_p)
                         }
-
-                        if (chatbotStore.mcp) {
-                            body["tools"] = await mcpStore.listTools()
+                        
+                        try {
+                        console.log('[createCompletion] pre-mcp logs');
+                        console.log(`chatbotStore.mcp: ${chatbotStore.mcp}`)
+                        } catch (e) {
+                            console.error(e)
                         }
+                        if (chatbotStore.mcp) {
+                            console.log("1")
+                            body["tools"] = await mcpStore.listTools()
+                            console.log("2")
+                        }
+                        console.log(`body: ${JSON.stringify(body)}`)
 
                         const request = {
                             headers: headers,
@@ -2680,8 +2695,10 @@
                         // Read the stream
                         await read(reader, messageStore.conversation.at(-1), buffer, chatbotStore.stream);
                     } catch (error) {
+                        console.log(`Request completion error: ${error.message}`)
                         snackbarStore.showErrorMessage(error.message);
                     } finally {
+                        console.log("Finish createCompletion")
                         messageStore.generating = false
                     }
                 };

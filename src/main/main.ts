@@ -81,39 +81,56 @@ async function initClient(): Promise<ClientObj[]> {
     console.log('Config loaded:', config);
 
     try {
-      const clients = await Promise.all(
-        Object.entries(config.mcpServers)
-          .map(async ([name, serverConfig]) => {
-            console.log(`Initializing client for ${name} with config:`, serverConfig);
+      const results = await Promise.allSettled(
+        Object.entries(config.mcpServers).map(([name, serverConfig]) => {
+          console.log(`Initializing client for ${name} with config:`, serverConfig);
 
-            const timeoutPromise = new Promise<Client | HttpClient>((resolve, reject) => {
-              setTimeout(() => {
-                reject(new Error(`Initialization of client for ${name} timed out after 30 seconds`));
-              }, 30000); // 30 seconds
+          const timeoutPromise = new Promise<Client | HttpClient>((resolve, reject) => {
+            setTimeout(() => {
+              reject(new Error(`Initialization of client for ${name} timed out after 30 seconds`));
+            }, 30000);
+          });
+
+          return Promise.race([
+            initializeClient(name, serverConfig),
+            timeoutPromise,
+          ])
+            .then(client => {
+              console.log(`${name} initialized.`);
+              const capabilities = client.getServerCapabilities();
+              return { name, client, capabilities } as ClientObj;
+            })
+            .catch(err => {
+              console.error(`Client ${name} failed to initialize:`, err?.message);
+              throw err;
             });
-
-            const client = await Promise.race([
-              initializeClient(name, serverConfig),
-              timeoutPromise,
-            ]);
-
-            console.log(`${name} initialized.`);
-            const capabilities = client.getServerCapabilities();
-            return { name, client, capabilities };
-          })
+        })
       );
 
-      console.log('All clients initialized.');
+      const clients = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => (r as PromiseFulfilledResult<ClientObj>).value);
 
-      // Count different types of servers
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      console.log('All clients attempted. Success:', clients.length, 'Failed:', failed);
+
       const localServers = clients.filter(c => c.client instanceof Client).length;
       const httpServers = clients.filter(c => c.client instanceof HttpClient).length;
 
-      notifier.notify({
-        appID: 'CUIGUO',
-        title: "MCP Servers are ready",
-        message: `${localServers} local, ${httpServers} HTTP servers initialized.`
-      });
+      if (clients.length > 0) {
+        notifier.notify({
+          appID: 'CUIGUO',
+          title: "MCP Servers are ready",
+          message: `${localServers} local, ${httpServers} HTTP servers initialized${failed ? `, ${failed} failed` : ''}.`
+        });
+      } else {
+        notifier.notify({
+          appID: 'CUIGUO',
+          title: 'Client initialization failed',
+          message: 'All MCP server initializations failed.'
+        });
+      }
 
       return clients;
     } catch (error) {
@@ -123,9 +140,7 @@ async function initClient(): Promise<ClientObj[]> {
         title: 'Client initialization failed',
         message: "Cannot start with current config, " + error?.message,
       });
-
-      // Instead of process.exit(1), throw the error to be handled by caller
-      throw new Error(`Client initialization failed: ${error?.message}`);
+      return [];
     }
   } else {
     console.log('NO clients configured.');
@@ -150,6 +165,7 @@ async function createWindow() {
   });
 
   mainWindow.loadFile(indexPath);
+  mainWindowRef = mainWindow;
 
   // 创建应用菜单
   const menu = Menu.buildFromTemplate([
@@ -218,6 +234,7 @@ async function createRegistryWindow() {
 }
 
 let features: any[] = [];
+let mainWindowRef: BrowserWindow | null = null;
 
 // Register IPC handlers for a MCP server
 function registerIpcHandlers(
@@ -230,6 +247,9 @@ function registerIpcHandlers(
   const registerHandler = (method: string, schema: any) => {
     const eventName = `${name}-${method}`;
     console.log(`IPC Main ${eventName}`);
+    try {
+      ipcMain.removeHandler(eventName);
+    } catch {}
     ipcMain.handle(eventName, async (event, params) => {
       return await manageRequests(client, `${method}`, schema, params);
     });
@@ -269,6 +289,30 @@ function registerIpcHandlers(
   return feature;
 }
 
+async function bootstrapClientsFromConfig() {
+  let clients: ClientObj[] = [];
+  try {
+    clients = await initClient();
+  } catch (error) {
+    console.error('Failed to initialize clients:', error?.message);
+    clients = [];
+  }
+
+  features = clients.map(clientObj => {
+    const feature = registerIpcHandlers(clientObj.name, clientObj.client, clientObj.capabilities);
+    if (clientObj.client instanceof HttpClient) {
+      feature.type = 'http';
+      feature.url = (clientObj.client as HttpClient).getUrl();
+    } else {
+      feature.type = 'local';
+    }
+    return feature;
+  });
+
+  console.log('Features initialized:', features.length, features);
+  BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
+}
+
 app.whenReady().then(async () => {
 
   // 启动内部npm仓库
@@ -290,39 +334,22 @@ app.whenReady().then(async () => {
     });
   }
 
-  let clients: ClientObj[] = [];
-  try {
-    clients = await initClient();
-  } catch (error) {
-    console.error('Failed to initialize clients:', error?.message);
-    // Continue with empty clients array instead of crashing
-    clients = [];
-  }
-
-  // Register IPC handlers for all initialized clients and populate features array
-  features = clients.map(clientObj => {
-    const feature = registerIpcHandlers(clientObj.name, clientObj.client, clientObj.capabilities);
-
-    // Determine the type based on the client instance
-    if (clientObj.client instanceof HttpClient) {
-      feature.type = 'http';
-      feature.url = (clientObj.client as HttpClient).getUrl(); // Add URL for HTTP clients
-    } else {
-      feature.type = 'local'; // Mark startup clients as local
-    }
-
-    return feature;
-  });
-
-  console.log('Features initialized:', features.length, features);
-
   createWindow();
+
+  bootstrapClientsFromConfig().catch(err => {
+    console.error('Deferred MCP client initialization failed:', err?.message);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
   ipcMain.handle('list-clients', () => {
+    return features;
+  });
+
+  ipcMain.handle('initialize-mcp-clients', async () => {
+    await bootstrapClientsFromConfig();
     return features;
   });
 
@@ -375,6 +402,7 @@ app.whenReady().then(async () => {
         console.log(`[DEBUG] Features array now contains:`, features.map(f => ({ name: f.name, type: f.type, has_tools: !!f.tools })));
 
         console.log(`New server ${serverName} registered with IPC handlers`);
+        BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
 
         // Save the server config (without the type field)
         const config = readConfig(configPath);
@@ -400,11 +428,6 @@ app.whenReady().then(async () => {
           message: `Failed to initialize server: ${error?.message}`
         };
       }
-
-      return {
-        success: false,
-        message: 'Unknown server type'
-      };
     } catch (error) {
       console.error(`Error initializing MCP server ${serverName}:`, error?.message);
       return {
@@ -440,6 +463,7 @@ app.whenReady().then(async () => {
         }
       }
 
+      BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
       return {
         success: true,
         message: `Server ${serverName} deleted successfully`

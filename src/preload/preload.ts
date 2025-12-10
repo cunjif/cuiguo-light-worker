@@ -74,6 +74,10 @@ async function updateMcpServersAPI() {
   console.log('Updating MCP Servers API...');
   const clients = await listClients();
   const win = window as any;
+  console.log(`Get mcp servers: ${win.mcpServers}`)
+  if (!win.mcpServers || typeof win.mcpServers !== 'object') {
+    win.mcpServers = {};
+  }
   
   console.log('Clients from list-clients:', clients);
   
@@ -173,10 +177,32 @@ async function updateMcpServersAPI() {
   console.log('MCP Servers API updated, window.mcpServers:', Object.keys(win.mcpServers), win.mcpServers);
 }
 
+async function getServers() {
+  const win = window as any;
+  if (!win.mcpServers || typeof win.mcpServers !== 'object') {
+    win.mcpServers = {};
+  }
+  console.log("get servers here")
+  ipcRenderer.invoke('initialize-mcp-clients').catch((e: Error) => {
+    console.warn('initialize-mcp-clients failed or not necessary:', e?.message || e);
+  }).finally(()=> {
+    updateMcpServersAPI().finally(()=>win.mcpServers);
+  });
+  // try {
+  //   await ipcRenderer.invoke('initialize-mcp-clients');
+  // } catch (e) {
+  //   console.warn('initialize-mcp-clients failed or not necessary:', e?.message || e);
+  // }
+  // await updateMcpServersAPI();
+  // return win.mcpServers;
+}
+
 contextBridge.exposeInMainWorld('initializeMcpServer', initializeMcpServer);
 contextBridge.exposeInMainWorld('deleteMcpServer', deleteMcpServer);
 contextBridge.exposeInMainWorld('updateMcpServersAPI', updateMcpServersAPI);
 contextBridge.exposeInMainWorld('listClients', listClients);
+contextBridge.exposeInMainWorld('getServers', getServers);
+ipcRenderer.on('clients-updated', async () => { await updateMcpServersAPI(); });
 
 // 暴露内部npm仓库管理器需要的API
 contextBridge.exposeInMainWorld('registryAPI', {
