@@ -182,19 +182,14 @@ async function getServers() {
   if (!win.mcpServers || typeof win.mcpServers !== 'object') {
     win.mcpServers = {};
   }
-  console.log("get servers here")
-  ipcRenderer.invoke('initialize-mcp-clients').catch((e: Error) => {
+
+  try {
+    await ipcRenderer.invoke('initialize-mcp-clients');
+  } catch (e) {
     console.warn('initialize-mcp-clients failed or not necessary:', e?.message || e);
-  }).finally(()=> {
-    updateMcpServersAPI().finally(()=>win.mcpServers);
-  });
-  // try {
-  //   await ipcRenderer.invoke('initialize-mcp-clients');
-  // } catch (e) {
-  //   console.warn('initialize-mcp-clients failed or not necessary:', e?.message || e);
-  // }
-  // await updateMcpServersAPI();
-  // return win.mcpServers;
+  }
+  await updateMcpServersAPI();
+  return win.mcpServers;
 }
 
 contextBridge.exposeInMainWorld('initializeMcpServer', initializeMcpServer);

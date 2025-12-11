@@ -81,6 +81,16 @@
             if (lottie) lottie.style.display = 'block';
             document.getElementById('loading').style.display = 'none';
         };
+
+        // Suppress specific DevTools autofill errors
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+            if (args.some(arg => typeof arg === 'string' &&
+                (arg.includes('Autofill.enable') || arg.includes('Autofill.setAddresses')))) {
+                return;
+            }
+            originalConsoleError.apply(console, args);
+        };
     </script>
 
     <style scoped lanMCP="scss">
@@ -1152,18 +1162,30 @@
             state: () => ({
                 serverTools: [],
                 loading: true,
+                mcpServers: {},
             }),
 
             getters: {
-                getServers: () => {
-                    var mcpServers = window.getServers()
-                    console.log('MCP:', Object.keys(mcpServers))
-                    return mcpServers;
+                getServers: (state) => {
+                    console.log('MCP:', Object.keys(state.mcpServers))
+                    return state.mcpServers;
                 },
             },
 
             actions: {
-                listServerResources: function () {
+                updateServers: async function() {
+                    try {
+                        this.mcpServers = await window.getServers();
+                        console.log('Updated MCP servers:', Object.keys(this.mcpServers));
+                    } catch (error) {
+                        console.error('Failed to update MCP servers:', error);
+                        this.mcpServers = {};
+                    }
+                },
+                listServerResources: async function () {
+                    // 确保获取最新的服务器列表
+                    await this.updateServers();
+                    
                     const mcpServers = this.getServers
                     const mcpKeys = Object.keys(mcpServers)
                     const mcpResources = []
@@ -1200,6 +1222,9 @@
 
                 },
                 listTools: async function () {
+                    // 确保获取最新的服务器列表
+                    await this.updateServers();
+                    
                     const mcpServers = this.getServers
                     console.log(`List MCP Servers: ${Object.keys(mcpServers)}`)
                     if (!mcpServers) {
@@ -1252,6 +1277,9 @@
                     return mcpTools
                 },
                 getTool: async function (tool_name) {
+                    // 确保获取最新的服务器列表
+                    await this.updateServers();
+                    
                     const mcpServers = this.getServers;
                     console.log(`Get MCP Servers: ${Object.keys(mcpServers)}`)
                     const mcpKeys = Object.keys(mcpServers);
@@ -1275,6 +1303,9 @@
                     return result;
                 },
                 callTool: async function (tool_name, tool_args) {
+                    // 确保获取最新的服务器列表
+                    await this.updateServers();
+                    
                     const tool = await this.getTool(tool_name)
                     if (!tool) {
                         return this.packReturn(`Tool name '${tool_name}' not found`)
@@ -1895,6 +1926,10 @@
                         }
                         
                         console.log('MCP Servers List Updated:', this.mcpServersList);
+                        
+                        // Also update mcpStore's servers
+                        const mcpStore = useMcpStore();
+                        mcpStore.updateServers();
                     }).catch(error => {
                         console.error('Error refreshing MCP servers list:', error);
                     });
