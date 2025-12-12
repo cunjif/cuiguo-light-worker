@@ -313,6 +313,74 @@ async function bootstrapClientsFromConfig() {
   BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
 }
 
+// 初始化特定的服务器
+async function bootstrapSpecificClients(serverNames: string[]) {
+  const config = readConfig(configPath);
+  if (!config || !config.mcpServers) {
+    console.error('No config or mcpServers found');
+    return;
+  }
+
+  // 过滤出需要初始化的服务器
+  const serversToInit = serverNames.filter(name => config.mcpServers[name]);
+  if (serversToInit.length === 0) {
+    console.log('No valid servers to initialize');
+    return;
+  }
+
+  console.log(`Initializing ${serversToInit.length} specific servers: ${serversToInit.join(', ')}`);
+
+  try {
+    // 为每个服务器初始化客户端
+    for (const serverName of serversToInit) {
+      const serverConfig = config.mcpServers[serverName];
+      
+      // 检查服务器是否已经存在
+      const existingIndex = features.findIndex(f => f.name === serverName);
+      if (existingIndex !== -1) {
+        console.log(`Server ${serverName} already exists, removing old instance`);
+        features.splice(existingIndex, 1);
+      }
+
+      try {
+        const timeoutPromise = new Promise<Client | HttpClient>((resolve, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Initialization of client for ${serverName} timed out after 30 seconds`));
+          }, 30000);
+        });
+
+        const client = await Promise.race([
+          initializeClient(serverName, serverConfig),
+          timeoutPromise,
+        ]);
+
+        console.log(`${serverName} initialized specifically.`);
+        const capabilities = client.getServerCapabilities();
+
+        // 注册IPC处理程序
+        const feature = registerIpcHandlers(serverName, client, capabilities);
+        
+        if (client instanceof HttpClient) {
+          feature.type = 'http';
+          feature.url = (client as HttpClient).getUrl();
+        } else {
+          feature.type = 'local';
+        }
+
+        features.push(feature);
+        console.log(`Server ${serverName} registered with IPC handlers`);
+      } catch (error) {
+        console.error(`Failed to initialize server ${serverName}:`, error?.message);
+      }
+    }
+
+    console.log('Specific features updated:', features.length, features);
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
+  } catch (error) {
+    console.error('Error during specific client initialization:', error?.message);
+  }
+}
+
 app.whenReady().then(async () => {
 
   // 启动内部npm仓库
@@ -348,8 +416,21 @@ app.whenReady().then(async () => {
     return features;
   });
 
-  ipcMain.handle('initialize-mcp-clients', async () => {
-    await bootstrapClientsFromConfig();
+  // Handle getting MCP configuration
+  ipcMain.handle('get-mcp-config', () => {
+    const config = readConfig(configPath);
+    return config ? config.mcpServers : {};
+  });
+
+  ipcMain.handle('initialize-mcp-clients', async (event, serverNames?: string[]) => {
+    // 如果提供了服务器名称列表，则只初始化这些服务器
+    if (serverNames && serverNames.length > 0) {
+      console.log(`Initializing specific MCP servers: ${serverNames.join(', ')}`);
+      await bootstrapSpecificClients(serverNames);
+    } else {
+      // 否则初始化所有服务器（默认行为）
+      await bootstrapClientsFromConfig();
+    }
     return features;
   });
 

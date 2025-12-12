@@ -70,8 +70,8 @@ async function exposeAPIs() {
   contextBridge.exposeInMainWorld('mcpServers', api);
 }
 
-async function updateMcpServersAPI() {
-  console.log('Updating MCP Servers API...');
+async function updateMcpServersAPI(fullRebuild: boolean = true) {
+  console.log('Updating MCP Servers API, fullRebuild:', fullRebuild);
   const clients = await listClients();
   const win = window as any;
   console.log(`Get mcp servers: ${win.mcpServers}`)
@@ -81,10 +81,7 @@ async function updateMcpServersAPI() {
   
   console.log('Clients from list-clients:', clients);
   
-  // Clear existing mcpServers and rebuild it
-  // Since window.mcpServers is exposed via contextBridge, we need to update its properties
-  // rather than replacing the entire object
-  
+  // 创建API方法的辅助函数
   const createAPIMethods = (methods: Record<string, string>) => {
     const result: Record<string, (...args: any) => Promise<any>> = {};
     Object.keys(methods).forEach(key => {
@@ -94,13 +91,16 @@ async function updateMcpServersAPI() {
     return result;
   };
 
-  // First, clear all existing servers from window.mcpServers
-  const existingKeys = Object.keys(win.mcpServers || {});
-  for (const key of existingKeys) {
-    delete win.mcpServers[key];
+  // 如果是完整重建，先清空所有现有服务器
+  if (fullRebuild) {
+    const existingKeys = Object.keys(win.mcpServers || {});
+    for (const key of existingKeys) {
+      delete win.mcpServers[key];
+    }
+    console.log('Cleared all existing servers for full rebuild');
   }
 
-  // Now add all servers (both predefined and dynamic)
+  // 添加或更新服务器
   clients.forEach((client: any) => {
     const { name, tools, prompts, resources, type, url } = client;
     
@@ -112,6 +112,12 @@ async function updateMcpServersAPI() {
       tools_value: tools,
       full_client: client
     });
+    
+    // 如果服务器已存在且不是完整重建，则跳过
+    if (!fullRebuild && win.mcpServers[name]) {
+      console.log(`Server ${name} already exists, skipping update`);
+      return;
+    }
     
     if (type === 'http' && url) {
       // For HTTP servers, create wrapper functions that make HTTP requests
@@ -177,19 +183,130 @@ async function updateMcpServersAPI() {
   console.log('MCP Servers API updated, window.mcpServers:', Object.keys(win.mcpServers), win.mcpServers);
 }
 
-async function getServers() {
+// 全局变量，用于跟踪配置文件和服务器状态
+let lastConfigHash: string = '';
+let initializedServers: Set<string> = new Set();
+let isInitializing: boolean = false;
+
+// 计算配置文件的哈希值
+function calculateConfigHash(config: any): string {
+  // 简单的哈希函数，用于检测配置变化
+  return JSON.stringify(config).split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0).toString();
+}
+
+  // 获取服务器列表，仅初始化变动的服务器
+async function getServers(): Promise<any> {
   const win = window as any;
   if (!win.mcpServers || typeof win.mcpServers !== 'object') {
     win.mcpServers = {};
   }
 
-  try {
-    await ipcRenderer.invoke('initialize-mcp-clients');
-  } catch (e) {
-    console.warn('initialize-mcp-clients failed or not necessary:', e?.message || e);
+  // 避免并发初始化
+  if (isInitializing) {
+    console.log('getServers: Already initializing, skipping');
+    return win.mcpServers;
   }
-  await updateMcpServersAPI();
-  return win.mcpServers;
+
+  try {
+    isInitializing = true;
+    console.log('getServers: Starting initialization');
+
+    // 获取当前配置
+    const currentConfig = await ipcRenderer.invoke('get-mcp-config');
+    const currentConfigStr = JSON.stringify(currentConfig, null, 2);
+    const currentConfigHash = calculateConfigHash(currentConfigStr);
+
+    // 获取已初始化的服务器列表
+    const existingClients = await listClients();
+    const existingServerNames = existingClients.map(client => client.name);
+
+    // 检测配置变化
+    const configChanged = currentConfigHash !== lastConfigHash;
+    
+    if (!configChanged) {
+      console.log('getServers: Config unchanged, returning existing servers');
+      return win.mcpServers;
+    }
+
+    console.log('getServers: Config changed, detecting which servers need initialization');
+
+    // 检测新增或配置变化的服务器
+    const changedServers: string[] = [];
+    const serverNames = Object.keys(currentConfig || {});
+
+    for (const serverName of serverNames) {
+      const existingClient = existingClients.find(client => client.name === serverName);
+      const currentServerConfig = currentConfig[serverName];
+      
+      // 如果服务器不存在或者是新配置与之前不同
+      if (!existingClient || JSON.stringify(existingClient) !== JSON.stringify(currentServerConfig)) {
+        changedServers.push(serverName);
+      }
+    }
+
+    // 检测已删除的服务器
+    const deletedServers = existingServerNames.filter(name => !serverNames.includes(name));
+
+    console.log(`getServers: ${changedServers.length} servers changed, ${deletedServers.length} servers deleted`);
+
+    // 清理已删除的服务器
+    if (deletedServers.length > 0) {
+      console.log('getServers: Cleaning up deleted servers:', deletedServers);
+      for (const serverName of deletedServers) {
+        if (win.mcpServers[serverName]) {
+          delete win.mcpServers[serverName];
+        }
+        initializedServers.delete(serverName);
+      }
+    }
+
+    // 如果有变化的服务器，只初始化这些服务器
+    if (changedServers.length > 0) {
+      console.log('getServers: Initializing changed servers:', changedServers);
+      
+      // 保存当前配置作为备份
+      localStorage.setItem('mcp_config_backup', currentConfigStr);
+      
+      // 初始化新服务器或更新现有服务器
+      await ipcRenderer.invoke('initialize-mcp-clients', changedServers);
+      
+      // 只更新变化的服务器
+      await updateMcpServersAPI(false);
+      
+      // 更新配置哈希
+      lastConfigHash = currentConfigHash;
+    } else {
+      console.log('getServers: No servers need initialization, just updating hash');
+      // 即使没有服务器需要初始化，也要更新哈希值
+      lastConfigHash = currentConfigHash;
+    }
+
+    // 更新状态
+    initializedServers = new Set(Object.keys(win.mcpServers));
+    
+    return win.mcpServers;
+  } catch (error) {
+    console.error('getServers: Error during initialization', error);
+    
+    // 尝试恢复之前的配置
+    const backupConfig = localStorage.getItem('mcp_config_backup');
+    if (backupConfig) {
+      console.log('getServers: Attempting to restore from backup');
+      try {
+        const config = JSON.parse(backupConfig);
+        await updateMcpServersAPI(true);
+      } catch (backupError) {
+        console.error('getServers: Failed to restore from backup', backupError);
+      }
+    }
+    
+    return win.mcpServers;
+  } finally {
+    isInitializing = false;
+  }
 }
 
 contextBridge.exposeInMainWorld('initializeMcpServer', initializeMcpServer);
