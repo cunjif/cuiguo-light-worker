@@ -923,51 +923,141 @@
             </v-dialog>
 
             <!-- Add MCP Server Dialog -->
-            <v-dialog v-model="settingStore.addMcpDialog" max-width="700" class="dialog-card">
-                <v-card prepend-icon="mdi-plus-circle" title="Add MCP Server">
+            <v-dialog v-model="settingStore.addMcpDialog" max-width="900" class="dialog-card">
+                <v-card prepend-icon="mdi-plus-circle" title="MCP工具管理">
                     <v-divider></v-divider>
                     <v-card-text>
-                        <div class="pa-4">
-                            <p class="text-caption text-grey mb-3">Paste your MCP configuration JSON and we'll extract the servers for you:</p>
-                            <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
-                                v-model="settingStore.mcpJsonConfig" 
-                                label='Paste JSON (e.g., {"mcpServers":{"playwright":{"url":"http://..."} or {"command":"..."}}})'
-                                rows="10" auto-grow clearable hide-details></v-textarea>
+                        <v-tabs v-model="settingStore.mcpTab" class="mb-4">
+                            <v-tab value="add-server">添加MCP服务配置</v-tab>
+                            <v-tab value="registry-manager">插件管理</v-tab>
+                        </v-tabs>
+                        
+                        <v-window v-model="settingStore.mcpTab">
+                            <!-- Add MCP Server Tab -->
+                            <v-window-item value="add-server">
+                                <div class="pa-4">
+                                    <p class="text-caption text-grey mb-3">粘贴您的MCP配置JSON，我们将为您提取服务配置：</p>
+                                    <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
+                                        v-model="settingStore.mcpJsonConfig" 
+                                        label='粘贴JSON (例如: {"mcpServers":{"playwright":{"url":"http://..."} or {"command":"..."}}})'
+                                        rows="10" auto-grow clearable hide-details></v-textarea>
+                                    
+                                    <v-btn variant="flat" color="primary" class="mb-4" @click="settingStore.parseAndShowMcpServers()">
+                                        <v-icon start>mdi-magnify</v-icon>提取MCP服务
+                                    </v-btn>
+                                    
+                                    <!-- Extracted Servers List -->
+                                    <div v-if="settingStore.extractedMcpServers.length > 0" class="mb-4">
+                                        <p class="text-subtitle2 mb-2">找到 {{ settingStore.extractedMcpServers.length }} 个MCP服务器:</p>
+                                        <v-checkbox v-for="(server, idx) in settingStore.extractedMcpServers" :key="idx"
+                                            v-model="settingStore.selectedMcpServers" :value="idx"
+                                            class="mb-2" hide-details>
+                                            <template #label>
+                                                <span class="font-weight-bold">{{ server.name }}</span>
+                                                <span class="text-caption text-grey ml-2">
+                                                    <v-icon size="small" :icon="server.type === 'http' ? 'mdi-cloud' : 'mdi-console'"></v-icon>
+                                                    {{ server.type === 'http' ? server.url : server.command }}
+                                                    {{ server.args ? `(${server.args.length} 参数)` : '' }}
+                                                </span>
+                                            </template>
+                                        </v-checkbox>
+                                    </div>
+                                    
+                                    <v-alert v-if="settingStore.mcpJsonError" type="error" class="mb-4" closable @input="settingStore.mcpJsonError = ''">
+                                        {{ settingStore.mcpJsonError }}
+                                    </v-alert>
+                                </div>
+                            </v-window-item>
                             
-                            <v-btn variant="flat" color="primary" class="mb-4" @click="settingStore.parseAndShowMcpServers()">
-                                <v-icon start>mdi-magnify</v-icon>Extract Servers
-                            </v-btn>
-                            
-                            <!-- Extracted Servers List -->
-                            <div v-if="settingStore.extractedMcpServers.length > 0" class="mb-4">
-                                <p class="text-subtitle2 mb-2">Found {{ settingStore.extractedMcpServers.length }} MCP Server(s):</p>
-                                <v-checkbox v-for="(server, idx) in settingStore.extractedMcpServers" :key="idx"
-                                    v-model="settingStore.selectedMcpServers" :value="idx"
-                                    class="mb-2" hide-details>
-                                    <template #label>
-                                        <span class="font-weight-bold">{{ server.name }}</span>
-                                        <span class="text-caption text-grey ml-2">
-                                            <v-icon size="small" :icon="server.type === 'http' ? 'mdi-cloud' : 'mdi-console'"></v-icon>
-                                            {{ server.type === 'http' ? server.url : server.command }}
-                                            {{ server.args ? `(${server.args.length} args)` : '' }}
-                                        </span>
-                                    </template>
-                                </v-checkbox>
-                            </div>
-                            
-                            <v-alert v-if="settingStore.mcpJsonError" type="error" class="mb-4" closable @input="settingStore.mcpJsonError = ''">
-                                {{ settingStore.mcpJsonError }}
-                            </v-alert>
-                        </div>
+                            <!-- Registry Manager Tab -->
+                            <v-window-item value="registry-manager">
+                                <div class="pa-4">
+                                    <!-- 仓库状态部分 -->
+                                    <div class="mb-6">
+                                        <h3 class="text-h6 mb-3">仓库状态</h3>
+                                        <v-card :class="settingStore.registryRunning ? 'bg-green-lighten-5' : 'bg-red-lighten-5'" class="pa-4">
+                                            <div class="d-flex align-center mb-2">
+                                                <v-icon :icon="settingStore.registryRunning ? 'mdi-server' : 'mdi-server-off'" 
+                                                    :color="settingStore.registryRunning ? 'green' : 'red'" class="mr-2"></v-icon>
+                                                <span class="font-weight-medium">{{ settingStore.registryRunning ? '运行中' : '已停止' }}</span>
+                                            </div>
+                                            <div v-if="settingStore.registryRunning && settingStore.registryUrl" class="text-caption">
+                                                URL: {{ settingStore.registryUrl }}
+                                            </div>
+                                        </v-card>
+                                        
+                                        <div class="mt-3 d-flex gap-2">
+                                            <v-btn :disabled="settingStore.registryRunning" 
+                                                color="success" variant="elevated" @click="settingStore.startRegistry">
+                                                <v-icon start>mdi-play</v-icon>启动仓库
+                                            </v-btn>
+                                            <v-btn :disabled="!settingStore.registryRunning" 
+                                                color="error" variant="elevated" @click="settingStore.stopRegistry">
+                                                <v-icon start>mdi-stop</v-icon>停止仓库
+                                            </v-btn>
+                                            <v-btn color="primary" variant="outlined" @click="settingStore.updateRegistryStatus">
+                                                <v-icon start>mdi-refresh</v-icon>刷新状态
+                                            </v-btn>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 依赖包管理部分 -->
+                                    <div class="mb-6">
+                                        <h3 class="text-h6 mb-3">依赖包管理</h3>
+                                        <v-file-input v-model="settingStore.registryZipFile" 
+                                            accept=".zip" 
+                                            label="选择包含.tgz文件的zip压缩包"
+                                            prepend-icon="mdi-file-upload"
+                                            variant="outlined"
+                                            density="compact"
+                                            class="mb-3">
+                                        </v-file-input>
+                                        
+                                        <v-btn :disabled="!settingStore.registryZipFile || settingStore.registryProcessing" 
+                                            color="primary" variant="elevated" @click="settingStore.processRegistryDependencies">
+                                            <v-icon start>mdi-cog</v-icon>处理依赖包
+                                        </v-btn>
+                                    </div>
+                                    
+                                    <!-- 操作日志部分 -->
+                                    <div>
+                                        <h3 class="text-h6 mb-3">操作日志</h3>
+                                        <v-card variant="outlined" class="pa-3" height="200" style="overflow-y: auto;">
+                                            <pre class="text-caption" style="font-family: monospace; white-space: pre-wrap;">{{ settingStore.registryLog }}</pre>
+                                        </v-card>
+                                        
+                                        <!-- 进度条 -->
+                                        <div v-if="settingStore.registryProgress > 0 && settingStore.registryProgress < 100" class="mt-3">
+                                            <v-progress-linear v-model="settingStore.registryProgress" 
+                                                height="20" 
+                                                color="primary">
+                                                <template v-slot:default="{ value }">
+                                                    <strong>{{ Math.ceil(value) }}%</strong>
+                                                </template>
+                                            </v-progress-linear>
+                                            <div class="text-caption mt-1">{{ settingStore.registryProgressText }}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 通知 -->
+                                    <v-snackbar v-model="settingStore.registryNotification.show" 
+                                        :color="settingStore.registryNotification.type"
+                                        location="top"
+                                        timeout="3000">
+                                        {{ settingStore.registryNotification.message }}
+                                    </v-snackbar>
+                                </div>
+                            </v-window-item>
+                        </v-window>
                     </v-card-text>
 
                     <v-card-actions>
                         <v-spacer></v-spacer>
-                        <v-btn variant="outlined" @click="settingStore.addMcpDialog = false">Cancel</v-btn>
-                        <v-btn variant="flat" color="primary" 
+                        <v-btn variant="outlined" @click="settingStore.addMcpDialog = false">取消</v-btn>
+                        <v-btn v-if="settingStore.mcpTab === 'add-server'" variant="flat" color="primary" 
                             :disabled="settingStore.selectedMcpServers.length === 0"
                             @click="settingStore.addExtractedMcpServers()">
-                            Add Selected ({{ settingStore.selectedMcpServers.length }})
+                            添加所选 ({{ settingStore.selectedMcpServers.length }})
                         </v-btn>
                     </v-card-actions>
                 </v-card>
@@ -1682,6 +1772,7 @@
                 
                 // MCP Server configuration
                 addMcpDialog: false,
+                mcpTab: 'add-server', // 'add-server' or 'registry-manager'
                 mcpServerName: '',
                 mcpServerType: 'local', // http, or local
                 mcpServerUrl: '',
@@ -1704,6 +1795,20 @@
                 // MCP Server config viewer
                 mcpConfigViewerDialog: false,
                 mcpConfigViewerServer: null, // The server being viewed
+                
+                // Registry Manager state
+                registryRunning: false,
+                registryUrl: '',
+                registryZipFile: null,
+                registryProcessing: false,
+                registryLog: '',
+                registryProgress: 0,
+                registryProgressText: '',
+                registryNotification: {
+                    show: false,
+                    message: '',
+                    type: 'success'
+                }
             }),
             actions: {
                 initDialog() {
@@ -1984,6 +2089,122 @@
                         this.refreshMcpServersList();
                         delete this.mcpServerStatus[serverName];
                     }
+                },
+                
+                // Registry Manager methods
+                async startRegistry() {
+                    try {
+                        this.addRegistryLog('正在启动内部npm仓库...');
+                        
+                        const result = await window.registryAPI.start();
+
+                        if (result.success) {
+                            this.addRegistryLog('内部npm仓库启动成功');
+                            this.showRegistryNotification('内部npm仓库启动成功', true);
+                        } else {
+                            this.addRegistryLog(`内部npm仓库启动失败: ${result.message}`);
+                            this.showRegistryNotification('内部npm仓库启动失败', false);
+                        }
+
+                        await this.updateRegistryStatus();
+                    } catch (error) {
+                        this.addRegistryLog(`启动仓库时出错: ${error.message}`);
+                        this.showRegistryNotification('启动仓库时出错', false);
+                    }
+                },
+                
+                async stopRegistry() {
+                    try {
+                        this.addRegistryLog('正在停止内部npm仓库...');
+
+                        const result = await window.registryAPI.stop();
+                        
+                        if (result.success) {
+                            this.addRegistryLog('内部npm仓库已停止');
+                            this.showRegistryNotification('内部npm仓库已停止', true);
+                        } else {
+                            this.addRegistryLog(`停止内部npm仓库失败: ${result.message}`);
+                            this.showRegistryNotification('停止内部npm仓库失败', false);
+                        }
+                        
+                        await this.updateRegistryStatus();
+                    } catch (error) {
+                        this.addRegistryLog(`停止仓库时出错: ${error.message}`);
+                        this.showRegistryNotification('停止仓库时出错', false);
+                    }
+                },
+                
+                async updateRegistryStatus() {
+                    try {
+                        const status = await window.registryAPI.status();
+
+                        this.registryRunning = status.running;
+                        this.registryUrl = status.url || '';
+
+                        this.addRegistryLog(`状态更新 ${status.running ? '运行中' : '已停止'}`);
+                    } catch (error) {
+                        this.addRegistryLog(`获取状态失败 ${error.message}`);
+                        this.showRegistryNotification('获取仓库状态失败', false);
+                    }
+                },
+                
+                async processRegistryDependencies() {
+                    if (!this.registryZipFile) {
+                        this.showRegistryNotification('请选择一个zip文件', false);
+                        return;
+                    }
+
+                    try {
+                        this.addRegistryLog(`正在处理依赖包 ${this.registryZipFile.name}`);
+                        this.registryProcessing = true;
+                        
+                        // 显示进度条
+                        this.updateRegistryProgress(5, '准备处理依赖包...');
+
+                        // 使用FileReader读取文件内容并保存到临时文件
+                        const arrayBuffer = await this.registryZipFile.arrayBuffer();
+                        const uint8Array = new Uint8Array(arrayBuffer);
+                        
+                        // 调用主进程API保存文件并获取路径
+                        this.updateRegistryProgress(10, '正在上传文件...');
+                        const result = await window.registryAPI.processDependencies({
+                            name: this.registryZipFile.name,
+                            data: Array.from(uint8Array)
+                        });
+
+                        if (result.success) {
+                            this.updateRegistryProgress(100, '依赖包处理完成');
+                            this.addRegistryLog('依赖包处理成功');
+                            this.showRegistryNotification('依赖包处理成功', true);
+                        } else {
+                            this.addRegistryLog(`依赖包处理失败: ${result.message}`);
+                            this.showRegistryNotification('依赖包处理失败', false);
+                            this.updateRegistryProgress(0, '处理失败');
+                        }
+                    } catch (error) {
+                        this.addRegistryLog(`处理依赖包时出错: ${error.message}`);
+                        this.showRegistryNotification('处理依赖包时出错', false);
+                        this.updateRegistryProgress(0, '处理出错');
+                    } finally {
+                        this.registryProcessing = false;
+                    }
+                },
+                
+                // Registry Manager helper methods
+                addRegistryLog(message) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    this.registryLog += `[${timestamp}] ${message}\n`;
+                },
+                
+                updateRegistryProgress(value, text) {
+                    this.registryProgress = value;
+                    this.registryProgressText = text;
+                },
+                
+                showRegistryNotification(message, isSuccess = true) {
+                    this.registryNotification.message = message;
+                    this.registryNotification.type = isSuccess ? 'success' : 'error';
+                    this.registryNotification.show = true;
                 }
 
             },

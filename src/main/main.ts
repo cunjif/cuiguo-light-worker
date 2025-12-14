@@ -172,13 +172,13 @@ async function createWindow() {
     {
       label: '应用',
       submenu: [
-        {
-          label: '插件管理',
-          click: () => {
-            createRegistryWindow();
-          }
-        },
-        { type: 'separator' },
+        // {
+        //   label: '插件管理',
+        //   click: () => {
+        //     createRegistryWindow();
+        //   }
+        // },
+        // { type: 'separator' },
         {
           label: '退出',
           click: () => {
@@ -191,20 +191,20 @@ async function createWindow() {
         }
       ]
     },
-    {
-      label: '视图',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    }
+    // {
+    //   label: '视图',
+    //   submenu: [
+    //     { role: 'reload' },
+    //     { role: 'forceReload' },
+    //     { role: 'toggleDevTools' },
+    //     { type: 'separator' },
+    //     { role: 'resetZoom' },
+    //     { role: 'zoomIn' },
+    //     { role: 'zoomOut' },
+    //     { type: 'separator' },
+    //     { role: 'togglefullscreen' }
+    //   ]
+    // }
   ]);
 
   Menu.setApplicationMenu(menu);
