@@ -347,7 +347,7 @@
                                 </v-list>
                             </v-menu>
                         </v-badge>
-                        <v-btn @click="settingStore.agentDialog = true" variant="elevated" icon="mdi-account-supervisor"
+                        <v-btn @click="() => { settingStore.refreshMcpServersList(); settingStore.agentDialog = true; }" variant="elevated" icon="mdi-account-supervisor"
                             v-tooltip:end="$t('$vuetify.dataIterator.a.title')">
                         </v-btn>
                         <!-- mcpStore.getServers -->
