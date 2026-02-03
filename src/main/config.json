@@ -26,6 +26,16 @@
       "args": [
         "bazi-mcp"
       ]
+    },
+     "MCPControl": {
+      "command": "mcp-control",
+      "args": ["--sse"]
+    },
+    "Markitdown Server": {
+      "command": "npx",
+      "args": [
+        "markitdown-mcp"
+      ]
     }
   }
 }

@@ -138,3 +138,5 @@ deps*
 .yarn/install-state.gz
 .pnp.*
 env/*
+
+extensions/*

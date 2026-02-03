@@ -1,73 +1,77 @@
 {
-    "name": "cuiguo-light-workstation",
-    "version": "1.0.0",
-    "author": {
-        "name": "- (排名不分先后)",
-        "email": "nobug@unknown.com"
+  "name": "cuiguo-light-workstation",
+  "version": "1.0.0",
+  "author": {
+    "name": "- (枢款不分先后)",
+    "email": "nobug@unknown.com"
+  },
+  "description": "light workstation for mcp",
+  "main": "dist/main/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "npm run build && electron ./dist/main/main.js",
+    "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
+    "build-app": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.cuiguo.lightworkstation",
+    "directories": {
+      "output": "artifacts"
     },
-    "description": "light workstation for mcp",
-    "main": "dist/main/main.js",
-    "type": "module",
-    "scripts": {
-        "start": "npm run build && electron ./dist/main/main.js",
-        "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
-        "build-app": "npm run build && electron-builder"
+    "files": [
+      "**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "./src/main/config.json",
+        "to": "./"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
     },
-    "build": {
-        "appId": "com.cuiguo.lightworkstation",
-        "directories": {
-            "output": "artifacts"
-        },
-        "files": [
-            "**/*"
-        ],
-        "extraFiles": [
-            {
-                "from": "./src/main/config.json",
-                "to": "."
-            }
-        ],
-        "win": {
-            "target": "nsis",
-            "icon": "icon.ico"
-        },
-        "mac": {
-            "target": "dmg",
-            "icon": "icon.icns"
-        },
-        "linux": {
-            "target": [
-                "AppImage",
-                "deb",
-                "rpm"
-            ],
-            "icon": "icon.png"
-        },
-        "nsis": {
-            "oneClick": false,
-            "allowToChangeInstallationDirectory": true
-        }
+    "mac": {
+      "target": "dmg",
+      "icon": "icon.icns"
     },
-    "devDependencies": {
-        "@types/node-notifier": "^8.0.5",
-        "copyfiles": "^2.4.1",
-        "electron": "^39.2.1",
-        "electron-builder": "^26.2.0",
-        "electron-debug": "^4.1.0",
-        "node-notifier": "^10.0.1",
-        "typescript": "^5.7.3"
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "icon": "icon.png"
     },
-    "dependencies": {
-        "@cfworker/json-schema": "^4.1.1",
-        "@modelcontextprotocol/sdk": "^1.13.2",
-        "@types/tar": "^6.1.13",
-        "aigroup-mdtoword-mcp": "^4.0.1",
-        "bazi-mcp": "^0.1.0",
-        "compressing": "^2.0.0",
-        "filesystem": "^1.0.1",
-        "form-data": "^4.0.5",
-        "markdownify": "^0.1.0",
-        "playwright-mcp": "^0.0.13",
-        "verdaccio": "^6.2.3"
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
+  },
+  "devDependencies": {
+    "@types/node-notifier": "^8.0.5",
+    "copyfiles": "^2.4.1",
+    "electron": "^39.2.1",
+    "electron-builder": "^26.2.0",
+    "electron-debug": "^4.1.0",
+    "node-notifier": "^10.0.1",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/sdk": "^1.13.2",
+    "@napi-rs/canvas": "^0.1.89",
+    "@playwright/test": "^1.39.0",
+    "@types/tar": "^6.1.13",
+    "aigroup-mdtoword-mcp": "^4.0.1",
+    "bazi-mcp": "^0.1.0",
+    "compressing": "^2.0.0",
+    "filesystem": "^1.0.1",
+    "form-data": "^4.0.5",
+    "markdownify": "^0.1.0",
+    "markitdown-mcp": "file:markitdown-mcp-1.0.0.tgz",
+    "mcp-control": "^0.2.0",
+    "playwright-mcp": "^0.0.10",
+    "verdaccio": "^2.2.6"
+  }
 }

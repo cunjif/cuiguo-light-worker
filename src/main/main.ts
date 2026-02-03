@@ -167,6 +167,17 @@ async function createWindow() {
   mainWindow.loadFile(indexPath);
   mainWindowRef = mainWindow;
 
+  // 添加 F12 和 Ctrl+Shift+I 快捷键打开开发者工具
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools();
+      }
+    }
+  });
+
   // 创建应用菜单
   const menu = Menu.buildFromTemplate([
     {

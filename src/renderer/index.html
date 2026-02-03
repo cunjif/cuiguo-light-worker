@@ -372,7 +372,14 @@
                                         <v-row>
                                             <v-img v-if="messageStore.base64" class="chat-images mt-1"
                                                 :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
-                                            <v-file-input v-else @click.stop accept="image/*" hide-input
+                                            <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
+                                                @click="messageStore.images=[]" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                <v-icon size="24" color="primary">mdi-file-document</v-icon>
+                                                <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+                                                    {{ messageStore.documentType.toUpperCase() }}
+                                                </span>
+                                            </div>
+                                            <v-file-input v-else @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md" hide-input
                                                 v-model="messageStore.images"
                                                 prepend-icon="mdi-plus-circle-outline"></v-file-input>
                                         </v-row>
@@ -618,6 +625,11 @@
                                     <v-combobox class="px-2" density='compact'
                                         :label="$t('$vuetify.dataIterator.i.authPrefix')"
                                         :items="defaultChoiceStore.authPrefix" v-model="chatbotStore.authPrefix"
+                                        variant="outlined">
+                                    </v-combobox>
+                                    <v-combobox class="px-2" density='compact'
+                                        :label="$t('$vuetify.dataIterator.i.authHeaderName')"
+                                        :items="['Authorization', 'x-api-key', 'Token']" v-model="chatbotStore.authHeaderName"
                                         variant="outlined">
                                     </v-combobox>
                                 </v-expansion-panel-text>
@@ -2537,6 +2549,8 @@
                         conversation: [],
                         images: [],
                         base64: '',
+                        documentContent: '',
+                        documentType: '',
                         generating: false
                     }),
                     actions: {
@@ -2555,6 +2569,8 @@
                         clear() {
                             this.userMessage = "";
                             this.images = [];
+                            this.documentContent = '';
+                            this.documentType = '';
                         },
                         handleKeydown(e) {
                             if (e.key === "Enter" && e.shiftKey) {
@@ -2579,17 +2595,37 @@
                             }
                         },
                         sendMessage() {
-                            if (this.userMessage) {
+                            if (this.userMessage || this.documentContent) {
                                 // Add the message to the list
 
                                 const imageBase64 = this.base64;
+                                const docContent = this.documentContent;
+
+                                let content = this.userMessage;
+
+                                // If document is provided, add it to the message
+                                if (docContent) {
+                                    const typeMap = {
+                                        'doc': 'Word',
+                                        'docx': 'Word',
+                                        'ppt': 'PowerPoint',
+                                        'pptx': 'PowerPoint',
+                                        'xls': 'Excel',
+                                        'xlsx': 'Excel',
+                                        'txt': 'Text',
+                                        'pdf': 'PDF',
+                                        'md': 'Markdown'
+                                    };
+                                    const docType = typeMap[this.documentType] || 'Document';
+                                    content = `[${docType} Document Content]\n\n${docContent}\n\n${this.userMessage}`;
+                                }
 
                                 this.conversation.push({
                                     content: imageBase64
                                         ? [
                                             { type: "image_url", image_url: { url: imageBase64 } },
-                                            { type: "text", text: this.userMessage }
-                                        ] : this.userMessage,
+                                            { type: "text", text: content }
+                                        ] : content,
                                     role: "user",
                                 });
 
@@ -2802,6 +2838,7 @@
                         path: "/chat/completions",
                         model: "Qwen/Qwen3-32B",
                         authPrefix: "Bearer",
+                        authHeaderName: "Authorization",
                         contentType: "application/json",
                         max_tokens_type: "max_tokens",
                         max_tokens_value: "",
@@ -2863,7 +2900,7 @@
                             "Content-Type": chatbotStore.contentType,
                         };
 
-                        if (chatbotStore.apiKey) headers.Token = `${chatbotStore.authPrefix} ${chatbotStore.apiKey}`
+                        if (chatbotStore.apiKey) headers[chatbotStore.authHeaderName || "Authorization"] = `${chatbotStore.authPrefix} ${chatbotStore.apiKey}`
 
                         const body = {
                             messages: agentStore.promptMessage(conversation),
@@ -3102,50 +3139,66 @@
                     (newValue, oldValue) => {
                         if (newValue.length === 0) {
                             messageStore.base64 = '';
+                            messageStore.documentContent = '';
+                            messageStore.documentType = '';
                         } else {
-                            const file = messageStore.images; // Assuming you're working with a single image
-                            const reader = new FileReader();
-                            const MAX_WIDTH = 2048;
-                            const MAX_HEIGHT = 2048; // adjust these values as needed
+                            const file = messageStore.images; // Assuming you're working with a single file
 
-                            reader.onload = (e) => {
-                                const img = new Image();
-                                img.onload = () => {
-                                    let width = img.width;
-                                    let height = img.height;
-                                    let quality = 0.8;
+                            // Check if it's an image file
+                            if (file.type.startsWith('image/')) {
+                                const reader = new FileReader();
+                                const MAX_WIDTH = 2048;
+                                const MAX_HEIGHT = 2048; // adjust these values as needed
 
-                                    // Check if the image exceeds the maximum dimensions
-                                    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-                                        // Calculate the scaling factor
-                                        const scaleFactor = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+                                reader.onload = (e) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        let width = img.width;
+                                        let height = img.height;
+                                        let quality = 0.8;
 
-                                        // Resize the image
-                                        width *= scaleFactor;
-                                        height *= scaleFactor;
-                                        quality *= scaleFactor;
+                                        // Check if the image exceeds the maximum dimensions
+                                        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                                            // Calculate the scaling factor
+                                            const scaleFactor = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
 
-                                    }
+                                            // Resize the image
+                                            width *= scaleFactor;
+                                            height *= scaleFactor;
+                                            quality *= scaleFactor;
 
-                                    const canvas = document.createElement('canvas');
-                                    const ctx = canvas.getContext('2d');
+                                        }
 
-                                    // Set canvas dimensions to match the resized image
-                                    canvas.width = width;
-                                    canvas.height = height;
+                                        const canvas = document.createElement('canvas');
+                                        const ctx = canvas.getContext('2d');
 
-                                    // Draw the image on the canvas
-                                    ctx.drawImage(img, 0, 0, width, height);
+                                        // Set canvas dimensions to match the resized image
+                                        canvas.width = width;
+                                        canvas.height = height;
 
-                                    // Convert the canvas to a PNG data URL
-                                    const pngDataUrl = canvas.toDataURL('image/jpeg', quality);
+                                        // Draw the image on the canvas
+                                        ctx.drawImage(img, 0, 0, width, height);
 
-                                    // Store the PNG data URL in messageStore.base64
-                                    messageStore.base64 = pngDataUrl;
+                                        // Convert the canvas to a PNG data URL
+                                        const pngDataUrl = canvas.toDataURL('image/jpeg', quality);
+
+                                        // Store the PNG data URL in messageStore.base64
+                                        messageStore.base64 = pngDataUrl;
+                                        messageStore.documentType = '';
+                                    };
+                                    img.src = e.target.result;
                                 };
-                                img.src = e.target.result;
-                            };
-                            reader.readAsDataURL(file);
+                                reader.readAsDataURL(file);
+                            } else {
+                                // Handle document files (text-based)
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    messageStore.documentContent = e.target.result;
+                                    messageStore.documentType = file.name.split('.').pop().toLowerCase();
+                                    messageStore.base64 = '';
+                                };
+                                reader.readAsText(file);
+                            }
                         }
                     }, { deep: true });
 
@@ -3332,6 +3385,7 @@
                             topP: 'Top P',
                             contentType: 'Content Type',
                             authPrefix: 'Auth Prefix',
+                            authHeaderName: 'Auth Header Name',
                             configFile: 'Config File'
                         },
                         snackbar: {
@@ -3378,6 +3432,7 @@
                             topP: '核采样（候选词范围）',
                             contentType: '媒体类型',
                             authPrefix: '鉴权请求头',
+                            authHeaderName: '认证请求头名称',
                             configFile: '配置文件'
                         },
                         snackbar: {
