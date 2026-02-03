@@ -10,7 +10,10 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "./"
+        "./",
+        "C:\\",
+        "/",
+        "*/**"
       ],
       "command": "npx"
     },
@@ -27,7 +30,7 @@
         "bazi-mcp"
       ]
     },
-     "MCPControl": {
+    "MCPControl": {
       "command": "mcp-control",
       "args": ["--sse"]
     },
