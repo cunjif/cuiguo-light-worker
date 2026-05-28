@@ -486,6 +486,15 @@
 
                     <v-card-text class="pb-0">
                         <!-- ---------------------------------------------- -->
+                        <!-- Provider Type -->
+                        <!-- ---------------------------------------------- -->
+                        <v-select density='compact' color="primary" variant="outlined"
+                            v-model="chatbotStore.provider"
+                            class="px-2 mb-4" label="Provider Type" prepend-inner-icon="mdi-cloud-outline"
+                            :items="providerTypes" @update:model-value="onProviderChange"
+                            hide-details></v-select>
+
+                        <!-- ---------------------------------------------- -->
                         <!-- APIKEY -->
                         <!-- ---------------------------------------------- -->
                         <v-text-field density='compact' color="primary" variant="outlined"
@@ -632,6 +641,25 @@
                                         :items="['Authorization', 'x-api-key', 'Token']" v-model="chatbotStore.authHeaderName"
                                         variant="outlined">
                                     </v-combobox>
+                                    <v-text-field v-if="providerCapabilities.seedSupported"
+                                        class="px-2" density='compact' label="Seed"
+                                        v-model.number="chatbotStore.seed" type='number' variant="outlined">
+                                    </v-text-field>
+                                    <v-text-field v-if="providerCapabilities.seedSupported"
+                                        class="px-2" density='compact' label="Frequency Penalty"
+                                        v-model.number="chatbotStore.frequency_penalty" type='number' variant="outlined"
+                                        :rules="[value => value === null || (value >= -2 && value <= 2)]">
+                                    </v-text-field>
+                                    <v-checkbox v-if="chatbotStore.provider === 'minimax'"
+                                        v-model="chatbotStore.mask_sensitive_info"
+                                        label="Mask Sensitive Info" density='compact' color="primary">
+                                    </v-checkbox>
+                                    <div v-if="chatbotStore.provider === 'anthropic-compatible'" class="px-2 text-caption text-grey">
+                                        Auth Prefix is not needed for Anthropic (x-api-key is used directly)
+                                    </div>
+                                    <div v-if="chatbotStore.provider === 'glm'" class="px-2 text-caption text-grey">
+                                        Temperature auto-adapted (do_sample will be set automatically)
+                                    </div>
                                 </v-expansion-panel-text>
                             </v-expansion-panel>
                         </v-expansion-panels>
@@ -1259,6 +1287,265 @@
         const { createPinia, defineStore, storeToRefs } = Pinia
         const { createI18n, useI18n } = VueI18n
         const { en, it, ja, sv, zhHans } = 'vuetify/locale'
+
+        // ========== Provider Abstraction Layer (Inline) ==========
+        const PROVIDER_TYPES = ['openai-compatible', 'anthropic-compatible', 'glm', 'qwen', 'kimi', 'minimax', 'doubao-seed'];
+
+        const providerRegistry = new Map();
+
+        function registerProvider(config) {
+            const required = ['type', 'connectionPreset', 'capabilities', 'requestTransformer', 'responseTransformer', 'errorTransformer'];
+            for (const key of required) {
+                if (config[key] === undefined || config[key] === null) {
+                    throw new Error(`Provider registration failed: missing required field "${key}" for type "${config.type}"`);
+                }
+            }
+            if (providerRegistry.has(config.type)) {
+                throw new Error(`Provider registration failed: duplicate type "${config.type}"`);
+            }
+            providerRegistry.set(config.type, config);
+        }
+
+        function getProvider(type) {
+            const provider = providerRegistry.get(type);
+            if (provider) return provider;
+            const fallback = providerRegistry.get('openai-compatible');
+            if (fallback) {
+                console.warn(`Provider "${type}" not found, falling back to openai-compatible`);
+                return fallback;
+            }
+            throw new Error('No provider registered');
+        }
+
+        function getAllProviderTypes() { return Array.from(providerRegistry.keys()); }
+        function getConnectionPreset(type) { return getProvider(type).connectionPreset; }
+        function getCapabilities(type) { return getProvider(type).capabilities; }
+
+        function openaiResponseTransformer(sseChunk) {
+            if ('choices' in sseChunk && Array.isArray(sseChunk.choices) && sseChunk.choices.length > 0) {
+                const choice = sseChunk.choices[0];
+                const delta = choice.delta || choice.message;
+                if (!delta) return null;
+                return {
+                    content: typeof delta.content === 'string' ? delta.content : '',
+                    reasoning_content: typeof delta.reasoning_content === 'string' ? delta.reasoning_content : '',
+                    tool_calls: Array.isArray(delta.tool_calls) ? delta.tool_calls : [],
+                    finish_reason: choice.finish_reason || null,
+                };
+            }
+            if ('response' in sseChunk) {
+                const resp = sseChunk.response;
+                if (!resp) return null;
+                return { content: typeof resp.content === 'string' ? resp.content : '', reasoning_content: '', tool_calls: [], finish_reason: null };
+            }
+            return null;
+        }
+
+        function openaiErrorTransformer(err) {
+            if (err.error && typeof err.error === 'object' && typeof err.error.message === 'string') return err.error.message;
+            if (Array.isArray(err.detail) && err.detail.length > 0) {
+                const d = err.detail[0];
+                if (typeof d.msg === 'string') return `${d.loc ? ' - ' + d.loc + ':' : ':'} ${d.msg}`;
+            }
+            return String(err.message || 'Unknown error');
+        }
+
+        function chineseErrorTransformer(err) {
+            if (Array.isArray(err.detail) && err.detail.length > 0) {
+                const d = err.detail[0];
+                if (typeof d.msg === 'string') return `${d.loc ? ' - ' + d.loc + ':' : ':'} ${d.msg}`;
+            }
+            if (err.error && typeof err.error === 'object' && typeof err.error.message === 'string') return err.error.message;
+            return String(err.message || 'Unknown error');
+        }
+
+        function openaiRequestTransformer(skeleton) { return skeleton; }
+
+        // Register OpenAI Compatible
+        registerProvider({
+            type: 'openai-compatible',
+            connectionPreset: { defaultUrl: 'https://api.openai.com', defaultPath: '/v1/chat/completions', defaultModel: 'gpt-4o', authHeaderName: 'Authorization', authPrefix: 'Bearer ' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false },
+            requestTransformer: openaiRequestTransformer,
+            responseTransformer: openaiResponseTransformer,
+            errorTransformer: openaiErrorTransformer,
+        });
+
+        // Register Anthropic Compatible
+        registerProvider({
+            type: 'anthropic-compatible',
+            connectionPreset: { defaultUrl: 'https://api.anthropic.com', defaultPath: '/v1/messages', defaultModel: 'claude-3-5-sonnet-20241022', authHeaderName: 'x-api-key', authPrefix: '' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false },
+            requestTransformer: (skeleton) => {
+                const body = { ...skeleton };
+                const messages = [...body.messages];
+                const systemMessages = messages.filter(m => m.role === 'system');
+                const otherMessages = messages.filter(m => m.role !== 'system');
+                body.messages = otherMessages;
+                if (systemMessages.length > 0) body.system = systemMessages.map(m => m.content).join('\n\n');
+                if (!body.max_tokens) body.max_tokens = 8192;
+                return body;
+            },
+            responseTransformer: (sseChunk) => {
+                if (sseChunk.type === 'content_block_delta') {
+                    const delta = sseChunk.delta;
+                    if (!delta) return null;
+                    if (delta.type === 'text_delta') return { content: typeof delta.text === 'string' ? delta.text : '', reasoning_content: '', tool_calls: [], finish_reason: null };
+                    if (delta.type === 'thinking_delta') return { content: '', reasoning_content: typeof delta.thinking === 'string' ? delta.thinking : '', tool_calls: [], finish_reason: null };
+                    if (delta.type === 'input_json_delta') return { content: '', reasoning_content: '', tool_calls: [{ function: { arguments: typeof delta.partial_json === 'string' ? delta.partial_json : '' } }], finish_reason: null };
+                    return null;
+                }
+                if (sseChunk.type === 'content_block_start') {
+                    const cb = sseChunk.content_block;
+                    if (cb && cb.type === 'tool_use') return { content: '', reasoning_content: '', tool_calls: [{ id: cb.id, function: { name: cb.name } }], finish_reason: null };
+                    return null;
+                }
+                if (sseChunk.type === 'message_delta') return { content: '', reasoning_content: '', tool_calls: [], finish_reason: sseChunk.delta?.stop_reason || null };
+                return null;
+            },
+            errorTransformer: (err) => {
+                if (err.error && typeof err.error === 'object' && typeof err.error.message === 'string') return err.error.message;
+                return String(err.message || 'Unknown error');
+            },
+        });
+
+        // Register GLM
+        registerProvider({
+            type: 'glm',
+            connectionPreset: { defaultUrl: 'https://open.bigmodel.cn', defaultPath: '/api/paas/v4/chat/completions', defaultModel: 'glm-4', authHeaderName: 'Authorization', authPrefix: 'Bearer ' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false },
+            requestTransformer: (skeleton, config) => {
+                const body = { ...skeleton };
+                if (config.temperature && parseFloat(config.temperature) > 0) body.do_sample = true;
+                return body;
+            },
+            responseTransformer: openaiResponseTransformer,
+            errorTransformer: chineseErrorTransformer,
+        });
+
+        // Register Qwen
+        registerProvider({
+            type: 'qwen',
+            connectionPreset: { defaultUrl: 'https://dashscope.aliyuncs.com', defaultPath: '/compatible-mode/v1/chat/completions', defaultModel: 'qwen-plus', authHeaderName: 'Authorization', authPrefix: 'Bearer ' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false },
+            requestTransformer: openaiRequestTransformer,
+            responseTransformer: openaiResponseTransformer,
+            errorTransformer: chineseErrorTransformer,
+        });
+
+        // Register Kimi
+        registerProvider({
+            type: 'kimi',
+            connectionPreset: { defaultUrl: 'https://api.moonshot.cn', defaultPath: '/v1/chat/completions', defaultModel: 'moonshot-v1-8k', authHeaderName: 'Authorization', authPrefix: 'Bearer ' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false },
+            requestTransformer: (skeleton, config) => {
+                const body = { ...skeleton };
+                if (typeof config.reasoning_effort === 'string') body.reasoning_effort = config.reasoning_effort;
+                return body;
+            },
+            responseTransformer: openaiResponseTransformer,
+            errorTransformer: chineseErrorTransformer,
+        });
+
+        // Register MiniMax
+        registerProvider({
+            type: 'minimax',
+            connectionPreset: { defaultUrl: 'https://api.minimax.chat', defaultPath: '/v1/text/chatcompletion_v2', defaultModel: 'MiniMax-Text-01', authHeaderName: 'Authorization', authPrefix: 'Bearer ' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: false, seedSupported: false },
+            requestTransformer: (skeleton, config) => {
+                const body = { ...skeleton };
+                if (config.mask_sensitive_info) body.mask_sensitive_info = true;
+                return body;
+            },
+            responseTransformer: openaiResponseTransformer,
+            errorTransformer: chineseErrorTransformer,
+        });
+
+        // Register Doubao-Seed
+        registerProvider({
+            type: 'doubao-seed',
+            connectionPreset: { defaultUrl: 'https://ark.cn-beijing.volces.com', defaultPath: '/api/v3/chat/completions', defaultModel: 'doubao-pro-32k', authHeaderName: 'Authorization', authPrefix: 'Bearer ' },
+            capabilities: { streamSupported: true, toolCallSupported: true, reasoningSupported: false, seedSupported: true },
+            requestTransformer: (skeleton, config) => {
+                const body = { ...skeleton };
+                if (config.seed !== undefined && config.seed !== null) body.seed = config.seed;
+                if (config.frequency_penalty !== undefined && config.frequency_penalty !== null) body.frequency_penalty = config.frequency_penalty;
+                return body;
+            },
+            responseTransformer: openaiResponseTransformer,
+            errorTransformer: chineseErrorTransformer,
+        });
+
+        function buildRequestSkeleton(config, messages) {
+            const skeleton = { messages, model: config.model, stream: config.stream };
+            if (config.max_tokens_value) skeleton[config.max_tokens_type] = parseInt(config.max_tokens_value);
+            if (typeof config.reasoning_effort === 'string') {
+                if (config.reasoning_effort === 'false') skeleton['chat_template_kwargs'] = { enable_thinking: false };
+                else skeleton['reasoning_effort'] = config.reasoning_effort;
+            }
+            if (config.temperature) skeleton['temperature'] = parseFloat(config.temperature);
+            if (config.top_p) skeleton['top_p'] = parseFloat(config.top_p);
+            return skeleton;
+        }
+
+        function buildAuthHeaders(config) {
+            const headers = { 'Content-Type': config.contentType || 'application/json' };
+            const provider = getProvider(config.provider);
+            const authHeaderName = config.authHeaderName || provider.connectionPreset.authHeaderName;
+            const authPrefix = config.authPrefix !== undefined ? config.authPrefix : provider.connectionPreset.authPrefix;
+            if (config.apiKey) headers[authHeaderName] = `${authPrefix}${config.apiKey}`;
+            if (config.provider === 'anthropic-compatible') headers['anthropic-version'] = '2023-06-01';
+            return headers;
+        }
+
+        function adaptRequest(config, messages) {
+            const provider = getProvider(config.provider);
+            const skeleton = buildRequestSkeleton(config, messages);
+            let body;
+            try { body = provider.requestTransformer(skeleton, config); }
+            catch (e) {
+                console.warn(`Request transformer for "${config.provider}" failed, falling back to openai-compatible:`, e);
+                body = getProvider('openai-compatible').requestTransformer(skeleton, config);
+            }
+            const headers = buildAuthHeaders(config);
+            const url = config.url + (config.path ? config.path : '');
+            return { headers, body, url };
+        }
+
+        function normalizeSSEChunk(providerType, rawChunk) {
+            try { return getProvider(providerType).responseTransformer(rawChunk); }
+            catch (e) { console.warn(`Response transformer for "${providerType}" failed:`, e); return null; }
+        }
+
+        function normalizeError(providerType, errorResponse, apiKey) {
+            let message;
+            try { message = getProvider(providerType).errorTransformer(errorResponse); }
+            catch (e) { message = String(errorResponse?.message || 'Unknown error'); }
+            if (apiKey && message.includes(apiKey)) {
+                message = message.replace(new RegExp(apiKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '***REDACTED***');
+            }
+            return message;
+        }
+
+        function migrateAllConfigs() {
+            try {
+                for (const key of Object.keys(localStorage)) {
+                    try {
+                        const raw = localStorage.getItem(key);
+                        if (!raw) continue;
+                        const parsed = JSON.parse(raw);
+                        if (parsed && typeof parsed === 'object' && parsed.apiKey !== undefined && parsed.url !== undefined && !parsed.provider) {
+                            parsed.provider = 'openai-compatible';
+                            localStorage.setItem(key, JSON.stringify(parsed));
+                        }
+                    } catch (e) { console.warn(`Failed to migrate config for key "${key}":`, e); }
+                }
+            } catch (e) { console.warn('localStorage not available, migration skipped:', e); }
+        }
+
+        // Run migration on load
+        migrateAllConfigs();
+        // ========== End Provider Abstraction Layer ==========
 
         const useMcpStore = defineStore("mcpStore", {
             state: () => ({
@@ -2833,6 +3120,7 @@
 
                 const useChatbotStore = defineStore("chatbotStore", {
                     state: () => ({
+                        provider: "openai-compatible",
                         apiKey: "",
                         url: "https://api2.aiql.com",
                         path: "/chat/completions",
@@ -2848,7 +3136,10 @@
                         stream: true,
                         thinking: true,
                         reasoning_effort: null,
-                        mcp: true
+                        mcp: true,
+                        seed: null,
+                        frequency_penalty: null,
+                        mask_sensitive_info: false
                     }),
 
                     persist: {
@@ -2883,65 +3174,35 @@
                             const { reasoning_content, ...rest } = item;
                             newConversation.push(rest);
                         }
-                        // (item.role === "user" && item.content[0].type === "image_url") {
-                        //     // Image is too large, only latest query could be kept
-                        //     newConversation = [item];
-                        // }
                         else {
                             newConversation.push(item);
                         }
                         return newConversation;
                     }, []);
-                    // const conversation = rawconversation
                     try {
                         messageStore.generating = true
-                        // Create a completion (axios is not used here because it does not support streaming)
-                        const headers = {
-                            "Content-Type": chatbotStore.contentType,
-                        };
 
-                        if (chatbotStore.apiKey) headers[chatbotStore.authHeaderName || "Authorization"] = `${chatbotStore.authPrefix} ${chatbotStore.apiKey}`
-
-                        const body = {
-                            messages: agentStore.promptMessage(conversation),
-                            model: chatbotStore.model,
-                            stream: chatbotStore.stream,
+                        if (!chatbotStore.apiKey) {
+                            snackbarStore.showErrorMessage('API Key is required');
+                            return;
                         }
 
-                        if (chatbotStore.max_tokens_value) {
-                            body[chatbotStore.max_tokens_type] = parseInt(chatbotStore.max_tokens_value)
-                        }
+                        const messages = agentStore.promptMessage(conversation);
 
-                        if (typeof chatbotStore.reasoning_effort === 'string') {
-                            if (chatbotStore.reasoning_effort === 'false') {
-                                // For Python API backends such as extra_body.chat_template_kwargs
-                                body['chat_template_kwargs'] = { enable_thinking: false }
-                            } else {
-                                // For OpenAI OpenAPI backends such as ChatGPT or DeepInfra
-                                body['reasoning_effort'] = chatbotStore.reasoning_effort
-                            }
-                        }
-
-                        if (chatbotStore.temperature) {
-                            body["temperature"] = parseFloat(chatbotStore.temperature)
-                        }
-
-                        if (chatbotStore.top_p) {
-                            body["top_p"] = parseFloat(chatbotStore.top_p)
-                        }
-                        
-                        try {
-                        console.log('[createCompletion] pre-mcp logs');
-                        console.log(`chatbotStore.mcp: ${chatbotStore.mcp}`)
-                        } catch (e) {
-                            console.error(e)
-                        }
                         if (chatbotStore.mcp) {
-                            console.log("1")
-                            body["tools"] = await mcpStore.listTools()
-                            console.log("2")
+                            const tools = await mcpStore.listTools();
+                            chatbotStore._mcpTools = tools;
                         }
-                        console.log(`body: ${JSON.stringify(body)}`)
+
+                        const { headers: authHeaders, body: requestBody, url } = adaptRequest(chatbotStore, messages);
+
+                        const body = { ...requestBody };
+                        if (chatbotStore.mcp && chatbotStore._mcpTools) {
+                            body.tools = chatbotStore._mcpTools;
+                            delete chatbotStore._mcpTools;
+                        }
+
+                        const headers = { ...authHeaders };
 
                         const request = {
                             headers: headers,
@@ -2949,33 +3210,30 @@
                             body: JSON.stringify(body),
                         };
 
-                        const completion = await fetch(
-                            chatbotStore.url + (chatbotStore.path ? chatbotStore.path : ''),
-                            request
-                        );
+                        console.log(`[createCompletion] provider: ${chatbotStore.provider}, url: ${url}`);
+                        console.log(`body: ${JSON.stringify(body)}`);
+
+                        const completion = await fetch(url, request);
 
                         console.log(completion)
 
-                        // Handle errors
                         if (!completion.ok) {
-                            const errorData = await completion.json();
-                            console.log(errorData.error?.message);
-                            if (errorData.error?.message)
-                                snackbarStore.showErrorMessage(`${completion.status}: ${errorData.error.message}`);
-                            else if (errorData.detail[0]?.msg)
-                                snackbarStore.showErrorMessage(`${completion.status}${(" - " + errorData.detail[0]?.loc + ":") || ":"} ${errorData.detail[0]?.msg}`);
-                            else
-                                snackbarStore.showErrorMessage(`${completion.status}: ${completion.statusText}`);
+                            let errorData;
+                            try {
+                                errorData = await completion.json();
+                            } catch (e) {
+                                errorData = {};
+                            }
+                            const errorMsg = normalizeError(chatbotStore.provider, errorData, chatbotStore.apiKey);
+                            snackbarStore.showErrorMessage(`${completion.status}: ${errorMsg}`);
                             return;
                         }
 
-                        // Create a reader
                         const reader = completion.body?.getReader();
                         if (!reader) {
                             snackbarStore.showErrorMessage('$vuetify.dataIterator.snackbar.parseStreamFail');
                         }
 
-                        // Add the bot message
                         messageStore.conversation.push({
                             content: "",
                             reasoning_content: "",
@@ -2985,7 +3243,6 @@
 
                         let buffer = ''
 
-                        // Read the stream
                         await read(reader, messageStore.conversation.at(-1), buffer, chatbotStore.stream);
                     } catch (error) {
                         console.log(`Request completion error: ${error.message}`)
@@ -3000,28 +3257,24 @@
                     reader,
                     target,
                     buffer,
-                    stream
+                    stream,
+                    currentEvent
                 ) => {
-                    // TextDecoder is a built-in object that allows you to convert a stream of bytes into a string
                     const decoder = new TextDecoder();
-                    // Destructure the value returned by reader.read()
                     const { done, value } = await reader.read();
 
-                    // If the stream is done reading, release the lock on the reader
                     if (done || !messageStore.generating) {
                         messageStore.generating = false;
                         return reader.releaseLock();
                     }
-                    // Convert the stream of bytes into a string
                     const chunks = decoder.decode(value);
 
                     if (stream) {
-                        // Split stream
                         let parts = chunks.split('\n')
 
                         if (parts.length === 1) {
                             buffer += parts[0]
-                            return read(reader, target, buffer, stream);
+                            return read(reader, target, buffer, stream, currentEvent);
                         }
 
                         if (buffer.length > 0) {
@@ -3034,12 +3287,18 @@
                             buffer = parts.pop();
                         }
 
+                        let event = currentEvent || '';
+
                         parts
                             .map((line) => line.trim())
                             .filter((line) => line.length > 0)
                             .forEach((line) => {
                                 const pos = line.indexOf(':');
                                 const name = line.substring(0, pos);
+                                if (name === 'event') {
+                                    event = line.substring(pos + 1).trim();
+                                    return;
+                                }
                                 if (name !== 'data') {
                                     return
                                 }
@@ -3049,26 +3308,38 @@
                                 } else if (content === "[DONE]") {
                                     return
                                 }
-                                parseJson(content, target)
+                                parseJson(content, target, event)
+                                event = '';
                             })
 
                     } else {
-                        parseJson(chunks, target)
+                        parseJson(chunks, target, '')
                     }
 
-                    // Repeat the process
-                    return read(reader, target, buffer, stream);
+                    return read(reader, target, buffer, stream, currentEvent);
                 };
 
-                const parseJson = (content, target) => {
+                const parseJson = (content, target, sseEvent) => {
                     try {
                         const parsed = JSON.parse(content)
-                        // const choice = 
-                        parseChoices(parsed, target)
-                        // parseChoice(choice, target)
+                        if (chatbotStore.provider === 'anthropic-compatible' && sseEvent) {
+                            parsed.type = sseEvent;
+                        }
+                        const delta = normalizeSSEChunk(chatbotStore.provider, parsed);
+                        if (delta) {
+                            if (target.role === 'assistant') {
+                                if (delta.content) target.content += delta.content;
+                                if (delta.reasoning_content) target.reasoning_content += delta.reasoning_content;
+                                if (delta.tool_calls && delta.tool_calls.length > 0) {
+                                    parseTool(delta.tool_calls, target);
+                                }
+                            }
+                        }
                     } catch (e) {
                         console.log(e, content)
-                        parseChoice(content, target)
+                        if (target.role === 'assistant') {
+                            target.content += content;
+                        }
                     }
                 };
 
@@ -3324,6 +3595,21 @@
                     defaultChoiceStore.resetState()
                 };
 
+                const providerTypes = ref(PROVIDER_TYPES);
+
+                const providerCapabilities = computed(() => {
+                    return getCapabilities(chatbotStore.provider);
+                });
+
+                const onProviderChange = (type) => {
+                    const preset = getConnectionPreset(type);
+                    chatbotStore.url = preset.defaultUrl;
+                    chatbotStore.path = preset.defaultPath;
+                    chatbotStore.model = preset.defaultModel;
+                    chatbotStore.authHeaderName = preset.authHeaderName;
+                    chatbotStore.authPrefix = preset.authPrefix;
+                };
+
                 return {
                     configFile,
 
@@ -3342,6 +3628,9 @@
                     languageStore,
 
                     resetALL,
+                    providerTypes,
+                    providerCapabilities,
+                    onProviderChange,
 
                 };
             }
