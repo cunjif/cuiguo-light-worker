@@ -1,7 +1,7 @@
 import { ProviderConfig, NormalizedDelta, RequestSkeleton, ModelConfig } from '../types.js';
 import { registerProvider } from '../registry.js';
 
-function openaiResponseTransformer(sseChunk: unknown): NormalizedDelta | null {
+export function openaiResponseTransformer(sseChunk: unknown): NormalizedDelta | null {
   const chunk = sseChunk as Record<string, unknown>;
   if ('choices' in chunk && Array.isArray(chunk.choices) && chunk.choices.length > 0) {
     const choice = chunk.choices[0];
@@ -27,7 +27,7 @@ function openaiResponseTransformer(sseChunk: unknown): NormalizedDelta | null {
   return null;
 }
 
-function openaiErrorTransformer(errorResponse: unknown): string {
+export function openaiErrorTransformer(errorResponse: unknown): string {
   const err = errorResponse as Record<string, unknown>;
   if (err.error && typeof err.error === 'object') {
     const errorObj = err.error as Record<string, unknown>;

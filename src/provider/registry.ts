@@ -1,5 +1,5 @@
-import { ProviderType, ProviderConfig, ConnectionPreset, Capabilities } from './types.js';
-import { registerOpenAICompatible } from './providers/openai-compatible.js';
+import { ProviderType, ProviderConfig, ConnectionPreset, Capabilities, RequestSkeleton, ModelConfig } from './types.js';
+import { registerOpenAICompatible, openaiResponseTransformer, openaiErrorTransformer } from './providers/openai-compatible.js';
 import { registerAnthropicCompatible } from './providers/anthropic-compatible.js';
 import { registerGLM } from './providers/glm.js';
 import { registerQwen } from './providers/qwen.js';
@@ -30,6 +30,17 @@ export function registerProvider(config: ProviderConfig): void {
   providerMap.set(config.type, config);
 }
 
+const DEFAULT_CAPABILITIES: Capabilities = { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false };
+const DEFAULT_CONNECTION_PRESET: ConnectionPreset = { defaultUrl: 'https://api.openai.com', defaultPath: '/v1/chat/completions', defaultModel: 'gpt-4o', authHeaderName: 'Authorization', authPrefix: 'Bearer ' };
+const DEFAULT_PROVIDER: ProviderConfig = {
+  type: 'openai-compatible',
+  connectionPreset: DEFAULT_CONNECTION_PRESET,
+  capabilities: DEFAULT_CAPABILITIES,
+  requestTransformer: (skeleton: RequestSkeleton, _config: ModelConfig) => skeleton,
+  responseTransformer: openaiResponseTransformer,
+  errorTransformer: openaiErrorTransformer,
+} satisfies ProviderConfig;
+
 export function getProvider(type: ProviderType): ProviderConfig {
   const provider = providerMap.get(type);
   if (provider) return provider;
@@ -38,7 +49,8 @@ export function getProvider(type: ProviderType): ProviderConfig {
     console.warn(`Provider "${type}" not found, falling back to openai-compatible`);
     return fallback;
   }
-  throw new Error('No provider registered, not even openai-compatible fallback');
+  console.warn('No provider registered, using hardcoded default');
+  return DEFAULT_PROVIDER;
 }
 
 export function getAllProviderTypes(): ProviderType[] {

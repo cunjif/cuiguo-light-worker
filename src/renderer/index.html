@@ -79,6 +79,8 @@
         window.onload = function () {
             const lottie = document.getElementById('lottie');
             if (lottie) lottie.style.display = 'block';
+            const lottieAlt = document.getElementById('lottie-alt');
+            if (lottieAlt) lottieAlt.style.display = 'block';
             document.getElementById('loading').style.display = 'none';
         };
 
@@ -115,7 +117,7 @@
             max-height: calc(70vh + 3rem);
         }
 
-        #lottie {
+        #lottie, #lottie-alt {
             display: none;
             height: calc(99vh - 50px);
             max-height: calc(100% - 100px);
@@ -125,45 +127,18 @@
             margin-bottom: 0.8rem;
         }
 
-        .input-area {
-            background-color: white;
-            display: flex;
-            padding-inline: 21.5px;
-            margin-inline: 21.5px;
-            width: 100%;
-            position: fixed;
-            left: 50%;
-            transform: translate(-50%);
-            bottom: 0;
+        .input-box textarea {
+            margin-bottom: 1px;
+        }
 
-            .input-panel {
-                flex: 1;
-                border-top: 5px solid white;
-                max-width: 1280px;
-                border-radius: 5px;
-                margin: 0 auto;
-            }
-
-            .input-box textarea {
-                margin-bottom: 1px;
-            }
-
-            .input-box textarea::-webkit-scrollbar {
-                display: none;
-
-            }
-
-            .input-icon {
-                margin: 0 10px 34px 10px;
-                /* top left bot right*/
-            }
+        .input-box textarea::-webkit-scrollbar {
+            display: none;
         }
 
         .chat-images {
             width: 25px;
             max-height: 40px;
             transition: all 0.2s;
-            /* margin-bottom: 20px; */
 
             &:hover {
                 transition: all 0.2s;
@@ -171,6 +146,86 @@
                 filter: grayscale(100%);
                 cursor: not-allowed;
             }
+        }
+
+        .main-layout {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .main-row {
+            height: 100%;
+        }
+
+        .left-panel {
+            height: 100vh;
+            overflow-y: auto;
+            border-right: 1px solid #e5e7eb;
+        }
+
+        .right-panel {
+            height: 100vh;
+            overflow-y: auto;
+            background-color: #fafafa;
+        }
+
+        .function-panel {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            flex-shrink: 0;
+            background-color: white;
+            min-height: 40px;
+        }
+
+        .input-section {
+            flex-shrink: 0;
+            background-color: white;
+        }
+
+        .nav-section {
+            flex-shrink: 0;
+            background-color: white;
+            flex-wrap: wrap;
+        }
+
+        .history-section {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+
+        .history-list-scrollable {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .panel-slide-enter-active,
+        .panel-slide-leave-active {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .panel-slide-enter-from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+
+        .panel-slide-leave-to {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+
+        .chat-bot-alt {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
         }
 
         .shadow {
@@ -206,27 +261,6 @@
             transform: translateX(35px);
         }
 
-        .toolbox-button {
-            position: fixed;
-            background-color: #1867C0;
-            bottom: 194px;
-            right: -46px;
-            z-index: 999;
-            padding: 0.5rem 1rem;
-            border-top-left-radius: 0.5rem;
-            border-bottom-left-radius: 0.5rem;
-            box-shadow: 1px 1px 9px #1867C0;
-            transition: all 0.5s;
-            cursor: pointer;
-
-            &:hover {
-                box-shadow: 1px 1px 18px #1867C0;
-                right: 0px;
-                transition: all 0.5s;
-            }
-
-        }
-
         .history-images {
             &:hover {
                 cursor: zoom-in;
@@ -240,13 +274,6 @@
 
         .md-editor-preview p {
             word-break: break-word;
-        }
-
-        .toolbox {
-            z-index: 99;
-            position: fixed;
-            bottom: 194px;
-            right: 5px;
         }
 
         .rotation {
@@ -301,123 +328,344 @@
 <body>
     <div id="app" v-cloak>
         <v-app>
-            <v-container v-show="messageStore.conversation.length === 0">
-                <div id="lottie" class="text-center text-h5">
-                    {{$t('$vuetify.dataIterator.title')}}
-                    <!-- <a href="https://github.com/AI-QL/chat-ui" style="color: #1867C0"
-                        class="font-weight-bold text-decoration-none" target="_blank">
-                        <v-icon class="mb-2">mdi-github</v-icon>
-                        {{$t('$vuetify.dataIterator.title')}}</a> -->
-                </div>
-            </v-container>
-            <v-container v-show="messageStore.conversation.length > 0" class="chat-bot">
-                <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
-                    :language="languageStore.getLocale"></tuui-chat-box>
-                <div class="fill-area"></div>
-            </v-container>
-            <div class="input-area">
-                <v-sheet elevation="0" class="input-panel d-flex align-end px-1">
-                    <v-speed-dial transition="expand-transition" offset="10">
-                        <template v-slot:activator="{ props: activatorProps }">
-                            <v-btn v-bind="activatorProps" size="small" icon="mdi-cog" absolute
-                                class="input-icon"></v-btn>
+            <v-container fluid class="main-layout pa-0">
+                <v-row no-gutters class="main-row">
+                    <v-col cols="7" :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
+                        <template v-if="settingStore.activePanel === 'chat'">
+                            <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
+                                <div id="lottie" class="text-center text-h5" data-component-id="chat-mcp.chat.loading-animation">
+                                    {{$t('$vuetify.dataIterator.title')}}
+                                </div>
+                            </v-container>
+                            <v-container v-show="messageStore.conversation.length > 0" class="chat-bot">
+                                <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
+                                    :language="languageStore.getLocale" data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
+                                <div class="fill-area"></div>
+                            </v-container>
                         </template>
-                        <v-btn key="4" variant="elevated" @click="settingStore.initDialog" icon="mdi-api"
-                            v-tooltip:end="$t('$vuetify.dataIterator.i.title')">
-                        </v-btn>
-                        <v-badge key="3" color="transparent" location='top left'>
-                            <template v-slot:badge>
-                                <iconify-icon :icon="languageStore.getIcon2()"></iconify-icon>
-                            </template>
-                            <v-menu transition="fade-transition">
-                                <template v-slot:activator="{ props }">
-                                    <v-btn variant="elevated" v-bind="props" icon="mdi-translate"
-                                        v-tooltip:end="$t('$vuetify.dataIterator.l.title')">
+                        <template v-else>
+                            <div class="function-panel">
+                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
+                                    <div class="d-flex align-center">
+                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md" hide-input
+                                            v-model="messageStore.images" prepend-icon="mdi-paperclip"
+                                            density="compact" variant="plain"
+                                            data-component-id="chat-mcp.chat.file-upload"></v-file-input>
+                                    </div>
+                                    <v-btn size="small" variant="text" icon
+                                        @click="settingStore.switchPanel"
+                                        data-component-id="chat-mcp.chat.switch-panel-button">
+                                        <v-icon>mdi-swap-horizontal</v-icon>
                                     </v-btn>
-                                </template>
-                                <v-list class='mb-2'>
-                                    <v-list-item v-for="n in languageStore.list" :key="n.value"
-                                        @click="languageStore.change(n.value)" density="compact">
-                                        <template v-slot:prepend>
-                                            <iconify-icon class='mr-3'
-                                                :icon="languageStore.getIcon(n.name)"></iconify-icon>
+                                </div>
+                                <v-divider></v-divider>
+                                <div class="input-section px-3 py-2">
+                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
+                                        clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
+                                        :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                        :rows="settingStore.inputRow" auto-grow max-rows="15"
+                                        data-component-id="chat-mcp.chat.input-textarea">
+                                        <template v-slot:prepend-inner>
+                                            <v-container>
+                                                <v-row>
+                                                    <v-img v-if="messageStore.base64" class="chat-images mt-1"
+                                                        :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
+                                                    <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
+                                                        @click="messageStore.images=[]" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                        <v-icon size="24" color="primary">mdi-file-document</v-icon>
+                                                        <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+                                                            {{ messageStore.documentType.toUpperCase() }}
+                                                        </span>
+                                                    </div>
+                                                </v-row>
+                                            </v-container>
                                         </template>
-                                        <v-list-item-title v-text="n.title"></v-list-item-title>
-                                    </v-list-item>
-                                </v-list>
-                            </v-menu>
-                        </v-badge>
-                        <v-btn @click="() => { settingStore.refreshMcpServersList(); settingStore.agentDialog = true; }" variant="elevated" icon="mdi-account-supervisor"
-                            v-tooltip:end="$t('$vuetify.dataIterator.a.title')">
-                        </v-btn>
-                        <!-- mcpStore.getServers -->
-                        <v-btn v-if="false" @click="resourceStore.resourceDialog = true"
-                            variant="elevated" icon="mdi-database" v-tooltip:end="$t('$vuetify.dataIterator.r.title')">
-                        </v-btn>
-                        <v-badge key="1" :content="historyStore.conversation.length" color="info" max="99"
-                            location='top left'>
-                            <v-btn variant="elevated" icon="mdi-list-box" @click="settingStore.configHistory = true"
-                                v-tooltip:end="$t('$vuetify.dataIterator.q.title')">
-                            </v-btn>
-                        </v-badge>
-                    </v-speed-dial>
-                    <v-container>
-                        <v-row>
-                            <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
-                                clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
-                                :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
-                                :rows="settingStore.inputRow" auto-grow max-rows="15">
-                                <template v-slot:prepend-inner>
-                                    <v-container>
-                                        <v-row>
-                                            <v-img v-if="messageStore.base64" class="chat-images mt-1"
-                                                :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
-                                            <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
-                                                @click="messageStore.images=[]" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
-                                                <v-icon size="24" color="primary">mdi-file-document</v-icon>
-                                                <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
-                                                    {{ messageStore.documentType.toUpperCase() }}
-                                                </span>
+                                        <template v-slot:append-inner>
+                                            <div class="d-flex flex-column ga-1 mr-1 mb-4">
+                                                <v-btn v-if="messageStore.userMessage" size="small" color="primary" variant="elevated"
+                                                    @click="messageStore.sendMessage" icon="mdi-arrow-up"
+                                                    data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                                <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
+                                                    @click="messageStore.stop" icon="mdi-stop"
+                                                    data-component-id="chat-mcp.chat.stop-button"></v-btn>
+                                                <v-speed-dial v-else-if="messageStore.conversation.length > 0" location="bottom center"
+                                                    transition="expand-transition">
+                                                    <template v-slot:activator="{ props: activatorProps }">
+                                                        <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
+                                                            color="primary"></v-btn>
+                                                    </template>
+                                                    <v-btn key="2" size="small" color="primary" variant="elevated"
+                                                        @click="messageStore.resendMessage" icon="mdi-autorenew"
+                                                        v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
+                                                        data-component-id="chat-mcp.chat.resend-button"></v-btn>
+                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.init()"
+                                                        icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
+                                                        data-component-id="chat-mcp.chat.new-conversation-button"></v-btn>
+                                                </v-speed-dial>
+                                                <v-btn v-else size="small" :color="mcpStore.getServers ? 'primary': 'grey'" variant="elevated"
+                                                    @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
+                                                    icon="mdi-account-edit"
+                                                    data-component-id="chat-mcp.chat.prompt-button"></v-btn>
                                             </div>
-                                            <v-file-input v-else @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md" hide-input
-                                                v-model="messageStore.images"
-                                                prepend-icon="mdi-plus-circle-outline"></v-file-input>
-                                        </v-row>
-                                    </v-container>
-                                </template>
-                            </v-textarea>
-                        </v-row>
-                    </v-container>
-                    <div class="input-icon">
-                        <v-btn v-if="messageStore.userMessage" size="small" color="primary" variant="elevated"
-                            @click="messageStore.sendMessage" icon="mdi-arrow-up">
-                        </v-btn>
-                        <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
-                            @click="messageStore.stop" icon="mdi-stop"></v-btn>
-                        <v-speed-dial v-else-if="messageStore.conversation.length > 0" location="bottom center"
-                            transition="expand-transition">
-                            <template v-slot:activator="{ props: activatorProps }">
-                                <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
-                                    color="primary"></v-btn>
-                            </template>
-                            <v-btn key="2" size="small" color="primary" variant="elevated"
-                                @click="messageStore.resendMessage" icon="mdi-autorenew"
-                                v-tooltip:start="$t('$vuetify.dataIterator.g.reg')">
-                            </v-btn>
-                            <v-btn key="1" color="primary" variant="elevated" @click="messageStore.init()"
-                                icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')">
-                            </v-btn>
-                        </v-speed-dial>
-                        <v-btn v-else size="small" :color="mcpStore.getServers ? 'primary': 'grey'" variant="elevated"
-                            @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
-                            icon="mdi-account-edit">
-                        </v-btn>
-                    </div>
-                </v-sheet>
-            </div>
+                                        </template>
+                                    </v-textarea>
+                                </div>
+                                <v-divider></v-divider>
+                                <div class="nav-section d-flex align-center justify-center ga-2 px-3 py-2">
+                                    <v-btn size="small" variant="tonal" @click="settingStore.initDialog"
+                                        prepend-icon="mdi-api" v-tooltip:bottom="$t('$vuetify.dataIterator.i.title')"
+                                        data-component-id="chat-mcp.chat.config-button">
+                                        {{ $t('$vuetify.dataIterator.i.title') }}
+                                    </v-btn>
+                                    <v-btn size="small" variant="tonal"
+                                        @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
+                                        prepend-icon="mdi-account-edit" v-tooltip:bottom="$t('$vuetify.dataIterator.a.title')"
+                                        data-component-id="chat-mcp.chat.prompt-button-nav">
+                                        {{ $t('$vuetify.dataIterator.a.title') }}
+                                    </v-btn>
+                                    <v-btn size="small" variant="tonal"
+                                        @click="settingStore.addMcpDialog = true; settingStore.mcpTab = 'add-server';"
+                                        prepend-icon="mdi-lan-connect" v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
+                                        data-component-id="chat-mcp.chat.mcp-button-nav">
+                                        {{ $t('$vuetify.dataIterator.mcp.title') }}
+                                    </v-btn>
+                                    <v-menu transition="fade-transition" data-component-id="chat-mcp.chat.language-menu">
+                                        <template v-slot:activator="{ props }">
+                                            <v-btn size="small" variant="tonal" v-bind="props"
+                                                prepend-icon="mdi-translate" v-tooltip:bottom="$t('$vuetify.dataIterator.l.title')"
+                                                data-component-id="chat-mcp.chat.language-button">
+                                                {{ $t('$vuetify.dataIterator.l.title') }}
+                                            </v-btn>
+                                        </template>
+                                        <v-list class='mb-2'>
+                                            <v-list-item v-for="n in languageStore.list" :key="n.value"
+                                                @click="languageStore.change(n.value)" density="compact">
+                                                <template v-slot:prepend>
+                                                    <iconify-icon class='mr-3'
+                                                        :icon="languageStore.getIcon(n.name)"></iconify-icon>
+                                                </template>
+                                                <v-list-item-title v-text="n.title"></v-list-item-title>
+                                            </v-list-item>
+                                        </v-list>
+                                    </v-menu>
+                                </div>
+                                <v-divider></v-divider>
+                                <div class="history-section px-3 py-2">
+                                    <div class="d-flex align-center justify-space-between mb-2">
+                                        <span class="text-subtitle-2 font-weight-bold">
+                                            <v-icon size="small" class="mr-1">mdi-history</v-icon>
+                                            {{ $t('$vuetify.dataIterator.q.title') }}
+                                        </span>
+                                        <div class="d-flex" style="gap: 20px;">
+                                            <v-btn size="x-small" variant="text" icon="mdi-download"
+                                                @click="historyStore.downloadHistory" density="compact"></v-btn>
+                                            <v-btn size="x-small" variant="text" icon="mdi-delete-off-outline"
+                                                @click="historyStore.resetState" density="compact"></v-btn>
+                                        </div>
+                                    </div>
+                                    <div class="history-list-scrollable">
+                                        <transition-group name="fade">
+                                            <v-card v-for="(item, index) in historyStore.conversation" variant="plain" :key="item.id"
+                                                class="mb-1">
+                                                <v-card-item>
+                                                    <template v-slot:prepend>
+                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon size="x-small"
+                                                            @click="historyStore.select(index)" density="compact">
+                                                            <b>{{item.history.length}}</b>
+                                                        </v-btn>
+                                                    </template>
+                                                    <v-card-subtitle class="font-weight-bold text-truncate" style="max-width: 200px;">
+                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content || "NA" }}
+                                                    </v-card-subtitle>
+                                                    <template v-slot:append>
+                                                        <div class="d-flex" style="gap: 20px;">
+                                                            <v-btn size="x-small" color="primary" icon="mdi-download" variant="text"
+                                                                @click="historyStore.downloadById(index)" density="compact"></v-btn>
+                                                            <v-btn size="x-small" icon="mdi-delete-outline" variant="text"
+                                                                @click="historyStore.deleteById(index)" density="compact"></v-btn>
+                                                        </div>
+                                                    </template>
+                                                </v-card-item>
+                                            </v-card>
+                                        </transition-group>
+                                        <div v-if="historyStore.conversation.length === 0" class="text-center text-disabled py-4 text-caption">
+                                            No history
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </v-col>
+                    <v-col cols="5" :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
+                        <template v-if="settingStore.activePanel === 'chat'">
+                            <div class="function-panel">
+                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
+                                    <div class="d-flex align-center">
+                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md" hide-input
+                                            v-model="messageStore.images" prepend-icon="mdi-paperclip"
+                                            density="compact" variant="plain"
+                                            data-component-id="chat-mcp.chat.file-upload"></v-file-input>
+                                    </div>
+                                    <v-btn size="small" variant="text" icon
+                                        @click="settingStore.switchPanel"
+                                        data-component-id="chat-mcp.chat.switch-panel-button">
+                                        <v-icon>mdi-swap-horizontal</v-icon>
+                                    </v-btn>
+                                </div>
+                                <v-divider></v-divider>
+                                <div class="input-section px-3 py-2">
+                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
+                                        clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
+                                        :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                        :rows="settingStore.inputRow" auto-grow max-rows="15"
+                                        data-component-id="chat-mcp.chat.input-textarea">
+                                        <template v-slot:prepend-inner>
+                                            <v-container>
+                                                <v-row>
+                                                    <v-img v-if="messageStore.base64" class="chat-images mt-1"
+                                                        :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
+                                                    <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
+                                                        @click="messageStore.images=[]" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                        <v-icon size="24" color="primary">mdi-file-document</v-icon>
+                                                        <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+                                                            {{ messageStore.documentType.toUpperCase() }}
+                                                        </span>
+                                                    </div>
+                                                </v-row>
+                                            </v-container>
+                                        </template>
+                                        <template v-slot:append-inner>
+                                            <div class="d-flex flex-column ga-1 mr-1 mb-4">
+                                                <v-btn v-if="messageStore.userMessage" size="small" color="primary" variant="elevated"
+                                                    @click="messageStore.sendMessage" icon="mdi-arrow-up"
+                                                    data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                                <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
+                                                    @click="messageStore.stop" icon="mdi-stop"
+                                                    data-component-id="chat-mcp.chat.stop-button"></v-btn>
+                                                <v-speed-dial v-else-if="messageStore.conversation.length > 0" location="bottom center"
+                                                    transition="expand-transition">
+                                                    <template v-slot:activator="{ props: activatorProps }">
+                                                        <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
+                                                            color="primary"></v-btn>
+                                                    </template>
+                                                    <v-btn key="2" size="small" color="primary" variant="elevated"
+                                                        @click="messageStore.resendMessage" icon="mdi-autorenew"
+                                                        v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
+                                                        data-component-id="chat-mcp.chat.resend-button"></v-btn>
+                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.init()"
+                                                        icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
+                                                        data-component-id="chat-mcp.chat.new-conversation-button"></v-btn>
+                                                </v-speed-dial>
+                                                <v-btn v-else size="small" :color="mcpStore.getServers ? 'primary': 'grey'" variant="elevated"
+                                                    @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
+                                                    icon="mdi-account-edit"
+                                                    data-component-id="chat-mcp.chat.prompt-button"></v-btn>
+                                            </div>
+                                        </template>
+                                    </v-textarea>
+                                </div>
+                                <v-divider></v-divider>
+                                <div class="nav-section d-flex align-center justify-center ga-2 px-3 py-2">
+                                    <v-btn size="small" variant="tonal" @click="settingStore.initDialog"
+                                        prepend-icon="mdi-api" v-tooltip:bottom="$t('$vuetify.dataIterator.i.title')"
+                                        data-component-id="chat-mcp.chat.config-button">
+                                        {{ $t('$vuetify.dataIterator.i.title') }}
+                                    </v-btn>
+                                    <v-btn size="small" variant="tonal"
+                                        @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
+                                        prepend-icon="mdi-account-edit" v-tooltip:bottom="$t('$vuetify.dataIterator.a.title')"
+                                        data-component-id="chat-mcp.chat.prompt-button-nav">
+                                        {{ $t('$vuetify.dataIterator.a.title') }}
+                                    </v-btn>
+                                    <v-btn size="small" variant="tonal"
+                                        @click="settingStore.addMcpDialog = true; settingStore.mcpTab = 'add-server';"
+                                        prepend-icon="mdi-lan-connect" v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
+                                        data-component-id="chat-mcp.chat.mcp-button-nav">
+                                        {{ $t('$vuetify.dataIterator.mcp.title') }}
+                                    </v-btn>
+                                    <v-menu transition="fade-transition" data-component-id="chat-mcp.chat.language-menu">
+                                        <template v-slot:activator="{ props }">
+                                            <v-btn size="small" variant="tonal" v-bind="props"
+                                                prepend-icon="mdi-translate" v-tooltip:bottom="$t('$vuetify.dataIterator.l.title')"
+                                                data-component-id="chat-mcp.chat.language-button">
+                                                {{ $t('$vuetify.dataIterator.l.title') }}
+                                            </v-btn>
+                                        </template>
+                                        <v-list class='mb-2'>
+                                            <v-list-item v-for="n in languageStore.list" :key="n.value"
+                                                @click="languageStore.change(n.value)" density="compact">
+                                                <template v-slot:prepend>
+                                                    <iconify-icon class='mr-3'
+                                                        :icon="languageStore.getIcon(n.name)"></iconify-icon>
+                                                </template>
+                                                <v-list-item-title v-text="n.title"></v-list-item-title>
+                                            </v-list-item>
+                                        </v-list>
+                                    </v-menu>
+                                </div>
+                                <v-divider></v-divider>
+                                <div class="history-section px-3 py-2">
+                                    <div class="d-flex align-center justify-space-between mb-2">
+                                        <span class="text-subtitle-2 font-weight-bold">
+                                            <v-icon size="small" class="mr-1">mdi-history</v-icon>
+                                            {{ $t('$vuetify.dataIterator.q.title') }}
+                                        </span>
+                                        <div class="d-flex" style="gap: 20px;">
+                                            <v-btn size="x-small" variant="text" icon="mdi-download"
+                                                @click="historyStore.downloadHistory" density="compact"></v-btn>
+                                            <v-btn size="x-small" variant="text" icon="mdi-delete-off-outline"
+                                                @click="historyStore.resetState" density="compact"></v-btn>
+                                        </div>
+                                    </div>
+                                    <div class="history-list-scrollable">
+                                        <transition-group name="fade">
+                                            <v-card v-for="(item, index) in historyStore.conversation" variant="plain" :key="item.id"
+                                                class="mb-1">
+                                                <v-card-item>
+                                                    <template v-slot:prepend>
+                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon size="x-small"
+                                                            @click="historyStore.select(index)" density="compact">
+                                                            <b>{{item.history.length}}</b>
+                                                        </v-btn>
+                                                    </template>
+                                                    <v-card-subtitle class="font-weight-bold text-truncate" style="max-width: 200px;">
+                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content || "NA" }}
+                                                    </v-card-subtitle>
+                                                    <template v-slot:append>
+                                                        <div class="d-flex" style="gap: 20px;">
+                                                            <v-btn size="x-small" color="primary" icon="mdi-download" variant="text"
+                                                                @click="historyStore.downloadById(index)" density="compact"></v-btn>
+                                                            <v-btn size="x-small" icon="mdi-delete-outline" variant="text"
+                                                                @click="historyStore.deleteById(index)" density="compact"></v-btn>
+                                                        </div>
+                                                    </template>
+                                                </v-card-item>
+                                            </v-card>
+                                        </transition-group>
+                                        <div v-if="historyStore.conversation.length === 0" class="text-center text-disabled py-4 text-caption">
+                                            No history
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
+                                <div id="lottie-alt" class="text-center text-h5" data-component-id="chat-mcp.chat.loading-animation-alt">
+                                    {{$t('$vuetify.dataIterator.title')}}
+                                </div>
+                            </v-container>
+                            <v-container v-show="messageStore.conversation.length > 0" class="chat-bot-alt">
+                                <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
+                                    :language="languageStore.getLocale" data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
+                            </v-container>
+                        </template>
+                    </v-col>
+                </v-row>
+            </v-container>
 
             <!-- snackbar -->
-            <v-snackbar v-model="snackbarStore.isShow" timeout="4000" :color="snackbarStore.type" location="top">
+            <v-snackbar v-model="snackbarStore.isShow" timeout="4000" :color="snackbarStore.type" location="top" data-component-id="chat-mcp.chat.snackbar">
                 <div class="d-flex align-center">
                     <v-icon class="mr-2">{{ snackbarStore.getIcon() }}</v-icon>
                     <span>{{$t(snackbarStore.message)}}</span>
@@ -430,7 +678,7 @@
                 </template>
             </v-snackbar>
 
-            <v-dialog v-model="settingStore.configHistory" class="dialog-card">
+            <v-dialog v-model="settingStore.configHistory" class="dialog-card" data-component-id="chat-mcp.dialog.history">
                 <v-card prepend-icon="mdi-history" :title="$t('$vuetify.dataIterator.q.title')" flat>
                     <template v-slot:append>
                         <v-card-actions>
@@ -475,7 +723,7 @@
 
             </v-dialog>
             <!-- dialog -->
-            <v-dialog v-model="settingStore.configDialog" class="dialog-card">
+            <v-dialog v-model="settingStore.configDialog" class="dialog-card" data-component-id="chat-mcp.dialog.config">
                 <v-card prepend-icon="mdi-cog-outline" :title="$t('$vuetify.dataIterator.i.title')">
                     <template v-slot:append>
                         <v-card-actions>
@@ -485,184 +733,113 @@
                     </template>
 
                     <v-card-text class="pb-0">
-                        <!-- ---------------------------------------------- -->
-                        <!-- Provider Type -->
-                        <!-- ---------------------------------------------- -->
-                        <v-select density='compact' color="primary" variant="outlined"
-                            v-model="chatbotStore.provider"
-                            class="px-2 mb-4" label="Provider Type" prepend-inner-icon="mdi-cloud-outline"
-                            :items="providerTypes" @update:model-value="onProviderChange"
-                            hide-details></v-select>
-
-                        <!-- ---------------------------------------------- -->
-                        <!-- APIKEY -->
-                        <!-- ---------------------------------------------- -->
-                        <v-text-field density='compact' color="primary" variant="outlined"
-                            :append-inner-icon="settingStore.apiKeyShow ? 'mdi-eye-off' : 'mdi-eye'"
-                            :type="settingStore.apiKeyShow ? 'text' : 'password'" v-model="chatbotStore.apiKey"
-                            class="px-2 mb-4" :label="$t('$vuetify.dataIterator.i.apikey')" prepend-inner-icon="mdi-key"
-                            clearable hide-details
-                            @click:append-inner="settingStore.apiKeyShow = !settingStore.apiKeyShow"></v-text-field>
-
-                        <v-expansion-panels static tile variant="accordion" class="px-2 mb-4">
-                            <v-expansion-panel>
-                                <v-expansion-panel-title v-slot="{ expanded }">
-                                    <v-icon icon="mdi-web" start></v-icon>
-                                    <v-row no-gutters class="hidden">
-                                        <span v-if="expanded">{{$t('$vuetify.dataIterator.i.endpoint')}}</span>
-                                        <span v-else>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{chatbotStore.url}}{{chatbotStore.path}}
+                        <v-row no-gutters>
+                            <v-col cols="4" class="pr-2" style="border-right: 1px solid rgba(0,0,0,0.12); min-height: 400px;" data-component-id="chat-mcp.dialog.provider-list">
+                                <div class="text-subtitle-2 px-2 py-2"><span>Providers</span></div>
+                                <v-list density="compact" nav class="pa-0">
+                                    <v-list-item v-for="pitem in chatbotStore.providers" :key="pitem.id"
+                                        density="compact"
+                                        :active="pitem.id === chatbotStore.activeProviderId"
+                                        color="primary"
+                                        @click="!providerEditMode && chatbotStore.switchProvider(pitem.id)">
+                                        <template v-slot:prepend>
+                                            <v-icon :icon="pitem.id === chatbotStore.activeProviderId ? 'mdi-check-circle' : 'mdi-circle-outline'" size="small" color="primary"></v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ pitem.name }}</v-list-item-title>
+                                        <v-list-item-subtitle>
+                                            <v-chip label size="x-small" class="ml-0">
+                                                {{ PROVIDER_DISPLAY_NAMES[pitem.provider] || pitem.provider }}
                                             </v-chip>
-
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{chatbotStore.model || "No model" }}
-                                            </v-chip>
-                                        </span>
-                                </v-expansion-panel-title>
-
-                                <v-expansion-panel-text>
-                                    <!-- ---------------------------------------------- -->
-                                    <!-- URL -->
-                                    <!-- ---------------------------------------------- -->
-                                    <v-combobox density='compact' class="px-2"
-                                        :label="$t('$vuetify.dataIterator.i.url')" :items="defaultChoiceStore.url"
-                                        v-model="chatbotStore.url" variant="outlined">
-                                    </v-combobox>
-
-                                    <!-- ---------------------------------------------- -->
-                                    <!-- Path -->
-                                    <!-- ---------------------------------------------- -->
-                                    <v-combobox density='compact' class="px-2"
-                                        :label="$t('$vuetify.dataIterator.i.path')" :items="defaultChoiceStore.path"
-                                        v-model="chatbotStore.path" variant="outlined">
-                                    </v-combobox>
-
-                                    <!-- ---------------------------------------------- -->
-                                    <!-- Model -->
-                                    <!-- ---------------------------------------------- -->
-                                    <v-combobox density='compact' class="px-2"
-                                        :label="$t('$vuetify.dataIterator.i.model')" :items="defaultChoiceStore.model"
-                                        v-model="chatbotStore.model" variant="outlined">
-                                    </v-combobox>
-                                </v-expansion-panel-text>
-                            </v-expansion-panel>
-
-                            <v-expansion-panel>
-                                <v-expansion-panel-title v-slot="{ expanded }">
-                                    <v-icon icon="mdi-account-key" start></v-icon>
-                                    <v-row no-gutters class="hidden">
-                                        <span v-if="expanded">{{ $t('$vuetify.dataIterator.i.advanced') }}</span>
-                                        <span v-else>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{ chatbotStore.stream ? "Stream" : "Stream: off" }}
-                                            </v-chip>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{ chatbotStore.mcp ? "MCP" : "MCP: off" }}
-                                            </v-chip>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{chatbotStore.max_tokens_type}}
-                                                {{": "}}
-                                                {{ chatbotStore.max_tokens_value ? chatbotStore.max_tokens_value :
-                                                "default" }}
-                                            </v-chip>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{"temperature: "}}
-                                                {{ chatbotStore.temperature ? chatbotStore.temperature :
-                                                "default" }}
-                                            </v-chip>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{"top_p: "}}
-                                                {{ chatbotStore.top_p ? chatbotStore.top_p :
-                                                "default" }}
-                                            </v-chip>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{ chatbotStore.authPrefix }}
-                                            </v-chip>
-                                            <v-chip label color="primary" class="ma-1">
-                                                {{ chatbotStore.contentType }}
-                                            </v-chip>
-                                        </span>
-                                </v-expansion-panel-title>
-
-                                <v-expansion-panel-text>
-                                    <v-row class="px-3 mt-2 mr-2">
-
-                                        <v-combobox class="px-2" density='compact'
-                                            :label="$t('$vuetify.dataIterator.i.reasoning')"
-                                            v-model="chatbotStore.reasoning_effort" clearable
-                                            :items="defaultChoiceStore.reasoning_efforts" variant="outlined">
-                                        </v-combobox>
-                                        <v-spacer></v-spacer>
-                                        <v-checkbox v-model="chatbotStore.stream"
-                                            :label="$t('$vuetify.dataIterator.i.stream')" density='compact'
-                                            color="primary">
-                                        </v-checkbox>
-                                        <v-checkbox v-if="mcpStore.getServers" v-model="chatbotStore.mcp"
-                                            :label="$t('$vuetify.dataIterator.i.mcp')" density='compact'
-                                            color="primary">
-                                        </v-checkbox>
+                                        </v-list-item-subtitle>
+                                        <template v-slot:append>
+                                            <v-btn icon="mdi-pencil" size="x-small" variant="text" @click.stop="startEditProvider(pitem)"></v-btn>
+                                            <v-btn icon="mdi-delete" size="x-small" variant="text" :disabled="chatbotStore.providers.length <= 1" @click.stop="confirmDeleteProvider(pitem)"></v-btn>
+                                        </template>
+                                    </v-list-item>
+                                </v-list>
+                                <v-btn block class="mt-2" density="compact" variant="tonal" color="primary" prepend-icon="mdi-plus"
+                                    :disabled="chatbotStore.providers.length >= 20"
+                                    @click="startCreateProvider()">
+                                    Add Provider
+                                </v-btn>
+                            </v-col>
+                            <!-- Right: Detail / Edit Form -->
+                            <v-col cols="8" class="pl-4" data-component-id="chat-mcp.dialog.provider-form">
+                                <template v-if="providerEditMode === 'create' || providerEditMode === 'edit'">
+                                    <v-text-field density='compact' class="px-2 mb-2" label="Instance Name" v-model="providerFormData.name" variant="outlined" hide-details></v-text-field>
+                                    <v-select density='compact' class="px-2 mb-2" label="Provider Type" v-model="providerFormData.provider" :items="providerTypes" variant="outlined" @update:model-value="onFormProviderChange" hide-details prepend-inner-icon="mdi-cloud-outline"></v-select>
+                                    <v-text-field density='compact' class="px-2 mb-2" :append-inner-icon="settingStore.apiKeyShow ? 'mdi-eye-off' : 'mdi-eye'" :type="settingStore.apiKeyShow ? 'text' : 'password'" v-model="providerFormData.apiKey" label="API Key" prepend-inner-icon="mdi-key" clearable hide-details variant="outlined" @click:append-inner="settingStore.apiKeyShow = !settingStore.apiKeyShow"></v-text-field>
+                                    <v-expansion-panels static tile variant="accordion" class="px-2 mb-2">
+                                        <v-expansion-panel>
+                                            <v-expansion-panel-title><v-icon icon="mdi-web" start></v-icon> Endpoint </v-expansion-panel-title>
+                                            <v-expansion-panel-text>
+                                                <v-combobox density='compact' class="px-2" label="URL" :items="defaultChoiceStore.url" v-model="providerFormData.url" variant="outlined"></v-combobox>
+                                                <v-combobox density='compact' class="px-2" label="Path" :items="defaultChoiceStore.path" v-model="providerFormData.path" variant="outlined"></v-combobox>
+                                                <v-combobox density='compact' class="px-2" label="Model" :items="defaultChoiceStore.model" v-model="providerFormData.model" variant="outlined"></v-combobox>
+                                            </v-expansion-panel-text>
+                                        </v-expansion-panel>
+                                        <v-expansion-panel>
+                                            <v-expansion-panel-title><v-icon icon="mdi-account-key" start></v-icon> Advanced </v-expansion-panel-title>
+                                            <v-expansion-panel-text>
+                                                <v-row class="px-3 mt-2 mr-2">
+                                                    <v-combobox class="px-2" density='compact' label="Reasoning Effort" v-model="providerFormData.reasoning_effort" clearable :items="defaultChoiceStore.reasoning_efforts" variant="outlined"></v-combobox>
+                                                    <v-spacer></v-spacer>
+                                                    <v-checkbox v-model="providerFormData.stream" label="Stream" density='compact' color="primary"></v-checkbox>
+                                                    <v-checkbox v-if="mcpStore.getServers" v-model="providerFormData.mcp" label="MCP" density='compact' color="primary"></v-checkbox>
+                                                </v-row>
+                                                <v-row class="px-3 mt-4 mb-0">
+                                                    <v-combobox class="px-2" density='compact' label="Max Tokens Prefix" :items="defaultChoiceStore.max_tokens_type" v-model="providerFormData.max_tokens_type" variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="MaxTokenValue" v-model="providerFormData.max_tokens_value" type='number' single-line variant="outlined"></v-combobox>
+                                                </v-row>
+                                                <v-row class="px-3 mt-0 mb-0">
+                                                    <v-combobox class="px-2" density='compact' label="Temperature" :items="defaultChoiceStore.temperature" type='number' v-model="providerFormData.temperature" variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="Top P" v-model="providerFormData.top_p" type='number' variant="outlined"></v-combobox>
+                                                </v-row>
+                                                <v-combobox class="px-2" density='compact' label="Content Type" v-model="providerFormData.contentType" variant="outlined"></v-combobox>
+                                                <v-combobox class="px-2" density='compact' label="Auth Prefix" :items="defaultChoiceStore.authPrefix" v-model="providerFormData.authPrefix" variant="outlined"></v-combobox>
+                                                <v-combobox class="px-2" density='compact' label="Auth Header Name" :items="['Authorization', 'x-api-key', 'Token']" v-model="providerFormData.authHeaderName" variant="outlined"></v-combobox>
+                                                <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2" density='compact' label="Seed" v-model.number="providerFormData.seed" type='number' variant="outlined"></v-text-field>
+                                                <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2" density='compact' label="Frequency Penalty" v-model.number="providerFormData.frequency_penalty" type='number' variant="outlined"></v-text-field>
+                                                <v-checkbox v-if="providerFormData.provider === 'minimax'" v-model="providerFormData.mask_sensitive_info" label="Mask Sensitive Info" density='compact' color="primary"></v-checkbox>
+                                                <div v-if="providerFormData.provider === 'anthropic-compatible'" class="px-2 text-caption text-grey">Auth Prefix not needed for Anthropic</div>
+                                                <div v-if="providerFormData.provider === 'glm'" class="px-2 text-caption text-grey">Temperature auto-adapted (do_sample)</div>
+                                            </v-expansion-panel-text>
+                                        </v-expansion-panel>
+                                    </v-expansion-panels>
+                                    <v-row class="mt-2 px-2">
+                                        <v-btn color="primary" variant="flat" @click="saveProviderForm">Save</v-btn>
+                                        <v-btn class="ml-2" variant="outlined" @click="cancelProviderForm">Cancel</v-btn>
                                     </v-row>
-                                    <v-row class="px-3 mt-4 mb-0">
-                                        <v-combobox class="px-2" density='compact'
-                                            :label="$t('$vuetify.dataIterator.i.maxTokensPrefix')"
-                                            :items="defaultChoiceStore.max_tokens_type"
-                                            v-model="chatbotStore.max_tokens_type" variant="outlined">
-                                        </v-combobox>
-                                        <v-combobox class="px-2" density='compact' label="MaxTokenValue"
-                                            v-model="chatbotStore.max_tokens_value" type='number' single-line
-                                            variant="outlined">
-                                        </v-combobox>
-                                    </v-row>
-                                    <v-row class="px-3 mt-0 mb-0">
-                                        <v-combobox class="px-2" density='compact'
-                                            :label="$t('$vuetify.dataIterator.i.temperature')"
-                                            :items="defaultChoiceStore.temperature" type='number'
-                                            v-model="chatbotStore.temperature" variant="outlined"
-                                            :rules="[value => !isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 2]">
-                                        </v-combobox>
-                                        <v-combobox class="px-2" density='compact'
-                                            :label="$t('$vuetify.dataIterator.i.topP')" v-model="chatbotStore.top_p"
-                                            type='number' variant="outlined"
-                                            :rules="[value => !isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 1]">
-                                        </v-combobox>
-                                    </v-row>
-                                    <v-combobox class="px-2" density='compact'
-                                        :label="$t('$vuetify.dataIterator.i.contentType')"
-                                        v-model="chatbotStore.contentType" variant="outlined">
-                                    </v-combobox>
-                                    <v-combobox class="px-2" density='compact'
-                                        :label="$t('$vuetify.dataIterator.i.authPrefix')"
-                                        :items="defaultChoiceStore.authPrefix" v-model="chatbotStore.authPrefix"
-                                        variant="outlined">
-                                    </v-combobox>
-                                    <v-combobox class="px-2" density='compact'
-                                        :label="$t('$vuetify.dataIterator.i.authHeaderName')"
-                                        :items="['Authorization', 'x-api-key', 'Token']" v-model="chatbotStore.authHeaderName"
-                                        variant="outlined">
-                                    </v-combobox>
-                                    <v-text-field v-if="providerCapabilities.seedSupported"
-                                        class="px-2" density='compact' label="Seed"
-                                        v-model.number="chatbotStore.seed" type='number' variant="outlined">
-                                    </v-text-field>
-                                    <v-text-field v-if="providerCapabilities.seedSupported"
-                                        class="px-2" density='compact' label="Frequency Penalty"
-                                        v-model.number="chatbotStore.frequency_penalty" type='number' variant="outlined"
-                                        :rules="[value => value === null || (value >= -2 && value <= 2)]">
-                                    </v-text-field>
-                                    <v-checkbox v-if="chatbotStore.provider === 'minimax'"
-                                        v-model="chatbotStore.mask_sensitive_info"
-                                        label="Mask Sensitive Info" density='compact' color="primary">
-                                    </v-checkbox>
-                                    <div v-if="chatbotStore.provider === 'anthropic-compatible'" class="px-2 text-caption text-grey">
-                                        Auth Prefix is not needed for Anthropic (x-api-key is used directly)
+                                </template>
+                                <template v-else>
+                                    <div v-if="chatbotStore.activeProvider" class="px-2">
+                                        <div class="text-h6 mb-2">{{ chatbotStore.activeProvider.name }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Type:</strong> {{ PROVIDER_DISPLAY_NAMES[chatbotStore.activeProvider.provider] || chatbotStore.activeProvider.provider }}</div>
+                                        <div class="text-body-2 mb-1"><strong>API Key:</strong> {{ maskApiKey(chatbotStore.activeProvider.apiKey) }}</div>
+                                        <div class="text-body-2 mb-1"><strong>URL:</strong> {{ chatbotStore.activeProvider.url }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Path:</strong> {{ chatbotStore.activeProvider.path }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Model:</strong> {{ chatbotStore.activeProvider.model }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Stream:</strong> {{ chatbotStore.activeProvider.stream ? 'On' : 'Off' }}</div>
+                                        <div class="text-body-2 mb-1"><strong>MCP:</strong> {{ chatbotStore.activeProvider.mcp ? 'On' : 'Off' }}</div>
+                                        <v-btn class="mt-4" color="primary" variant="tonal" density="compact" @click="startEditProvider(chatbotStore.activeProvider)">Edit</v-btn>
                                     </div>
-                                    <div v-if="chatbotStore.provider === 'glm'" class="px-2 text-caption text-grey">
-                                        Temperature auto-adapted (do_sample will be set automatically)
-                                    </div>
-                                </v-expansion-panel-text>
-                            </v-expansion-panel>
-                        </v-expansion-panels>
+                                    <div v-else class="px-2 text-body-2 text-grey">No provider selected</div>
+                                </template>
+                            </v-col>
+                        </v-row>
+
+                        <!-- Delete Confirm Dialog -->
+                        <v-dialog v-model="showDeleteDialog" max-width="400" data-component-id="chat-mcp.dialog.delete-confirm">
+                            <v-card>
+                                <v-card-title>Delete Provider</v-card-title>
+                                <v-card-text>Are you sure you want to delete "{{ deleteTargetName }}"? This action cannot be undone.</v-card-text>
+                                <v-card-actions>
+                                    <v-spacer></v-spacer>
+                                    <v-btn variant="text" @click="showDeleteDialog = false">Cancel</v-btn>
+                                    <v-btn color="error" variant="flat" @click="doDeleteProvider">Delete</v-btn>
+                                </v-card-actions>
+                            </v-card>
+                        </v-dialog>
 
                         <!-- Dialog Btn -->
                         <v-card-actions>
@@ -670,14 +847,14 @@
                                 variant="outlined" v-model="configFile"
                                 :label="$t('$vuetify.dataIterator.i.configFile')" accept="application/json"
                                 single-line></v-file-input>
-
                             <v-spacer></v-spacer>
                             <v-btn variant="flat" color="primary" @click="settingStore.configDialog = false">OK</v-btn>
                         </v-card-actions>
+
                     </v-card-text>
                 </v-card>
             </v-dialog>
-            <v-dialog v-model="promptStore.promptDialog" class="dialog-card">
+            <v-dialog v-model="promptStore.promptDialog" class="dialog-card" data-component-id="chat-mcp.dialog.prompt">
                 <v-card prepend-icon="mdi-account-cog" :title="$t('$vuetify.dataIterator.p.title')">
                     <v-data-iterator :items="promptStore.promptList" :search="promptStore.search" items-per-page="-1"
                         @update:options="promptStore.loadPrompts" :loading="promptStore.loading">
@@ -710,7 +887,7 @@
                     </v-data-iterator>
                 </v-card>
             </v-dialog>
-            <v-dialog v-model="promptStore.promptSheet" class="dialog-card">
+            <v-dialog v-model="promptStore.promptSheet" class="dialog-card" data-component-id="chat-mcp.dialog.prompt-detail">
                 <v-card prepend-icon="mdi-account-cog-outline"
                     :title="$t('$vuetify.dataIterator.p.sheet') + ' - ' + promptStore.promptSelect.title"
                     :subtitle="promptStore.promptSelect.name">
@@ -732,7 +909,7 @@
                     </v-card-text>
                 </v-card>
             </v-dialog>
-            <v-dialog v-model="resourceStore.resourceDialog" class="dialog-card" scrollable>
+            <v-dialog v-model="resourceStore.resourceDialog" class="dialog-card" scrollable data-component-id="chat-mcp.dialog.resource">
                 <v-card prepend-icon="mdi-database" :title="$t('$vuetify.dataIterator.r.title')">
                     <v-tabs :items="mcpStore.listServerResources()" v-model="resourceStore.tab" color="primary">
                         <template v-slot:tab="{ item }">
@@ -783,7 +960,7 @@
                     </v-card-text>
                 </v-card>
             </v-dialog>
-            <v-dialog v-model="settingStore.agentDialog" class="dialog-card">
+            <v-dialog v-model="settingStore.agentDialog" class="dialog-card" data-component-id="chat-mcp.dialog.agent">
                 <v-card prepend-icon="mdi-history" :title="$t('$vuetify.dataIterator.a.title')"
                     style="overflow-x: auto">
                     <template v-slot:append>
@@ -793,7 +970,7 @@
                         </v-card-actions>
                     </template>
                     <!-- board column -->
-                    <v-container class="pt-0">
+                    <v-container class="pt-0" data-component-id="chat-mcp.dialog.agent-board">
                         <v-row justify="center" class="mx-0 mb-2">
                             <v-col cols="auto" v-for="column in agentStore.columns" :key="column.key" class="flex-fill">
                                 <v-divider></v-divider>
@@ -859,7 +1036,7 @@
                                     No MCP servers configured yet
                                 </div>
                                 
-                                <v-list v-else density="compact" class="mb-4">
+                                <v-list v-else density="compact" class="mb-4" data-component-id="chat-mcp.dialog.mcp-server-list">
                                     <v-list-item v-for="server in settingStore.mcpServersList" :key="server.name"
                                         :title="server.name" class="mb-2" @dblclick="settingStore.showMcpServerConfig(server)" style="cursor: pointer;">
                                         <template v-slot:prepend>
@@ -905,7 +1082,7 @@
                 </v-card>
             </v-dialog>
 
-            <v-dialog v-model="agentStore.editDialog" class="dialog-card">
+            <v-dialog v-model="agentStore.editDialog" class="dialog-card" data-component-id="chat-mcp.dialog.agent-edit">
                 <v-card>
                     <v-card-title class="pa-4 d-flex align-center">
                         <span class="flex-fill">Edit Card</span>
@@ -938,7 +1115,7 @@
             </v-dialog>
 
             <!-- MCP Server Config Viewer Dialog -->
-            <v-dialog v-model="settingStore.mcpConfigViewerDialog" max-width="800" class="dialog-card">
+            <v-dialog v-model="settingStore.mcpConfigViewerDialog" max-width="800" class="dialog-card" data-component-id="chat-mcp.dialog.mcp-config-viewer">
                 <v-card v-if="settingStore.mcpConfigViewerServer" prepend-icon="mdi-code-json" :title="'MCP Server Config - ' + settingStore.mcpConfigViewerServer.name">
                     <v-divider></v-divider>
                     <v-card-text class="pa-4">
@@ -963,7 +1140,7 @@
             </v-dialog>
 
             <!-- Add MCP Server Dialog -->
-            <v-dialog v-model="settingStore.addMcpDialog" max-width="900" class="dialog-card">
+            <v-dialog v-model="settingStore.addMcpDialog" max-width="900" class="dialog-card" data-component-id="chat-mcp.dialog.mcp-add">
                 <v-card prepend-icon="mdi-plus-circle" title="MCP工具管理">
                     <v-divider></v-divider>
                     <v-card-text>
@@ -974,7 +1151,7 @@
                         
                         <v-window v-model="settingStore.mcpTab">
                             <!-- Add MCP Server Tab -->
-                            <v-window-item value="add-server">
+                            <v-window-item value="add-server" data-component-id="chat-mcp.dialog.mcp-add-server-tab">
                                 <div class="pa-4">
                                     <p class="text-caption text-grey mb-3">粘贴您的MCP配置JSON，我们将为您提取服务配置：</p>
                                     <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
@@ -1010,12 +1187,12 @@
                             </v-window-item>
                             
                             <!-- Registry Manager Tab -->
-                            <v-window-item value="registry-manager">
+                            <v-window-item value="registry-manager" data-component-id="chat-mcp.dialog.mcp-registry-tab">
                                 <div class="pa-4">
                                     <!-- 仓库状态部分 -->
                                     <div class="mb-6">
                                         <h3 class="text-h6 mb-3">仓库状态</h3>
-                                        <v-card :class="settingStore.registryRunning ? 'bg-green-lighten-5' : 'bg-red-lighten-5'" class="pa-4">
+                                        <v-card :class="settingStore.registryRunning ? 'bg-green-lighten-5' : 'bg-red-lighten-5'" class="pa-4" data-component-id="chat-mcp.dialog.registry-status">
                                             <div class="d-flex align-center mb-2">
                                                 <v-icon :icon="settingStore.registryRunning ? 'mdi-server' : 'mdi-server-off'" 
                                                     :color="settingStore.registryRunning ? 'green' : 'red'" class="mr-2"></v-icon>
@@ -1062,7 +1239,7 @@
                                     <!-- 操作日志部分 -->
                                     <div>
                                         <h3 class="text-h6 mb-3">操作日志</h3>
-                                        <v-card variant="outlined" class="pa-3" height="200" style="overflow-y: auto;">
+                                        <v-card variant="outlined" class="pa-3" height="200" style="overflow-y: auto;" data-component-id="chat-mcp.dialog.registry-log">
                                             <pre class="text-caption" style="font-family: monospace; white-space: pre-wrap;">{{ settingStore.registryLog }}</pre>
                                         </v-card>
                                         
@@ -1122,7 +1299,7 @@
 
     <template id="tuui-chat-box-template">
         <div v-for="group in groupMessages">
-            <div v-if="group.group === 'user'">
+            <div v-if="group.group === 'user'" data-component-id="chat-mcp.chat.user-message">
                 <div class="px-2 py-5 chat-message">
                     <div class="message">
                         <v-avatar :size=size class="mt-3 mr-3 mr-lg-6" color="primary" icon="mdi-account-circle">
@@ -1149,7 +1326,7 @@
                     </div>
                 </div>
             </div>
-            <div v-if="group.group === 'assistant'">
+            <div v-if="group.group === 'assistant'" data-component-id="chat-mcp.chat.assistant-message">
                 <div class="px-2 py-5 chat-message">
                     <div class="message">
                         <v-avatar :size=size class="mt-3 mr-3 mr-lg-6" color="teal" icon="mdi-lightning-bolt-circle">
@@ -1175,7 +1352,7 @@
                     </div>
                 </div>
             </div>
-            <div v-if="group.group === 'tool'">
+            <div v-if="group.group === 'tool'" data-component-id="chat-mcp.chat.tool-message">
                 <div class="px-2 py-5 chat-message">
                     <div class="message">
                         <v-avatar :size=size class="mt-3 mr-3 mr-lg-6" color="brown" icon="mdi-swap-vertical-circle">
@@ -1236,7 +1413,7 @@
     </template>
 
     <template id="tuui-img-dialog-template">
-        <v-dialog>
+        <v-dialog data-component-id="chat-mcp.chat.image-dialog">
             <template v-slot:activator="{ props: activatorProps }">
                 <div>
                     <v-img class="history-images mb-3" contain position="left" min-width="80px" min-height="80px"
@@ -1259,7 +1436,7 @@
                     <v-expand-transition>
                         <div v-if="isHovering">
                             <v-divider></v-divider>
-                            <v-card-actions>
+                            <v-card-actions data-component-id="chat-mcp.chat.message-actions">
                                 <v-btn v-if="showCopy" color="primary" icon="mdi-content-copy" size="x-small"
                                     variant="plain" @click="copyToClipboard(messages[index])"></v-btn>
                                 <v-btn v-if="showModify" color="primary"
@@ -1306,6 +1483,10 @@
             providerRegistry.set(config.type, config);
         }
 
+        const DEFAULT_CAPABILITIES = { streamSupported: true, toolCallSupported: true, reasoningSupported: true, seedSupported: false };
+        const DEFAULT_CONNECTION_PRESET = { defaultUrl: 'https://api.openai.com', defaultPath: '/v1/chat/completions', defaultModel: 'gpt-4o', authHeaderName: 'Authorization', authPrefix: 'Bearer ' };
+        const DEFAULT_PROVIDER = { type: 'openai-compatible', connectionPreset: DEFAULT_CONNECTION_PRESET, capabilities: DEFAULT_CAPABILITIES, requestTransformer: openaiRequestTransformer, responseTransformer: openaiResponseTransformer, errorTransformer: openaiErrorTransformer };
+
         function getProvider(type) {
             const provider = providerRegistry.get(type);
             if (provider) return provider;
@@ -1314,7 +1495,8 @@
                 console.warn(`Provider "${type}" not found, falling back to openai-compatible`);
                 return fallback;
             }
-            throw new Error('No provider registered');
+            console.warn('No provider registered, using hardcoded default');
+            return DEFAULT_PROVIDER;
         }
 
         function getAllProviderTypes() { return Array.from(providerRegistry.keys()); }
@@ -1546,6 +1728,164 @@
         // Run migration on load
         migrateAllConfigs();
         // ========== End Provider Abstraction Layer ==========
+
+        // ========== Multi-Provider Instance Management ==========
+        const PROVIDER_DISPLAY_NAMES = {
+            'openai-compatible': 'OpenAI',
+            'anthropic-compatible': 'Anthropic',
+            'glm': 'GLM',
+            'qwen': 'Qwen',
+            'kimi': 'Kimi',
+            'minimax': 'MiniMax',
+            'doubao-seed': 'Doubao',
+        };
+
+        function generateInstanceId() {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+            return 'pi-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+        }
+
+        function generateDefaultName(providerType, existingCount) {
+            const displayName = PROVIDER_DISPLAY_NAMES[providerType] || providerType;
+            return `${displayName}-${existingCount + 1}`;
+        }
+
+        function maskApiKey(apiKey) {
+            if (!apiKey || apiKey.length < 8) return '****';
+            return apiKey.substring(0, 4) + '****' + apiKey.substring(apiKey.length - 4);
+        }
+
+        function createDefaultInstance(providerType) {
+            const preset = getConnectionPreset(providerType);
+            return {
+                id: generateInstanceId(),
+                name: generateDefaultName(providerType, 0),
+                provider: providerType,
+                apiKey: '',
+                url: preset.defaultUrl,
+                path: preset.defaultPath,
+                model: preset.defaultModel,
+                authHeaderName: preset.authHeaderName,
+                authPrefix: preset.authPrefix,
+                contentType: 'application/json',
+                max_tokens_type: 'max_tokens',
+                max_tokens_value: '',
+                temperature: '',
+                top_p: '',
+                method: 'POST',
+                stream: true,
+                thinking: true,
+                reasoning_effort: null,
+                mcp: true,
+                seed: null,
+                frequency_penalty: null,
+                mask_sensitive_info: false,
+            };
+        }
+
+        function validateInstance(instance) {
+            if (!instance || typeof instance !== 'object') return false;
+            if (typeof instance.id !== 'string' || !instance.id) return false;
+            if (typeof instance.name !== 'string') return false;
+            if (typeof instance.provider !== 'string' || !instance.provider) return false;
+            return true;
+        }
+
+        const INSTANCE_FIELDS = [
+            'provider', 'apiKey', 'url', 'path', 'model', 'authPrefix', 'authHeaderName',
+            'contentType', 'max_tokens_type', 'max_tokens_value', 'temperature', 'top_p',
+            'method', 'stream', 'thinking', 'reasoning_effort', 'mcp',
+            'seed', 'frequency_penalty', 'mask_sensitive_info'
+        ];
+
+        function applyInstanceToStore(store, instance) {
+            for (const field of INSTANCE_FIELDS) {
+                if (instance[field] !== undefined) {
+                    store[field] = instance[field];
+                }
+            }
+        }
+
+        function runMigrationV2() {
+            try {
+                const storeKey = 'chatbotStore';
+                const raw = localStorage.getItem(storeKey);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== 'object') return;
+
+                if (Array.isArray(parsed.providers) && parsed.providers.length > 0) {
+                    const validProviders = parsed.providers.filter(validateInstance);
+                    if (validProviders.length > 0) {
+                        parsed.providers = validProviders;
+                        if (!validProviders.find(p => p.id === parsed.activeProviderId)) {
+                            parsed.activeProviderId = validProviders[0].id;
+                        }
+                        localStorage.setItem(storeKey, JSON.stringify(parsed));
+                        return;
+                    }
+                }
+
+                const instance = {
+                    id: generateInstanceId(),
+                    name: generateDefaultName(parsed.provider || 'openai-compatible', 0),
+                    provider: parsed.provider || 'openai-compatible',
+                    apiKey: parsed.apiKey || '',
+                    url: parsed.url || '',
+                    path: parsed.path || '',
+                    model: parsed.model || '',
+                    authPrefix: parsed.authPrefix !== undefined ? parsed.authPrefix : 'Bearer',
+                    authHeaderName: parsed.authHeaderName || 'Authorization',
+                    contentType: parsed.contentType || 'application/json',
+                    max_tokens_type: parsed.max_tokens_type || 'max_tokens',
+                    max_tokens_value: parsed.max_tokens_value || '',
+                    temperature: parsed.temperature || '',
+                    top_p: parsed.top_p || '',
+                    method: parsed.method || 'POST',
+                    stream: parsed.stream !== undefined ? parsed.stream : true,
+                    thinking: parsed.thinking !== undefined ? parsed.thinking : true,
+                    reasoning_effort: parsed.reasoning_effort !== undefined ? parsed.reasoning_effort : null,
+                    mcp: parsed.mcp !== undefined ? parsed.mcp : true,
+                    seed: parsed.seed !== undefined ? parsed.seed : null,
+                    frequency_penalty: parsed.frequency_penalty !== undefined ? parsed.frequency_penalty : null,
+                    mask_sensitive_info: parsed.mask_sensitive_info !== undefined ? parsed.mask_sensitive_info : false,
+                };
+
+                parsed.providers = [instance];
+                parsed.activeProviderId = instance.id;
+                localStorage.setItem(storeKey, JSON.stringify(parsed));
+            } catch (e) {
+                console.warn('Migration V2 failed:', e);
+            }
+        }
+
+        function ensureProviderInstances(store) {
+            if (!Array.isArray(store.providers) || store.providers.length === 0) {
+                console.warn('providers was invalid or empty, created default instance');
+                const instance = createDefaultInstance('openai-compatible');
+                store.providers = [instance];
+                store.activeProviderId = instance.id;
+                applyInstanceToStore(store, instance);
+            } else {
+                store.providers = store.providers.filter(validateInstance);
+                if (store.providers.length === 0) {
+                    console.warn('All provider instances invalid, created default instance');
+                    const instance = createDefaultInstance('openai-compatible');
+                    store.providers = [instance];
+                    store.activeProviderId = instance.id;
+                    applyInstanceToStore(store, instance);
+                } else if (!store.providers.find(p => p.id === store.activeProviderId)) {
+                    console.warn('activeProviderId not found in providers, reset to first');
+                    store.activeProviderId = store.providers[0].id;
+                    applyInstanceToStore(store, store.providers[0]);
+                } else if (!PROVIDER_TYPES.includes(store.provider)) {
+                    console.warn(`store.provider "${store.provider}" is not a valid ProviderType, synced from activeProvider`);
+                    const active = store.providers.find(p => p.id === store.activeProviderId);
+                    applyInstanceToStore(store, active || store.providers[0]);
+                }
+            }
+        }
+        // ========== End Multi-Provider Instance Management ==========
 
         const useMcpStore = defineStore("mcpStore", {
             state: () => ({
@@ -2107,9 +2447,17 @@
                     show: false,
                     message: '',
                     type: 'success'
-                }
+                },
+
+                activePanel: 'chat',
+                panelTransitioning: false
             }),
             actions: {
+                switchPanel() {
+                    this.panelTransitioning = true;
+                    this.activePanel = this.activePanel === 'chat' ? 'function' : 'chat';
+                    setTimeout(() => { this.panelTransitioning = false; }, 300);
+                },
                 initDialog() {
                     this.apiKeyShow = false; // hide api key
                     this.configDialog = true;
@@ -3054,9 +3402,22 @@
                             historyStore.replace(id)
                         },
                         select(id) {
+                            if (id < 0 || id >= this.conversation.length) return
+                            if (messageStore.generating) messageStore.generating = false
+                            const currentConversation = JSON.parse(JSON.stringify(messageStore.conversation))
+                            const selectedHistory = JSON.parse(JSON.stringify(this.conversation[id].history))
+                            if (currentConversation.length === 0) {
+                                messageStore.conversation = selectedHistory
+                                this.conversation.splice(id, 1)
+                            } else {
+                                this.conversation.unshift({
+                                    id: this.getDate,
+                                    history: currentConversation
+                                })
+                                messageStore.conversation = selectedHistory
+                                this.conversation.splice(id + 1, 1)
+                            }
                             settingStore.configHistory = false
-                            messageStore.conversation = this.conversation[id].history
-                            this.asyncReplace(id)
                         },
                         getColor(id) {
                             const targetElement = this.conversation[id]?.history.find(element => element.role === "assistant");
@@ -3120,6 +3481,8 @@
 
                 const useChatbotStore = defineStore("chatbotStore", {
                     state: () => ({
+                        providers: [],
+                        activeProviderId: '',
                         provider: "openai-compatible",
                         apiKey: "",
                         url: "https://api2.aiql.com",
@@ -3145,10 +3508,58 @@
                     persist: {
                         enabled: true,
                         strategies: [{ storage: localStorage }],
-                        // paths: ["apiKey"] 
+                    },
+
+                    getters: {
+                        activeProvider(state) {
+                            return state.providers.find(p => p.id === state.activeProviderId);
+                        },
                     },
 
                     actions: {
+                        _applyInstanceToStore(instance) {
+                            applyInstanceToStore(this, instance);
+                        },
+
+                        switchProvider(id) {
+                            const instance = this.providers.find(p => p.id === id);
+                            if (!instance) return;
+                            this.activeProviderId = id;
+                            this._applyInstanceToStore(instance);
+                        },
+
+                        addProvider(instance) {
+                            if (this.providers.length >= 20) {
+                                throw new Error('已达到最大实例数量限制（20）');
+                            }
+                            this.providers.push(instance);
+                            this.switchProvider(instance.id);
+                            return instance.id;
+                        },
+
+                        updateProvider(id, updated) {
+                            const idx = this.providers.findIndex(p => p.id === id);
+                            if (idx === -1) return;
+                            this.providers[idx] = { ...this.providers[idx], ...updated };
+                            if (id === this.activeProviderId) {
+                                this._applyInstanceToStore(this.providers[idx]);
+                            }
+                        },
+
+                        removeProvider(id) {
+                            if (this.providers.length <= 1) {
+                                throw new Error('至少需要保留一个 Provider 实例');
+                            }
+                            const idx = this.providers.findIndex(p => p.id === id);
+                            if (idx === -1) return;
+                            const wasActive = id === this.activeProviderId;
+                            this.providers.splice(idx, 1);
+                            if (wasActive) {
+                                const newIdx = Math.min(idx, this.providers.length - 1);
+                                this.switchProvider(this.providers[newIdx].id);
+                            }
+                        },
+
                         resetState() {
                             this.$reset();
                             defaultChoiceStore.resetState()
@@ -3162,6 +3573,8 @@
                 });
 
                 const chatbotStore = useChatbotStore();
+                runMigrationV2();
+                ensureProviderInstances(chatbotStore);
                 const messageStore = useMessageStore();
                 const historyStore = useHistoryStore();
                 const defaultChoiceStore = useDefaultChoiceStore();
@@ -3491,13 +3904,26 @@
                 };
 
                 const initLottie = () => {
-                    lottie.loadAnimation({
-                        container: document.getElementById('lottie'), // the dom element that will contain the animation
-                        renderer: 'svg',
-                        loop: true,
-                        autoplay: true,
-                        path: '../lib/anime/lottie.json' // the path to the animation json
-                    });
+                    const lottieContainer = document.getElementById('lottie');
+                    if (lottieContainer) {
+                        lottie.loadAnimation({
+                            container: lottieContainer,
+                            renderer: 'svg',
+                            loop: true,
+                            autoplay: true,
+                            path: '../lib/anime/lottie.json'
+                        });
+                    }
+                    const lottieAltContainer = document.getElementById('lottie-alt');
+                    if (lottieAltContainer) {
+                        lottie.loadAnimation({
+                            container: lottieAltContainer,
+                            renderer: 'svg',
+                            loop: true,
+                            autoplay: true,
+                            path: '../lib/anime/lottie.json'
+                        });
+                    }
                 };
 
                 onMounted(async () => {
@@ -3511,12 +3937,13 @@
 
                 const resizeInputBox = () => {
                     const inputBox = document.querySelector(".input-box");
+                    if (!inputBox) return;
                     const handleResize = (entries) => {
                         for (const entry of entries) {
                             if (entry.target === inputBox) {
                                 const chatElement = document.querySelector(".chat-bot");
                                 if (chatElement) {
-                                    chatElement.style.marginBottom = `${Math.max(entry.contentRect.height, 122)}px`
+                                    chatElement.style.paddingBottom = `${Math.max(entry.contentRect.height, 50)}px`
                                 }
                             }
                         }
@@ -3598,7 +4025,7 @@
                 const providerTypes = ref(PROVIDER_TYPES);
 
                 const providerCapabilities = computed(() => {
-                    return getCapabilities(chatbotStore.provider);
+                    return getCapabilities(chatbotStore.provider || 'openai-compatible');
                 });
 
                 const onProviderChange = (type) => {
@@ -3608,6 +4035,67 @@
                     chatbotStore.model = preset.defaultModel;
                     chatbotStore.authHeaderName = preset.authHeaderName;
                     chatbotStore.authPrefix = preset.authPrefix;
+                };
+
+                const providerEditMode = ref(null);
+                const providerFormData = ref({});
+                const providerFormCapabilities = computed(() => getCapabilities(providerFormData.value.provider || 'openai-compatible'));
+                const showDeleteDialog = ref(false);
+                const deleteTargetId = ref(null);
+                const deleteTargetName = ref('');
+
+                const onFormProviderChange = (type) => {
+                    const preset = getConnectionPreset(type);
+                    providerFormData.value.url = preset.defaultUrl;
+                    providerFormData.value.path = preset.defaultPath;
+                    providerFormData.value.model = preset.defaultModel;
+                    providerFormData.value.authHeaderName = preset.authHeaderName;
+                    providerFormData.value.authPrefix = preset.authPrefix;
+                };
+
+                const startCreateProvider = () => {
+                    providerEditMode.value = 'create';
+                    providerFormData.value = createDefaultInstance('openai-compatible');
+                };
+
+                const startEditProvider = (instance) => {
+                    providerEditMode.value = 'edit';
+                    providerFormData.value = JSON.parse(JSON.stringify(instance));
+                };
+
+                const saveProviderForm = () => {
+                    const data = providerFormData.value;
+                    if (!data.provider || !data.apiKey) {
+                        snackbarStore.showErrorMessage('Provider type and API Key are required');
+                        return;
+                    }
+                    if (providerEditMode.value === 'create') {
+                        data.id = generateInstanceId();
+                        if (!data.name) data.name = generateDefaultName(data.provider, chatbotStore.providers.length);
+                        chatbotStore.addProvider(data);
+                    } else {
+                        chatbotStore.updateProvider(data.id, data);
+                    }
+                    providerEditMode.value = null;
+                    providerFormData.value = {};
+                };
+
+                const cancelProviderForm = () => {
+                    providerEditMode.value = null;
+                    providerFormData.value = {};
+                };
+
+                const confirmDeleteProvider = (instance) => {
+                    deleteTargetId.value = instance.id;
+                    deleteTargetName.value = instance.name;
+                    showDeleteDialog.value = true;
+                };
+
+                const doDeleteProvider = () => {
+                    chatbotStore.removeProvider(deleteTargetId.value);
+                    showDeleteDialog.value = false;
+                    deleteTargetId.value = null;
+                    deleteTargetName.value = '';
                 };
 
                 return {
@@ -3631,6 +4119,18 @@
                     providerTypes,
                     providerCapabilities,
                     onProviderChange,
+                    providerEditMode,
+                    providerFormData,
+                    providerFormCapabilities,
+                    showDeleteDialog,
+                    deleteTargetName,
+                    onFormProviderChange,
+                    startCreateProvider,
+                    startEditProvider,
+                    saveProviderForm,
+                    cancelProviderForm,
+                    confirmDeleteProvider,
+                    doDeleteProvider,
 
                 };
             }
@@ -3653,6 +4153,7 @@
                         l: { title: 'Language' },
                         a: { title: 'Prompts & MCP' },
                         r: { title: 'Resources' },
+                        mcp: { title: 'MCP Management' },
                         g: {
                             new: 'New Conversation',
                             reg: 'Regeneration'
@@ -3701,6 +4202,7 @@
                         },
                         a: { title: '提示词和MCP' },
                         r: { title: '资源' },
+                        mcp: { title: 'MCP管理' },
                         g: {
                             new: '新对话',
                             reg: '重新生成'
