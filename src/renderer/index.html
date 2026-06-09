@@ -330,7 +330,7 @@
         <v-app>
             <v-container fluid class="main-layout pa-0">
                 <v-row no-gutters class="main-row">
-                    <v-col cols="7" :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
+                    <v-col :cols="settingStore.leftColValue" :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie" class="text-center text-h5" data-component-id="chat-mcp.chat.loading-animation">
@@ -353,7 +353,7 @@
                                             data-component-id="chat-mcp.chat.file-upload"></v-file-input>
                                     </div>
                                     <v-btn size="small" variant="text" icon
-                                        @click="settingStore.switchPanel"
+                                        @click="!settingStore.panelTransitioning && settingStore.switchPanel()"
                                         data-component-id="chat-mcp.chat.switch-panel-button">
                                         <v-icon>mdi-swap-horizontal</v-icon>
                                     </v-btn>
@@ -388,7 +388,7 @@
                                                 <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
                                                     @click="messageStore.stop" icon="mdi-stop"
                                                     data-component-id="chat-mcp.chat.stop-button"></v-btn>
-                                                <v-speed-dial v-else-if="messageStore.conversation.length > 0" location="bottom center"
+                                                <v-speed-dial v-else location="bottom center"
                                                     transition="expand-transition">
                                                     <template v-slot:activator="{ props: activatorProps }">
                                                         <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
@@ -398,30 +398,26 @@
                                                         @click="messageStore.resendMessage" icon="mdi-autorenew"
                                                         v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
                                                         data-component-id="chat-mcp.chat.resend-button"></v-btn>
-                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.init()"
+                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.startNew()"
                                                         icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
                                                         data-component-id="chat-mcp.chat.new-conversation-button"></v-btn>
                                                 </v-speed-dial>
-                                                <v-btn v-else size="small" :color="mcpStore.getServers ? 'primary': 'grey'" variant="elevated"
-                                                    @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
-                                                    icon="mdi-account-edit"
-                                                    data-component-id="chat-mcp.chat.prompt-button"></v-btn>
                                             </div>
                                         </template>
                                     </v-textarea>
                                 </div>
                                 <v-divider></v-divider>
                                 <div class="nav-section d-flex align-center justify-center ga-2 px-3 py-2">
+                                    <v-btn size="small" variant="tonal"
+                                        @click="messageStore.startNew()"
+                                        prepend-icon="mdi-plus-circle-outline" v-tooltip:bottom="$t('$vuetify.dataIterator.g.new')"
+                                        data-component-id="chat-mcp.chat.new-conversation-nav-button">
+                                        {{ $t('$vuetify.dataIterator.g.new') }}
+                                    </v-btn>
                                     <v-btn size="small" variant="tonal" @click="settingStore.initDialog"
                                         prepend-icon="mdi-api" v-tooltip:bottom="$t('$vuetify.dataIterator.i.title')"
                                         data-component-id="chat-mcp.chat.config-button">
                                         {{ $t('$vuetify.dataIterator.i.title') }}
-                                    </v-btn>
-                                    <v-btn size="small" variant="tonal"
-                                        @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
-                                        prepend-icon="mdi-account-edit" v-tooltip:bottom="$t('$vuetify.dataIterator.a.title')"
-                                        data-component-id="chat-mcp.chat.prompt-button-nav">
-                                        {{ $t('$vuetify.dataIterator.a.title') }}
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
                                         @click="settingStore.addMcpDialog = true; settingStore.mcpTab = 'add-server';"
@@ -496,7 +492,7 @@
                             </div>
                         </template>
                     </v-col>
-                    <v-col cols="5" :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
+                    <v-col :cols="settingStore.rightColValue" :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <div class="function-panel">
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
@@ -507,7 +503,7 @@
                                             data-component-id="chat-mcp.chat.file-upload"></v-file-input>
                                     </div>
                                     <v-btn size="small" variant="text" icon
-                                        @click="settingStore.switchPanel"
+                                        @click="!settingStore.panelTransitioning && settingStore.switchPanel()"
                                         data-component-id="chat-mcp.chat.switch-panel-button">
                                         <v-icon>mdi-swap-horizontal</v-icon>
                                     </v-btn>
@@ -542,7 +538,7 @@
                                                 <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
                                                     @click="messageStore.stop" icon="mdi-stop"
                                                     data-component-id="chat-mcp.chat.stop-button"></v-btn>
-                                                <v-speed-dial v-else-if="messageStore.conversation.length > 0" location="bottom center"
+                                                <v-speed-dial v-else location="bottom center"
                                                     transition="expand-transition">
                                                     <template v-slot:activator="{ props: activatorProps }">
                                                         <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
@@ -552,30 +548,26 @@
                                                         @click="messageStore.resendMessage" icon="mdi-autorenew"
                                                         v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
                                                         data-component-id="chat-mcp.chat.resend-button"></v-btn>
-                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.init()"
+                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.startNew()"
                                                         icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
                                                         data-component-id="chat-mcp.chat.new-conversation-button"></v-btn>
                                                 </v-speed-dial>
-                                                <v-btn v-else size="small" :color="mcpStore.getServers ? 'primary': 'grey'" variant="elevated"
-                                                    @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
-                                                    icon="mdi-account-edit"
-                                                    data-component-id="chat-mcp.chat.prompt-button"></v-btn>
                                             </div>
                                         </template>
                                     </v-textarea>
                                 </div>
                                 <v-divider></v-divider>
                                 <div class="nav-section d-flex align-center justify-center ga-2 px-3 py-2">
+                                    <v-btn size="small" variant="tonal"
+                                        @click="messageStore.startNew()"
+                                        prepend-icon="mdi-plus-circle-outline" v-tooltip:bottom="$t('$vuetify.dataIterator.g.new')"
+                                        data-component-id="chat-mcp.chat.new-conversation-nav-button">
+                                        {{ $t('$vuetify.dataIterator.g.new') }}
+                                    </v-btn>
                                     <v-btn size="small" variant="tonal" @click="settingStore.initDialog"
                                         prepend-icon="mdi-api" v-tooltip:bottom="$t('$vuetify.dataIterator.i.title')"
                                         data-component-id="chat-mcp.chat.config-button">
                                         {{ $t('$vuetify.dataIterator.i.title') }}
-                                    </v-btn>
-                                    <v-btn size="small" variant="tonal"
-                                        @click="mcpStore.getServers ? promptStore.promptDialog = true : false"
-                                        prepend-icon="mdi-account-edit" v-tooltip:bottom="$t('$vuetify.dataIterator.a.title')"
-                                        data-component-id="chat-mcp.chat.prompt-button-nav">
-                                        {{ $t('$vuetify.dataIterator.a.title') }}
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
                                         @click="settingStore.addMcpDialog = true; settingStore.mcpTab = 'add-server';"
@@ -665,7 +657,7 @@
             </v-container>
 
             <!-- snackbar -->
-            <v-snackbar v-model="snackbarStore.isShow" timeout="4000" :color="snackbarStore.type" location="top" data-component-id="chat-mcp.chat.snackbar">
+            <v-snackbar v-model="snackbarStore.isShow" timeout="4000" :color="snackbarStore.type" location="top" v-if="snackbarStore" data-component-id="chat-mcp.chat.snackbar">
                 <div class="d-flex align-center">
                     <v-icon class="mr-2">{{ snackbarStore.getIcon() }}</v-icon>
                     <span>{{$t(snackbarStore.message)}}</span>
@@ -725,11 +717,11 @@
             <!-- dialog -->
             <v-dialog v-model="settingStore.configDialog" class="dialog-card" data-component-id="chat-mcp.dialog.config">
                 <v-card prepend-icon="mdi-cog-outline" :title="$t('$vuetify.dataIterator.i.title')">
+                    <input type="file" ref="importFileInput" accept=".json" style="display:none" @change="handleImportFile" />
                     <template v-slot:append>
-                        <v-card-actions>
-                            <v-spacer></v-spacer>
-                            <v-btn color="error" icon="mdi-refresh" @click="chatbotStore.resetState"></v-btn>
-                        </v-card-actions>
+                        <v-btn icon="mdi-import" variant="text" :disabled="!!providerEditMode" @click="triggerImport" :title="$t('$vuetify.dataIterator.i.importConfig')"></v-btn>
+                        <v-btn icon="mdi-export" variant="text" :disabled="!!providerEditMode || chatbotStore.providers.length === 0" @click="showExportDialog = true" :title="$t('$vuetify.dataIterator.i.exportConfig')"></v-btn>
+                        <v-btn icon="mdi-refresh" variant="text" @click="chatbotStore.resetState" :title="$t('$vuetify.dataIterator.i.resetConfig')"></v-btn>
                     </template>
 
                     <v-card-text class="pb-0">
@@ -748,7 +740,7 @@
                                         <v-list-item-title>{{ pitem.name }}</v-list-item-title>
                                         <v-list-item-subtitle>
                                             <v-chip label size="x-small" class="ml-0">
-                                                {{ PROVIDER_DISPLAY_NAMES[pitem.provider] || pitem.provider }}
+                                                {{ getProviderDisplayName(pitem.provider) }}
                                             </v-chip>
                                         </v-list-item-subtitle>
                                         <template v-slot:append>
@@ -814,7 +806,7 @@
                                 <template v-else>
                                     <div v-if="chatbotStore.activeProvider" class="px-2">
                                         <div class="text-h6 mb-2">{{ chatbotStore.activeProvider.name }}</div>
-                                        <div class="text-body-2 mb-1"><strong>Type:</strong> {{ PROVIDER_DISPLAY_NAMES[chatbotStore.activeProvider.provider] || chatbotStore.activeProvider.provider }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Type:</strong> {{ getProviderDisplayName(chatbotStore.activeProvider.provider) }}</div>
                                         <div class="text-body-2 mb-1"><strong>API Key:</strong> {{ maskApiKey(chatbotStore.activeProvider.apiKey) }}</div>
                                         <div class="text-body-2 mb-1"><strong>URL:</strong> {{ chatbotStore.activeProvider.url }}</div>
                                         <div class="text-body-2 mb-1"><strong>Path:</strong> {{ chatbotStore.activeProvider.path }}</div>
@@ -843,72 +835,46 @@
 
                         <!-- Dialog Btn -->
                         <v-card-actions>
-                            <v-file-input prepend-icon="" prepend-inner-icon="mdi-upload" class="mr-2"
-                                variant="outlined" v-model="configFile"
-                                :label="$t('$vuetify.dataIterator.i.configFile')" accept="application/json"
-                                single-line></v-file-input>
                             <v-spacer></v-spacer>
                             <v-btn variant="flat" color="primary" @click="settingStore.configDialog = false">OK</v-btn>
                         </v-card-actions>
 
+                        <!-- Export Dialog -->
+                        <v-dialog v-model="showExportDialog" max-width="500">
+                            <v-card :title="$t('$vuetify.dataIterator.i.exportTitle')">
+                                <v-card-text>
+                                    <v-checkbox
+                                        :label="$t('$vuetify.dataIterator.i.selectAll')"
+                                        :model-value="exportAllSelected"
+                                        :indeterminate="exportIndeterminate"
+                                        @click="toggleExportAll"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                    <v-divider></v-divider>
+                                    <v-checkbox
+                                        v-for="pitem in chatbotStore.providers"
+                                        :key="pitem.id"
+                                        :label="pitem.name + ' (' + getProviderDisplayName(pitem.provider) + ')'"
+                                        :model-value="exportSelectedIds.includes(pitem.id)"
+                                        @change="toggleExportItem(pitem.id)"
+                                        color="primary"
+                                        density="compact"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-card-text>
+                                <v-card-actions>
+                                    <v-spacer></v-spacer>
+                                    <v-btn variant="text" @click="cancelExport">{{ $t('$vuetify.dataIterator.i.cancel') }}</v-btn>
+                                    <v-btn variant="flat" color="primary" :disabled="exportSelectedIds.length === 0" @click="confirmExport">{{ $t('$vuetify.dataIterator.i.confirmExport') }}</v-btn>
+                                </v-card-actions>
+                            </v-card>
+                        </v-dialog>
+
                     </v-card-text>
                 </v-card>
             </v-dialog>
-            <v-dialog v-model="promptStore.promptDialog" class="dialog-card" data-component-id="chat-mcp.dialog.prompt">
-                <v-card prepend-icon="mdi-account-cog" :title="$t('$vuetify.dataIterator.p.title')">
-                    <v-data-iterator :items="promptStore.promptList" :search="promptStore.search" items-per-page="-1"
-                        @update:options="promptStore.loadPrompts" :loading="promptStore.loading">
-                        <template v-slot:header>
-                            <v-toolbar class="px-2">
-                                <v-text-field v-model="promptStore.search" density="comfortable" placeholder="Search"
-                                    prepend-inner-icon="mdi-magnify" width="100vw" max-width="400px" variant="solo"
-                                    clearable hide-details></v-text-field>
-                            </v-toolbar>
-                        </template>
-                        <template v-slot:default="{ items }">
-                            <v-container class="pa-2" fluid>
-                                <v-row dense>
-                                    <v-col v-for="item in items" :key="item.raw.title +':'+ item.raw.name" cols="auto"
-                                        class="flex-fill">
-                                        <v-card border flat>
-                                            <v-card-item :subtitle="item.raw.name" class="mb-2" :title="item.raw.title">
-                                                <template v-slot:append>
-                                                    <v-btn icon="mdi-lead-pencil" size="small" text="Read" border flat
-                                                        @click="promptStore.select(item.raw)">
-                                                    </v-btn>
-                                                </template>
-                                            </v-card-item>
-                                            <v-card-text>{{ item.raw.description }}</v-card-text>
-                                        </v-card>
-                                    </v-col>
-                                </v-row>
-                            </v-container>
-                        </template>
-                    </v-data-iterator>
-                </v-card>
-            </v-dialog>
-            <v-dialog v-model="promptStore.promptSheet" class="dialog-card" data-component-id="chat-mcp.dialog.prompt-detail">
-                <v-card prepend-icon="mdi-account-cog-outline"
-                    :title="$t('$vuetify.dataIterator.p.sheet') + ' - ' + promptStore.promptSelect.title"
-                    :subtitle="promptStore.promptSelect.name">
-                    <v-divider></v-divider>
-                    <v-card-text>
-                        <div>{{promptStore.promptSelect.description}}</div>
-                        <div v-if="promptStore.promptSelect.arguments">
-                            <br>
-                            <v-textarea class="mx-2" v-for="argument in promptStore.promptSelect.arguments"
-                                color="primary" type="text" variant="outlined" v-model="argument.content"
-                                :label="argument.name" rows="1" auto-grow>
-                        </div>
-                        </v-textarea>
-                        <v-card-actions>
-                            <v-spacer></v-spacer>
-                            <v-btn class="pt-0" variant="flat" color="primary"
-                                @click="messageStore.applyPrompt(promptStore.fetchSelect())">Get</v-btn>
-                        </v-card-actions>
-                    </v-card-text>
-                </v-card>
-            </v-dialog>
+
             <v-dialog v-model="resourceStore.resourceDialog" class="dialog-card" scrollable data-component-id="chat-mcp.dialog.resource">
                 <v-card prepend-icon="mdi-database" :title="$t('$vuetify.dataIterator.r.title')">
                     <v-tabs :items="mcpStore.listServerResources()" v-model="resourceStore.tab" color="primary">
@@ -961,7 +927,7 @@
                 </v-card>
             </v-dialog>
             <v-dialog v-model="settingStore.agentDialog" class="dialog-card" data-component-id="chat-mcp.dialog.agent">
-                <v-card prepend-icon="mdi-history" :title="$t('$vuetify.dataIterator.a.title')"
+                <v-card prepend-icon="mdi-history" :title="$t('$vuetify.dataIterator.ag.title')"
                     style="overflow-x: auto">
                     <template v-slot:append>
                         <v-card-actions>
@@ -1459,7 +1425,7 @@
     </template>
 
     <script lang="ts" setup>
-        const { createApp, ref, reactive, computed, onMounted, watch, nextTick, axios, defineProps, defineComponent } = Vue
+        const { createApp, ref, reactive, computed, onMounted, onUnmounted, onUpdated, watch, nextTick, axios, defineProps, defineComponent } = Vue
         const { createVuetify } = Vuetify
         const { createPinia, defineStore, storeToRefs } = Pinia
         const { createI18n, useI18n } = VueI18n
@@ -2450,8 +2416,22 @@
                 },
 
                 activePanel: 'chat',
-                panelTransitioning: false
+                panelTransitioning: false,
+                chatPanelCols: 7,
+                functionPanelCols: 5
             }),
+            getters: {
+                leftColValue(state) {
+                    return state.activePanel === 'chat'
+                        ? state.chatPanelCols
+                        : state.functionPanelCols;
+                },
+                rightColValue(state) {
+                    return state.activePanel === 'chat'
+                        ? state.functionPanelCols
+                        : state.chatPanelCols;
+                }
+            },
             actions: {
                 switchPanel() {
                     this.panelTransitioning = true;
@@ -2941,92 +2921,6 @@
             },
         });
 
-        const usePromptStore = defineStore("promptStore", {
-            state: () => ({
-                promptDialog: false,
-                promptSheet: false,
-                promptList: [],
-                promptSelect: {},
-                search: '',
-                loading: false,
-            }),
-            actions: {
-                loadPrompts: function () {
-                    this.loading = true
-                    try {
-                        this.fetchPrompts().then((prompts) => {
-                            console.log(prompts)
-                            this.promptList = prompts
-                            return
-                        })
-                    } catch (error) {
-                        console.error('Failed to load prompts:', error);
-                    } finally {
-                        this.loading = false;
-                    }
-
-                },
-                fetchPrompts: async function () {
-                    const mcpStore = useMcpStore();
-                    const mcpServers = mcpStore.getServers
-                    if (!mcpServers) {
-                        return []
-                    }
-                    const mcpKeys = Object.keys(mcpServers)
-                    const allPrompts = []
-                    for (const key of mcpKeys) {
-                        const obj = await mcpServers[key]?.prompts?.list();
-                        if (obj) {
-                            obj.prompts.forEach(prompt => allPrompts.push({ title: key, ...prompt }));
-                        }
-                    }
-
-                    return allPrompts;
-                },
-                select: function (prompt) {
-                    console.log(prompt.title, prompt.name, prompt.arguments)
-                    this.promptSelect = prompt
-                    this.promptSheet = true
-                    this.promptDialog = false
-                },
-                fetchSelect: async function () {
-                    const mcpStore = useMcpStore();
-                    const mcpServers = mcpStore.getServers
-                    const getFun = mcpServers[this.promptSelect.title]?.prompts?.get
-                    if (!getFun) {
-                        return []
-                    }
-                    const params = { name: this.promptSelect.name }
-                    if (this.promptSelect.arguments) {
-                        for (const argument of this.promptSelect.arguments) {
-                            if (argument.name) {
-                                if (!params['arguments']) {
-                                    params['arguments'] = {};
-                                }
-                                params['arguments'][argument.name] = argument.content
-                            }
-                        }
-                    }
-
-                    console.log(params)
-                    const prompts = await getFun(params)
-
-                    const conversations = prompts.messages.map(item => {
-                        const content = mcpStore.convertItem(item.content)
-                        const conversation = {
-                            role: item.role,
-                            content: item.role == 'user' ? [content] : content.text
-                        }
-                        return conversation
-                    });
-
-                    this.promptSheet = false
-
-                    return conversations
-                },
-            },
-        });
-
         const TuuiImgDialog = {
             template: '#tuui-img-dialog-template',
             props: { src: { type: String, required: true } }
@@ -3145,7 +3039,6 @@
                 const mcpStore = useMcpStore();
                 const agentStore = useAgentStore();
                 const settingStore = useSettingStore();
-                const promptStore = usePromptStore();
                 const resourceStore = useResourceStore();
 
                 const { locale } = useI18n({ useScope: 'global' });
@@ -3196,6 +3089,22 @@
                                 this.conversation = [];
                                 snackbarStore.showSuccessMessage('$vuetify.dataIterator.snackbar.addnew')
                             }
+                        },
+                        startNew() {
+                            if (this.generating) {
+                                this.generating = false;
+                            }
+                            if (this.conversation.length > 0) {
+                                historyStore.init([...this.conversation]);
+                                this.conversation = [];
+                                snackbarStore.showSuccessMessage('$vuetify.dataIterator.snackbar.addnew');
+                            } else {
+                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.addfail');
+                            }
+                            nextTick(() => {
+                                const textarea = document.querySelector('.message-input textarea');
+                                textarea?.focus();
+                            });
                         },
                         stop() {
                             this.generating = false;
@@ -3270,12 +3179,6 @@
 
                                 this.startInference();
                             }
-                        },
-                        applyPrompt: async function (fetchedPrompt) {
-                            const messages = await fetchedPrompt
-                            console.log(messages)
-                            this.conversation = messages
-
                         },
                         startInference: async function () {
                             console.log('[startInference] begin');
@@ -3903,10 +3806,13 @@
                     });
                 };
 
+                const lottieAnimation = ref(null);
+                const lottieAltAnimation = ref(null);
+
                 const initLottie = () => {
                     const lottieContainer = document.getElementById('lottie');
-                    if (lottieContainer) {
-                        lottie.loadAnimation({
+                    if (lottieContainer && !lottieAnimation.value) {
+                        lottieAnimation.value = lottie.loadAnimation({
                             container: lottieContainer,
                             renderer: 'svg',
                             loop: true,
@@ -3915,8 +3821,8 @@
                         });
                     }
                     const lottieAltContainer = document.getElementById('lottie-alt');
-                    if (lottieAltContainer) {
-                        lottie.loadAnimation({
+                    if (lottieAltContainer && !lottieAltAnimation.value) {
+                        lottieAltAnimation.value = lottie.loadAnimation({
                             container: lottieAltContainer,
                             renderer: 'svg',
                             loop: true,
@@ -3926,6 +3832,22 @@
                     }
                 };
 
+                const destroyLottie = () => {
+                    if (lottieAnimation.value) {
+                        lottieAnimation.value.destroy();
+                        lottieAnimation.value = null;
+                    }
+                    if (lottieAltAnimation.value) {
+                        lottieAltAnimation.value.destroy();
+                        lottieAltAnimation.value = null;
+                    }
+                };
+
+                const reinitLottie = () => {
+                    destroyLottie();
+                    nextTick(() => { initLottie(); });
+                };
+
                 onMounted(async () => {
                     initLottie();
                     agentStore.initAgent();
@@ -3933,6 +3855,19 @@
                     resizeAvatar()
                     window.onresize = () => resizeAvatar()
                     resizeInputBox()
+                });
+
+                onUnmounted(() => {
+                    destroyLottie();
+                });
+
+                watch(
+                    () => settingStore.activePanel,
+                    () => { reinitLottie(); }
+                );
+
+                onUpdated(() => {
+                    initLottie();
                 });
 
                 const resizeInputBox = () => {
@@ -3963,25 +3898,89 @@
                     }
                 };
 
-                const configFile = ref(null)
+                const importFileInput = ref(null)
 
-                watch(configFile, (newValue, oldValue) => {
-                    if (newValue) {
-
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            try {
-                                const json = JSON.parse(event.target.result)
-                                chatbotStore.updateStoreFromJSON(json.chatbotStore)
-                                defaultChoiceStore.updateStoreFromJSON(json.defaultChoiceStore)
-                            } catch {
-                                snackbarStore.showErrorMessage('$vuetify.dataIterator.snackbar.parseConfigFail')
-                            }
-
-                        };
-                        reader.readAsText(newValue);
+                const triggerImport = () => {
+                    const input = importFileInput.value
+                    if (input) {
+                        input.value = ''
+                        input.click()
                     }
-                });
+                }
+
+                const handleImportFile = (event) => {
+                    const file = event.target.files[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = (e) => {
+                        try {
+                            const json = JSON.parse(e.target.result)
+                            if (json.chatbotStore) chatbotStore.updateStoreFromJSON(json.chatbotStore)
+                            if (json.defaultChoiceStore) defaultChoiceStore.updateStoreFromJSON(json.defaultChoiceStore)
+                            snackbarStore.showSuccessMessage('$vuetify.dataIterator.snackbar.importSuccess')
+                        } catch {
+                            snackbarStore.showErrorMessage('$vuetify.dataIterator.snackbar.parseConfigFail')
+                        }
+                    }
+                    reader.readAsText(file)
+                }
+
+                const showExportDialog = ref(false)
+                const exportSelectedIds = ref([])
+
+                const exportAllSelected = computed(() => chatbotStore.providers.length > 0 && exportSelectedIds.value.length === chatbotStore.providers.length)
+                const exportIndeterminate = computed(() => exportSelectedIds.value.length > 0 && exportSelectedIds.value.length < chatbotStore.providers.length)
+
+                const toggleExportAll = () => {
+                    if (exportAllSelected.value) {
+                        exportSelectedIds.value = []
+                    } else {
+                        exportSelectedIds.value = chatbotStore.providers.map(p => p.id)
+                    }
+                }
+
+                const toggleExportItem = (id) => {
+                    const idx = exportSelectedIds.value.indexOf(id)
+                    if (idx >= 0) {
+                        exportSelectedIds.value.splice(idx, 1)
+                    } else {
+                        exportSelectedIds.value.push(id)
+                    }
+                }
+
+                const confirmExport = () => {
+                    try {
+                        const selectedProviders = chatbotStore.providers.filter(p => exportSelectedIds.value.includes(p.id))
+                        const exportData = {
+                            chatbotStore: { ...chatbotStore.$state, providers: selectedProviders },
+                            defaultChoiceStore: { ...defaultChoiceStore.$state }
+                        }
+                        const jsonStr = JSON.stringify(exportData, null, 2)
+                        const blob = new Blob([jsonStr], { type: 'application/json' })
+                        const url = URL.createObjectURL(blob)
+                        const now = new Date()
+                        const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `chat-mcp-config-${ts}.json`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                        showExportDialog.value = false
+                        exportSelectedIds.value = []
+                        snackbarStore.showSuccessMessage('$vuetify.dataIterator.snackbar.exportSuccess')
+                    } catch {
+                        snackbarStore.showErrorMessage('$vuetify.dataIterator.snackbar.exportFail')
+                    }
+                }
+
+                const cancelExport = () => {
+                    showExportDialog.value = false
+                    exportSelectedIds.value = []
+                }
+
+                const getProviderDisplayName = (providerType) => {
+                    return PROVIDER_DISPLAY_NAMES[providerType] || providerType
+                }
 
                 watch(computed(() => agentStore.card?.refFile),
                     (newValue, oldValue) => {
@@ -4099,10 +4098,20 @@
                 };
 
                 return {
-                    configFile,
+                    importFileInput,
+                    triggerImport,
+                    handleImportFile,
+                    showExportDialog,
+                    exportSelectedIds,
+                    exportAllSelected,
+                    exportIndeterminate,
+                    toggleExportAll,
+                    toggleExportItem,
+                    confirmExport,
+                    cancelExport,
+                    getProviderDisplayName,
 
                     settingStore,
-                    promptStore,
                     resourceStore,
                     agentStore,
                     snackbarStore,
@@ -4144,15 +4153,9 @@
                     dataIterator: {
                         title: 'CUIGUO Workstattion',
                         q: { title: 'Query History' },
-                        p: {
-                            title: 'Prompts Template',
-                            sheet: 'Prompts Sheet',
-                            inuse: 'In Use',
-                            standby: 'Standby'
-                        },
                         l: { title: 'Language' },
-                        a: { title: 'Prompts & MCP' },
                         r: { title: 'Resources' },
+                        ag: { title: 'Agent' },
                         mcp: { title: 'MCP Management' },
                         g: {
                             new: 'New Conversation',
@@ -4176,7 +4179,14 @@
                             contentType: 'Content Type',
                             authPrefix: 'Auth Prefix',
                             authHeaderName: 'Auth Header Name',
-                            configFile: 'Config File'
+                            configFile: 'Config File',
+                            importConfig: 'Import Config',
+                            exportConfig: 'Export Config',
+                            exportTitle: 'Export Provider Configuration',
+                            selectAll: 'Select All',
+                            confirmExport: 'Confirm Export',
+                            cancel: 'Cancel',
+                            resetConfig: 'Reset Config'
                         },
                         snackbar: {
                             addnew: 'Added new session.',
@@ -4184,7 +4194,10 @@
                             stopped: 'Generating stopped.',
                             parseStreamFail: 'Cannot read the stream.',
                             parseConfigFail: 'Cannot parse the config file.',
-                            copied: 'Copied to clipboard.'
+                            copied: 'Copied to clipboard.',
+                            importSuccess: 'Config imported successfully',
+                            exportSuccess: 'Config exported successfully',
+                            exportFail: 'Export failed, data serialization error'
                         }
                     },
                 },
@@ -4196,12 +4209,8 @@
                         title: '脆果办公桌',
                         q: { title: '历史记录' },
                         l: { title: '语言设置' },
-                        p: {
-                            title: 'MCP提示词模板',
-                            sheet: 'MCP提示词表单'
-                        },
-                        a: { title: '提示词和MCP' },
                         r: { title: '资源' },
+                        ag: { title: 'Agent' },
                         mcp: { title: 'MCP管理' },
                         g: {
                             new: '新对话',
@@ -4224,7 +4233,14 @@
                             contentType: '媒体类型',
                             authPrefix: '鉴权请求头',
                             authHeaderName: '认证请求头名称',
-                            configFile: '配置文件'
+                            configFile: '配置文件',
+                            importConfig: '导入配置',
+                            exportConfig: '导出配置',
+                            exportTitle: '导出 Provider 配置',
+                            selectAll: '全选',
+                            confirmExport: '确认导出',
+                            cancel: '取消',
+                            resetConfig: '重置配置'
                         },
                         snackbar: {
                             addnew: '已添加新会话',
@@ -4232,7 +4248,10 @@
                             stopped: '停止生成',
                             parseStreamFail: '无法解析数据流',
                             parseConfigFail: '无法解析配置文件',
-                            copied: '已复制到剪切板'
+                            copied: '已复制到剪切板',
+                            importSuccess: '配置导入成功',
+                            exportSuccess: '配置导出成功',
+                            exportFail: '导出失败，数据序列化异常'
                         }
                     },
                 },
