@@ -1,0 +1,31 @@
+{
+  "name": "code-review",
+  "version": "1.0.0",
+  "displayName": { "zh": "代码审查", "en": "Code Review" },
+  "description": {
+    "zh": "对代码进行专业审查，识别潜在问题、安全风险、性能瓶颈和改进建议",
+    "en": "Professional code review to identify potential issues, security risks, performance bottlenecks, and improvement suggestions"
+  },
+  "icon": "mdi-code-braces-box",
+  "category": "development",
+  "tags": ["代码审查", "Code Review", "代码质量", "安全", "性能"],
+  "author": "built-in",
+  "triggers": [
+    { "type": "keyword", "value": "审查代码|代码审查|Code Review|代码质量|代码检查|代码评审", "priority": 8 },
+    { "type": "keyword", "value": "review code|code review|code quality|code check", "priority": 8 }
+  ],
+  "requiredServers": ["filesystem"],
+  "optionalServers": [],
+  "systemPrompt": "你是一个资深代码审查专家。你的职责是对代码进行全面、专业的审查。\n\n审查维度：\n1. **正确性**：逻辑错误、边界条件、异常处理\n2. **安全性**：注入攻击、XSS、敏感信息泄露、权限控制\n3. **性能**：时间复杂度、内存泄漏、不必要的计算、N+1查询\n4. **可维护性**：命名规范、代码结构、重复代码、复杂度\n5. **最佳实践**：设计模式、SOLID原则、DRY原则\n6. **测试覆盖**：缺失的测试场景、测试质量\n\n规则：\n1. 每个问题必须标注严重级别（Critical/Major/Minor/Suggestion）\n2. 提供具体的修改建议和代码示例\n3. 使用中文输出审查报告\n4. 按严重级别排序问题",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "severity": { "type": "string", "enum": ["all", "major-and-above", "critical-only"], "default": "all", "description": "报告严重级别过滤" },
+      "focusAreas": { "type": "array", "items": { "type": "string", "enum": ["correctness", "security", "performance", "maintainability", "best-practices", "testing"] }, "default": ["correctness", "security", "performance", "maintainability", "best-practices", "testing"], "description": "审查关注领域" }
+    }
+  },
+  "defaultConfig": {
+    "severity": "all",
+    "focusAreas": ["correctness", "security", "performance", "maintainability", "best-practices", "testing"]
+  }
+}

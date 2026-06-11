@@ -11,6 +11,7 @@ import { initializeClient, manageRequests } from './client.js';
 import notifier from 'node-notifier';
 
 import { npmRegistry } from '../lib/repo/internal_repo.js';
+import * as skillEngine from './skills/engine.js';
 
 import path from 'path';
 import os from 'os';
@@ -664,6 +665,87 @@ app.whenReady().then(async () => {
   });
 
 
+
+  // Skills management IPC handlers
+  ipcMain.handle('skills:list-registry', () => {
+    return skillEngine.listRegistrySkills();
+  });
+
+  ipcMain.handle('skills:install', async (event, name: string, currentInstalled: any[]) => {
+    return skillEngine.installSkill(name, currentInstalled);
+  });
+
+  ipcMain.handle('skills:uninstall', async (event, name: string, currentInstalled: any[]) => {
+    return skillEngine.uninstallSkill(name, currentInstalled);
+  });
+
+  ipcMain.handle('skills:toggle', async (event, name: string, enabled: boolean, currentInstalled: any[]) => {
+    return skillEngine.toggleSkill(name, enabled, currentInstalled);
+  });
+
+  ipcMain.handle('skills:update-config', async (event, name: string, config: Record<string, any>, currentInstalled: any[]) => {
+    return skillEngine.updateSkillConfig(name, config, currentInstalled);
+  });
+
+  ipcMain.handle('skills:match', async (event, userInput: string, currentInstalled: any[]) => {
+    return skillEngine.matchSkill(userInput, currentInstalled);
+  });
+
+  ipcMain.handle('skills:get-manifest', async (event, name: string) => {
+    return skillEngine.getSkillManifest(name);
+  });
+
+  ipcMain.handle('skills:get-system-prompt', async (event, name: string, currentInstalled: any[]) => {
+    return skillEngine.getSkillSystemPrompt(name, currentInstalled);
+  });
+
+  ipcMain.handle('skills:record-usage', async (event, name: string, currentInstalled: any[]) => {
+    const updated = skillEngine.recordSkillUsage(name, currentInstalled);
+    return { success: true, installedSkills: updated };
+  });
+
+  ipcMain.handle('skills:import', async (event, manifestJson: string) => {
+    return skillEngine.importSkill(manifestJson);
+  });
+
+  ipcMain.handle('skills:export', async (event, name: string) => {
+    return skillEngine.exportSkill(name);
+  });
+
+  ipcMain.handle('skills:import-pack', async (event, filePath: string) => {
+    return await skillEngine.importSkillPack(filePath);
+  });
+
+  ipcMain.handle('skills:import-pack-from-data', async (event, fileData: { name: string, data: number[] }) => {
+    try {
+      const tempDir = os.tmpdir();
+      const tempFilePath = path.join(tempDir, fileData.name);
+      const buffer = Buffer.from(fileData.data);
+      writeFileSync(tempFilePath, buffer);
+
+      const result = await skillEngine.importSkillPack(tempFilePath);
+
+      try { fs.unlinkSync(tempFilePath); } catch {}
+
+      return result;
+    } catch (error: any) {
+      return { success: false, message: `Failed to import skill pack: ${error.message}` };
+    }
+  });
+
+  ipcMain.handle('skills:export-pack', async (event, skillNames: string[]) => {
+    return await skillEngine.exportSkillPack(skillNames);
+  });
+
+  ipcMain.handle('skills:read-file-for-export', async (event, filePath: string) => {
+    try {
+      const data = readFileSync(filePath);
+      try { fs.unlinkSync(filePath); } catch {}
+      return Array.from(new Uint8Array(data));
+    } catch (error: any) {
+      return [];
+    }
+  });
 
   // Features are already initialized above, no need to re-register handlers
   console.log('Final features:', features);

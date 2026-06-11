@@ -1,0 +1,175 @@
+{
+  "version": "1.0.0",
+  "skills": [
+    {
+      "name": "doc-expert",
+      "version": "1.0.0",
+      "displayName": { "zh": "文档专家", "en": "Doc Expert" },
+      "description": {
+        "zh": "专业技术文档生成专家，支持PRD、BRD、HLD、LLD、TDD及技术方案文档",
+        "en": "Professional technical documentation expert for PRDs, BRDs, HLDs, LLDs, TDDs, and technical solution documents"
+      },
+      "icon": "mdi-file-document-edit",
+      "category": "document",
+      "tags": ["PRD", "BRD", "HLD", "LLD", "TDD", "文档", "document"],
+      "author": "built-in",
+      "triggers": [
+        { "type": "keyword", "value": "写文档|生成PRD|写PRD|写BRD|写HLD|写LLD|技术方案|方案评审", "priority": 8 },
+        { "type": "keyword", "value": "write PRD|write document|write BRD|write HLD|write LLD|solution review", "priority": 8 }
+      ],
+      "requiredServers": [],
+      "optionalServers": ["filesystem"],
+      "systemPrompt": "你是一个专业的技术文档专家。你的职责是根据用户需求生成高质量的技术文档，包括但不限于：产品需求文档(PRD)、业务需求文档(BRD)、概要设计文档(HLD)、详细设计文档(LLD)、测试设计文档(TDD)和技术方案文档。\n\n规则：\n1. 文档结构必须清晰，使用标准模板格式\n2. 每个章节必须有实质性内容，不允许占位符\n3. 技术方案必须包含可行性分析\n4. 所有接口定义必须包含请求/响应示例\n5. 使用Markdown格式输出\n6. 优先使用中文，除非用户明确要求英文",
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "language": { "type": "string", "enum": ["zh", "en"], "default": "zh" },
+          "templateStyle": { "type": "string", "enum": ["concise", "detailed"], "default": "detailed" }
+        }
+      },
+      "defaultConfig": { "language": "zh", "templateStyle": "detailed" }
+    },
+    {
+      "name": "data-analysis",
+      "version": "1.0.0",
+      "displayName": { "zh": "数据分析", "en": "Data Analysis" },
+      "description": {
+        "zh": "使用DuckDB SQL引擎分析Excel和CSV文件，支持查询、统计、聚合、关联和导出",
+        "en": "Analyze Excel and CSV files using DuckDB SQL engine with query, statistics, aggregation, joins, and export"
+      },
+      "icon": "mdi-chart-bar",
+      "category": "analysis",
+      "tags": ["数据分析", "Excel", "CSV", "SQL", "统计", "analysis"],
+      "author": "built-in",
+      "triggers": [
+        { "type": "keyword", "value": "分析数据|统计数据|Excel分析|CSV分析|数据查询|数据聚合", "priority": 9 },
+        { "type": "keyword", "value": "analyze data|statistics|Excel analysis|CSV analysis|data query", "priority": 9 }
+      ],
+      "requiredServers": ["filesystem"],
+      "optionalServers": [],
+      "systemPrompt": "你是一个数据分析专家。你可以使用DuckDB SQL引擎来分析用户上传的Excel(.xlsx/.xls)和CSV文件。\n\n规则：\n1. 始终先了解数据结构（表名、列名、数据类型）再进行分析\n2. SQL查询必须正确，注意表名和列名的引用\n3. 统计结果必须包含数据量和时间范围等上下文信息\n4. 图表建议必须基于数据特征\n5. 导出结果时说明格式和编码",
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "maxRows": { "type": "number", "default": 10000 },
+          "defaultFormat": { "type": "string", "enum": ["table", "chart", "raw"], "default": "table" }
+        }
+      },
+      "defaultConfig": { "maxRows": 10000, "defaultFormat": "table" }
+    },
+    {
+      "name": "frontend-design",
+      "version": "1.0.0",
+      "displayName": { "zh": "前端设计", "en": "Frontend Design" },
+      "description": {
+        "zh": "创建高质量、生产级的前端界面，生成有设计感的代码，避免通用AI美学",
+        "en": "Create distinctive, production-grade frontend interfaces with high design quality, avoiding generic AI aesthetics"
+      },
+      "icon": "mdi-palette",
+      "category": "design",
+      "tags": ["前端", "UI", "设计", "Vue", "React", "frontend", "design"],
+      "author": "built-in",
+      "triggers": [
+        { "type": "keyword", "value": "设计界面|写页面|UI设计|前端页面|组件设计|布局设计", "priority": 8 },
+        { "type": "keyword", "value": "build UI|design page|frontend component|create interface", "priority": 8 }
+      ],
+      "requiredServers": [],
+      "optionalServers": ["filesystem"],
+      "systemPrompt": "你是一个资深前端设计专家。你的职责是创建高质量、有设计感的前端界面代码。\n\n规则：\n1. 代码必须是生产级别，不允许占位符或简化\n2. 设计必须独特有辨识度，避免千篇一律的AI风格\n3. 优先使用Vuetify组件库（当前项目使用Vuetify 3）\n4. 响应式设计，支持不同屏幕尺寸\n5. 颜色方案必须协调，使用CSS变量管理主题色\n6. 交互细节必须完善（hover、focus、过渡动画）\n7. 代码注释使用中文\n8. 输出完整可运行的代码，不要省略",
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "framework": { "type": "string", "enum": ["vue3-vuetify", "react", "html-css"], "default": "vue3-vuetify" },
+          "colorScheme": { "type": "string", "enum": ["light", "dark", "auto"], "default": "auto" }
+        }
+      },
+      "defaultConfig": { "framework": "vue3-vuetify", "colorScheme": "auto" }
+    },
+    {
+      "name": "i18n-integration",
+      "version": "1.0.0",
+      "displayName": { "zh": "国际化集成", "en": "i18n Integration" },
+      "description": {
+        "zh": "为Vue3/React应用添加国际化(i18n)支持，包括框架搭建、翻译文件创建、语言切换和文本提取",
+        "en": "Add internationalization (i18n) support to Vue3/React apps with framework setup, translation files, language switching, and text extraction"
+      },
+      "icon": "mdi-translate",
+      "category": "development",
+      "tags": ["i18n", "国际化", "多语言", "翻译", "internationalization"],
+      "author": "built-in",
+      "triggers": [
+        { "type": "keyword", "value": "国际化|i18n|多语言|语言切换|翻译文件|中英文切换", "priority": 9 },
+        { "type": "keyword", "value": "i18n|internationalization|multi-language|language switching|locale", "priority": 9 }
+      ],
+      "requiredServers": ["filesystem"],
+      "optionalServers": [],
+      "systemPrompt": "你是一个国际化(i18n)集成专家。你可以为Vue3和React应用添加完整的多语言支持。\n\n规则：\n1. 优先使用vue-i18n（Vue3项目）或react-i18next（React项目）\n2. 翻译文件必须使用JSON格式，按命名空间组织\n3. 翻译键必须使用点号分隔的层级结构（如 app.header.title）\n4. 必须支持中文(zh)和英文(en)两种语言\n5. 语言切换必须无需刷新页面\n6. 提取可翻译文本时保持上下文完整性\n7. 日期、数字、货币格式必须本地化\n8. 代码注释使用中文",
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "framework": { "type": "string", "enum": ["vue3", "react"], "default": "vue3" },
+          "languages": { "type": "array", "items": { "type": "string" }, "default": ["zh", "en"] },
+          "fallbackLocale": { "type": "string", "default": "zh" }
+        }
+      },
+      "defaultConfig": { "framework": "vue3", "languages": ["zh", "en"], "fallbackLocale": "zh" }
+    },
+    {
+      "name": "prd-generator",
+      "version": "1.0.0",
+      "displayName": { "zh": "PRD生成器", "en": "PRD Generator" },
+      "description": {
+        "zh": "根据功能描述生成标准产品需求文档(PRD)，包含用户故事、功能规格、验收标准等",
+        "en": "Generate standard Product Requirements Documents from feature descriptions, including user stories, functional specs, and acceptance criteria"
+      },
+      "icon": "mdi-clipboard-text",
+      "category": "document",
+      "tags": ["PRD", "产品需求", "需求文档", "用户故事", "验收标准"],
+      "author": "built-in",
+      "triggers": [
+        { "type": "keyword", "value": "生成PRD|产品需求|需求文档|规划功能|需求分析", "priority": 9 },
+        { "type": "keyword", "value": "create PRD|product requirements|spec out|plan feature", "priority": 9 }
+      ],
+      "requiredServers": [],
+      "optionalServers": ["filesystem"],
+      "systemPrompt": "你是一个资深产品经理，专长于编写产品需求文档(PRD)。\n\n规则：\n1. PRD必须包含：背景与目标、用户故事、功能规格、非功能需求、数据模型、接口设计、验收标准、里程碑\n2. 用户故事格式：作为[角色]，我希望[功能]，以便[价值]\n3. 功能规格必须包含优先级(P0/P1/P2)和复杂度评估\n4. 验收标准必须可量化、可测试\n5. 接口设计必须包含请求/响应示例\n6. 使用EARS格式编写需求（Ubiquitous、Event-Driven、Unwanted Behaviour、State-Driven）\n7. 输出Markdown格式，优先使用中文",
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "language": { "type": "string", "enum": ["zh", "en"], "default": "zh" },
+          "includeDataModel": { "type": "boolean", "default": true },
+          "includeAPI": { "type": "boolean", "default": true }
+        }
+      },
+      "defaultConfig": { "language": "zh", "includeDataModel": true, "includeAPI": true }
+    },
+    {
+      "name": "code-review",
+      "version": "1.0.0",
+      "displayName": { "zh": "代码审查", "en": "Code Review" },
+      "description": {
+        "zh": "对代码进行专业审查，识别潜在问题、安全风险、性能瓶颈和改进建议",
+        "en": "Professional code review to identify potential issues, security risks, performance bottlenecks, and improvement suggestions"
+      },
+      "icon": "mdi-code-braces-box",
+      "category": "development",
+      "tags": ["代码审查", "Code Review", "代码质量", "安全", "性能"],
+      "author": "built-in",
+      "triggers": [
+        { "type": "keyword", "value": "审查代码|代码审查|Code Review|代码质量|代码检查|代码评审", "priority": 8 },
+        { "type": "keyword", "value": "review code|code review|code quality|code check", "priority": 8 }
+      ],
+      "requiredServers": ["filesystem"],
+      "optionalServers": [],
+      "systemPrompt": "你是一个资深代码审查专家。你的职责是对代码进行全面、专业的审查。\n\n审查维度：\n1. **正确性**：逻辑错误、边界条件、异常处理\n2. **安全性**：注入攻击、XSS、敏感信息泄露、权限控制\n3. **性能**：时间复杂度、内存泄漏、不必要的计算、N+1查询\n4. **可维护性**：命名规范、代码结构、重复代码、复杂度\n5. **最佳实践**：设计模式、SOLID原则、DRY原则\n6. **测试覆盖**：缺失的测试场景、测试质量\n\n规则：\n1. 每个问题必须标注严重级别（Critical/Major/Minor/Suggestion）\n2. 提供具体的修改建议和代码示例\n3. 使用中文输出审查报告\n4. 按严重级别排序问题",
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["all", "major-and-above", "critical-only"], "default": "all" },
+          "focusAreas": { "type": "array", "items": { "type": "string", "enum": ["correctness", "security", "performance", "maintainability", "best-practices", "testing"] }, "default": ["correctness", "security", "performance", "maintainability", "best-practices", "testing"] }
+        }
+      },
+      "defaultConfig": { "severity": "all", "focusAreas": ["correctness", "security", "performance", "maintainability", "best-practices", "testing"] }
+    }
+  ]
+}

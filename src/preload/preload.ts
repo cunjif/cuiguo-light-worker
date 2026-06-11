@@ -331,4 +331,21 @@ contextBridge.exposeInMainWorld('registryAPI', {
   }
 });
 
+contextBridge.exposeInMainWorld('skillsAPI', {
+  listRegistry: () => ipcRenderer.invoke('skills:list-registry'),
+  install: (name: string, currentInstalled: any[]) => ipcRenderer.invoke('skills:install', name, currentInstalled),
+  uninstall: (name: string, currentInstalled: any[]) => ipcRenderer.invoke('skills:uninstall', name, currentInstalled),
+  toggle: (name: string, enabled: boolean, currentInstalled: any[]) => ipcRenderer.invoke('skills:toggle', name, enabled, currentInstalled),
+  updateConfig: (name: string, config: any, currentInstalled: any[]) => ipcRenderer.invoke('skills:update-config', name, config, currentInstalled),
+  match: (input: string, currentInstalled: any[]) => ipcRenderer.invoke('skills:match', input, currentInstalled),
+  getManifest: (name: string) => ipcRenderer.invoke('skills:get-manifest', name),
+  getSystemPrompt: (name: string, currentInstalled: any[]) => ipcRenderer.invoke('skills:get-system-prompt', name, currentInstalled),
+  recordUsage: (name: string, currentInstalled: any[]) => ipcRenderer.invoke('skills:record-usage', name, currentInstalled),
+  importSkill: (manifestJson: string) => ipcRenderer.invoke('skills:import', manifestJson),
+  exportSkill: (name: string) => ipcRenderer.invoke('skills:export', name),
+  importPack: (fileData: { name: string, data: number[] }) => ipcRenderer.invoke('skills:import-pack-from-data', fileData),
+  exportPack: (skillNames: string[]) => ipcRenderer.invoke('skills:export-pack', skillNames),
+  readFileForExport: (filePath: string) => ipcRenderer.invoke('skills:read-file-for-export', filePath),
+});
+
 exposeAPIs();

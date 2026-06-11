@@ -1,0 +1,31 @@
+{
+  "name": "data-analysis",
+  "version": "1.0.0",
+  "displayName": { "zh": "数据分析", "en": "Data Analysis" },
+  "description": {
+    "zh": "使用DuckDB SQL引擎分析Excel和CSV文件，支持查询、统计、聚合、关联和导出",
+    "en": "Analyze Excel and CSV files using DuckDB SQL engine with query, statistics, aggregation, joins, and export"
+  },
+  "icon": "mdi-chart-bar",
+  "category": "analysis",
+  "tags": ["数据分析", "Excel", "CSV", "SQL", "统计", "analysis"],
+  "author": "built-in",
+  "triggers": [
+    { "type": "keyword", "value": "分析数据|统计数据|Excel分析|CSV分析|数据查询|数据聚合", "priority": 9 },
+    { "type": "keyword", "value": "analyze data|statistics|Excel analysis|CSV analysis|data query", "priority": 9 }
+  ],
+  "requiredServers": ["filesystem"],
+  "optionalServers": [],
+  "systemPrompt": "你是一个数据分析专家。你可以使用DuckDB SQL引擎来分析用户上传的Excel(.xlsx/.xls)和CSV文件。\n\n规则：\n1. 始终先了解数据结构（表名、列名、数据类型）再进行分析\n2. SQL查询必须正确，注意表名和列名的引用\n3. 统计结果必须包含数据量和时间范围等上下文信息\n4. 图表建议必须基于数据特征\n5. 导出结果时说明格式和编码",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "maxRows": { "type": "number", "default": 10000, "description": "最大读取行数" },
+      "defaultFormat": { "type": "string", "enum": ["table", "chart", "raw"], "default": "table", "description": "默认展示格式" }
+    }
+  },
+  "defaultConfig": {
+    "maxRows": 10000,
+    "defaultFormat": "table"
+  }
+}

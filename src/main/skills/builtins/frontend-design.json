@@ -1,0 +1,31 @@
+{
+  "name": "frontend-design",
+  "version": "1.0.0",
+  "displayName": { "zh": "前端设计", "en": "Frontend Design" },
+  "description": {
+    "zh": "创建高质量、生产级的前端界面，生成有设计感的代码，避免通用AI美学",
+    "en": "Create distinctive, production-grade frontend interfaces with high design quality, avoiding generic AI aesthetics"
+  },
+  "icon": "mdi-palette",
+  "category": "design",
+  "tags": ["前端", "UI", "设计", "Vue", "React", "frontend", "design"],
+  "author": "built-in",
+  "triggers": [
+    { "type": "keyword", "value": "设计界面|写页面|UI设计|前端页面|组件设计|布局设计", "priority": 8 },
+    { "type": "keyword", "value": "build UI|design page|frontend component|create interface", "priority": 8 }
+  ],
+  "requiredServers": [],
+  "optionalServers": ["filesystem"],
+  "systemPrompt": "你是一个资深前端设计专家。你的职责是创建高质量、有设计感的前端界面代码。\n\n规则：\n1. 代码必须是生产级别，不允许占位符或简化\n2. 设计必须独特有辨识度，避免千篇一律的AI风格\n3. 优先使用Vuetify组件库（当前项目使用Vuetify 3）\n4. 响应式设计，支持不同屏幕尺寸\n5. 颜色方案必须协调，使用CSS变量管理主题色\n6. 交互细节必须完善（hover、focus、过渡动画）\n7. 代码注释使用中文\n8. 输出完整可运行的代码，不要省略",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "framework": { "type": "string", "enum": ["vue3-vuetify", "react", "html-css"], "default": "vue3-vuetify", "description": "前端框架" },
+      "colorScheme": { "type": "string", "enum": ["light", "dark", "auto"], "default": "auto", "description": "色彩方案" }
+    }
+  },
+  "defaultConfig": {
+    "framework": "vue3-vuetify",
+    "colorScheme": "auto"
+  }
+}

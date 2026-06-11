@@ -1,0 +1,33 @@
+{
+  "name": "i18n-integration",
+  "version": "1.0.0",
+  "displayName": { "zh": "国际化集成", "en": "i18n Integration" },
+  "description": {
+    "zh": "为Vue3/React应用添加国际化(i18n)支持，包括框架搭建、翻译文件创建、语言切换和文本提取",
+    "en": "Add internationalization (i18n) support to Vue3/React apps with framework setup, translation files, language switching, and text extraction"
+  },
+  "icon": "mdi-translate",
+  "category": "development",
+  "tags": ["i18n", "国际化", "多语言", "翻译", "internationalization"],
+  "author": "built-in",
+  "triggers": [
+    { "type": "keyword", "value": "国际化|i18n|多语言|语言切换|翻译文件|中英文切换", "priority": 9 },
+    { "type": "keyword", "value": "i18n|internationalization|multi-language|language switching|locale", "priority": 9 }
+  ],
+  "requiredServers": ["filesystem"],
+  "optionalServers": [],
+  "systemPrompt": "你是一个国际化(i18n)集成专家。你可以为Vue3和React应用添加完整的多语言支持。\n\n规则：\n1. 优先使用vue-i18n（Vue3项目）或react-i18next（React项目）\n2. 翻译文件必须使用JSON格式，按命名空间组织\n3. 翻译键必须使用点号分隔的层级结构（如 app.header.title）\n4. 必须支持中文(zh)和英文(en)两种语言\n5. 语言切换必须无需刷新页面\n6. 提取可翻译文本时保持上下文完整性\n7. 日期、数字、货币格式必须本地化\n8. 代码注释使用中文",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "framework": { "type": "string", "enum": ["vue3", "react"], "default": "vue3", "description": "前端框架" },
+      "languages": { "type": "array", "items": { "type": "string" }, "default": ["zh", "en"], "description": "支持的语言列表" },
+      "fallbackLocale": { "type": "string", "default": "zh", "description": "回退语言" }
+    }
+  },
+  "defaultConfig": {
+    "framework": "vue3",
+    "languages": ["zh", "en"],
+    "fallbackLocale": "zh"
+  }
+}

@@ -322,6 +322,33 @@
         ::-webkit-scrollbar-thumb:hover {
             background-color: grey;
         }
+
+        .attachment-bar {
+            max-height: 200px;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .attachment-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+
+        .attachment-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .drag-over {
+            border: 2px dashed rgb(var(--v-theme-primary));
+            background-color: rgba(var(--v-theme-primary), 0.05);
+            border-radius: 8px;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -339,7 +366,7 @@
                             </v-container>
                             <v-container v-show="messageStore.conversation.length > 0" class="chat-bot">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
-                                    :language="languageStore.getLocale" data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
+                                    :language="languageStore.getLocale" :generating="messageStore.generating" @regenerate="messageStore.regenerateFromIndex($event)" data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
                                 <div class="fill-area"></div>
                             </v-container>
                         </template>
@@ -347,7 +374,7 @@
                             <div class="function-panel">
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
                                     <div class="d-flex align-center">
-                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md" hide-input
+                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
                                             v-model="messageStore.images" prepend-icon="mdi-paperclip"
                                             density="compact" variant="plain"
                                             data-component-id="chat-mcp.chat.file-upload"></v-file-input>
@@ -359,14 +386,33 @@
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                <div class="input-section px-3 py-2">
+                                <div class="input-section px-3 py-2" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
+                                    <div v-if="skillStore.activeSkill" class="d-flex align-center mb-2 ga-1 flex-wrap">
+                                        <v-chip size="small" color="primary" variant="flat" closable @click:close="skillStore.deactivateSkill()">
+                                            <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon || 'mdi-auto-fix' }}</v-icon>
+                                            {{ skillStore.getActiveSkillManifest()?.displayName?.zh || skillStore.activeSkill }}
+                                        </v-chip>
+                                    </div>
+                                    <div v-else-if="skillStore.matchedSkill" class="d-flex align-center mb-2 ga-1">
+                                        <v-chip size="small" color="info" variant="tonal" @click="skillStore.activateSkill(skillStore.matchedSkill.name)">
+                                            <v-icon start size="small">{{ skillStore.matchedSkill.icon }}</v-icon>
+                                            {{ skillStore.matchedSkill.displayName.zh }}
+                                            <v-icon end size="small">mdi-plus-circle</v-icon>
+                                        </v-chip>
+                                        <span class="text-caption text-grey">{{ $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
+                                    </div>
                                     <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
                                         clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
+                                        @input="skillStore.matchAndSuggest(messageStore.userMessage)"
                                         :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
-                                            <v-container>
+                                            <chat-mcp-chat-attachment-bar :attachments="messageStore.attachments"
+                                                @remove="messageStore.removeAttachment($event)"
+                                                @preview="previewAttachment($event)"
+                                                @clear="messageStore.clearAttachments()" />
+                                            <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
                                                         :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
@@ -382,9 +428,14 @@
                                         </template>
                                         <template v-slot:append-inner>
                                             <div class="d-flex flex-column ga-1 mr-1 mb-4">
-                                                <v-btn v-if="messageStore.userMessage" size="small" color="primary" variant="elevated"
+                                                <v-btn v-if="messageStore.userMessage && !messageStore.isProcessingFiles" size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                                <v-btn v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating" size="small" color="primary" variant="elevated"
+                                                    @click="messageStore.sendMessage" icon="mdi-arrow-up"
+                                                    data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small" color="grey" variant="elevated" disabled
+                                                    icon="mdi-arrow-up" v-tooltip:start="'Files processing...'"></v-btn>
                                                 <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
                                                     @click="messageStore.stop" icon="mdi-stop"
                                                     data-component-id="chat-mcp.chat.stop-button"></v-btn>
@@ -424,6 +475,12 @@
                                         prepend-icon="mdi-lan-connect" v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
                                         data-component-id="chat-mcp.chat.mcp-button-nav">
                                         {{ $t('$vuetify.dataIterator.mcp.title') }}
+                                    </v-btn>
+                                    <v-btn size="small" variant="tonal"
+                                        @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills();"
+                                        prepend-icon="mdi-auto-fix" v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
+                                        data-component-id="chat-mcp.chat.skill-button-nav">
+                                        {{ $t('$vuetify.dataIterator.skill.title') }}
                                     </v-btn>
                                     <v-menu transition="fade-transition" data-component-id="chat-mcp.chat.language-menu">
                                         <template v-slot:activator="{ props }">
@@ -497,7 +554,7 @@
                             <div class="function-panel">
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
                                     <div class="d-flex align-center">
-                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md" hide-input
+                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
                                             v-model="messageStore.images" prepend-icon="mdi-paperclip"
                                             density="compact" variant="plain"
                                             data-component-id="chat-mcp.chat.file-upload"></v-file-input>
@@ -509,14 +566,33 @@
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                <div class="input-section px-3 py-2">
+                                <div class="input-section px-3 py-2" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
+                                    <div v-if="skillStore.activeSkill" class="d-flex align-center mb-2 ga-1 flex-wrap">
+                                        <v-chip size="small" color="primary" variant="flat" closable @click:close="skillStore.deactivateSkill()">
+                                            <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon || 'mdi-auto-fix' }}</v-icon>
+                                            {{ skillStore.getActiveSkillManifest()?.displayName?.zh || skillStore.activeSkill }}
+                                        </v-chip>
+                                    </div>
+                                    <div v-else-if="skillStore.matchedSkill" class="d-flex align-center mb-2 ga-1">
+                                        <v-chip size="small" color="info" variant="tonal" @click="skillStore.activateSkill(skillStore.matchedSkill.name)">
+                                            <v-icon start size="small">{{ skillStore.matchedSkill.icon }}</v-icon>
+                                            {{ skillStore.matchedSkill.displayName.zh }}
+                                            <v-icon end size="small">mdi-plus-circle</v-icon>
+                                        </v-chip>
+                                        <span class="text-caption text-grey">{{ $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
+                                    </div>
                                     <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
                                         clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
+                                        @input="skillStore.matchAndSuggest(messageStore.userMessage)"
                                         :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
-                                            <v-container>
+                                            <chat-mcp-chat-attachment-bar :attachments="messageStore.attachments"
+                                                @remove="messageStore.removeAttachment($event)"
+                                                @preview="previewAttachment($event)"
+                                                @clear="messageStore.clearAttachments()" />
+                                            <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
                                                         :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
@@ -532,9 +608,14 @@
                                         </template>
                                         <template v-slot:append-inner>
                                             <div class="d-flex flex-column ga-1 mr-1 mb-4">
-                                                <v-btn v-if="messageStore.userMessage" size="small" color="primary" variant="elevated"
+                                                <v-btn v-if="messageStore.userMessage && !messageStore.isProcessingFiles" size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                                <v-btn v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating" size="small" color="primary" variant="elevated"
+                                                    @click="messageStore.sendMessage" icon="mdi-arrow-up"
+                                                    data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small" color="grey" variant="elevated" disabled
+                                                    icon="mdi-arrow-up" v-tooltip:start="'Files processing...'"></v-btn>
                                                 <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
                                                     @click="messageStore.stop" icon="mdi-stop"
                                                     data-component-id="chat-mcp.chat.stop-button"></v-btn>
@@ -574,6 +655,12 @@
                                         prepend-icon="mdi-lan-connect" v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
                                         data-component-id="chat-mcp.chat.mcp-button-nav">
                                         {{ $t('$vuetify.dataIterator.mcp.title') }}
+                                    </v-btn>
+                                    <v-btn size="small" variant="tonal"
+                                        @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills();"
+                                        prepend-icon="mdi-auto-fix" v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
+                                        data-component-id="chat-mcp.chat.skill-button-nav">
+                                        {{ $t('$vuetify.dataIterator.skill.title') }}
                                     </v-btn>
                                     <v-menu transition="fade-transition" data-component-id="chat-mcp.chat.language-menu">
                                         <template v-slot:activator="{ props }">
@@ -649,7 +736,7 @@
                             </v-container>
                             <v-container v-show="messageStore.conversation.length > 0" class="chat-bot-alt">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
-                                    :language="languageStore.getLocale" data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
+                                    :language="languageStore.getLocale" :generating="messageStore.generating" @regenerate="messageStore.regenerateFromIndex($event)" data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
                             </v-container>
                         </template>
                     </v-col>
@@ -1246,6 +1333,289 @@
                 </v-card>
             </v-dialog>
 
+            <!-- Skill Management Dialog -->
+            <v-dialog v-model="settingStore.skillDialog" max-width="900" class="dialog-card" data-component-id="chat-mcp.dialog.skill-manage">
+                <v-card prepend-icon="mdi-auto-fix" :title="$t('$vuetify.dataIterator.skill.title')"
+                    @dragover.prevent="settingStore.skillDragOver = true"
+                    @dragleave.prevent="settingStore.skillDragOver = false"
+                    @drop.prevent="settingStore.skillDragOver = false; handleSkillDrop($event)">
+                    <v-overlay v-model="settingStore.skillDragOver" contained class="align-center justify-center" opacity="0.8">
+                        <div class="text-center">
+                            <v-icon size="64" color="primary">mdi-package-variant-closed</v-icon>
+                            <p class="text-h6 mt-2">{{ $t('$vuetify.dataIterator.skill.dropToInstall') }}</p>
+                        </div>
+                    </v-overlay>
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        <v-tabs v-model="settingStore.skillTab" class="mb-4">
+                            <v-tab value="registry">{{ $t('$vuetify.dataIterator.skill.registry') }}</v-tab>
+                            <v-tab value="installed">{{ $t('$vuetify.dataIterator.skill.installed') }}</v-tab>
+                            <v-tab value="workflow">{{ $t('$vuetify.dataIterator.skill.workflow') }}</v-tab>
+                        </v-tabs>
+
+                        <v-window v-model="settingStore.skillTab">
+                            <!-- Registry Tab -->
+                            <v-window-item value="registry" data-component-id="chat-mcp.dialog.skill-registry-tab">
+                                <div class="pa-4">
+                                    <v-row class="mb-4" dense>
+                                        <v-col cols="8">
+                                            <v-text-field v-model="skillStore.skillSearchQuery"
+                                                density="compact" variant="outlined"
+                                                prepend-inner-icon="mdi-magnify"
+                                                :placeholder="$t('$vuetify.dataIterator.skill.searchPlaceholder')"
+                                                clearable hide-details></v-text-field>
+                                        </v-col>
+                                        <v-col cols="4">
+                                            <v-select v-model="skillStore.skillCategoryFilter"
+                                                :items="skillStore.skillCategories"
+                                                density="compact" variant="outlined"
+                                                :label="$t('$vuetify.dataIterator.skill.category')"
+                                                hide-details>
+                                                <template v-slot:item="{ props, item }">
+                                                    <v-list-item v-bind="props" :title="item.value === 'all' ? $t('$vuetify.dataIterator.skill.allCategories') : item.value"></v-list-item>
+                                                </template>
+                                                <template v-slot:selection="{ item }">
+                                                    {{ item.value === 'all' ? $t('$vuetify.dataIterator.skill.allCategories') : item.value }}
+                                                </template>
+                                            </v-select>
+                                        </v-col>
+                                    </v-row>
+
+                                    <v-row dense>
+                                        <v-col v-for="skill in skillStore.filteredRegistrySkills" :key="skill.name"
+                                            cols="12" sm="6" md="4">
+                                            <v-card variant="outlined" class="mb-3" height="100%">
+                                                <v-card-item>
+                                                    <template v-slot:prepend>
+                                                        <v-icon :icon="skill.icon" color="primary" size="large"></v-icon>
+                                                    </template>
+                                                    <v-card-title class="text-body-1 font-weight-bold">{{ skill.displayName.zh }}</v-card-title>
+                                                    <v-card-subtitle class="text-caption">{{ skill.category }}</v-card-subtitle>
+                                                </v-card-item>
+                                                <v-card-text class="pt-0 pb-2">
+                                                    <p class="text-caption text-grey mb-2" style="line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ skill.description.zh }}</p>
+                                                    <div class="d-flex flex-wrap ga-1">
+                                                        <v-chip v-for="tag in skill.tags.slice(0, 3)" :key="tag" size="x-small" variant="tonal" label>{{ tag }}</v-chip>
+                                                    </div>
+                                                </v-card-text>
+                                                <v-card-actions class="pt-0">
+                                                    <v-spacer></v-spacer>
+                                                    <v-btn v-if="!skillStore.installedSkillNames.includes(skill.name)"
+                                                        size="small" variant="flat" color="primary"
+                                                        @click="skillStore.installSkill(skill.name)">
+                                                        <v-icon start>mdi-download</v-icon>{{ $t('$vuetify.dataIterator.skill.install') }}
+                                                    </v-btn>
+                                                    <v-chip v-else size="small" color="success" variant="tonal">
+                                                        <v-icon start>mdi-check</v-icon>{{ $t('$vuetify.dataIterator.skill.installedLabel') }}
+                                                    </v-chip>
+                                                </v-card-actions>
+                                            </v-card>
+                                        </v-col>
+                                    </v-row>
+
+                                    <v-alert v-if="skillStore.filteredRegistrySkills.length === 0 && !skillStore.loadingRegistry"
+                                        type="info" variant="tonal" class="mt-4">
+                                        {{ $t('$vuetify.dataIterator.skill.noSkillsFound') }}
+                                    </v-alert>
+                                </div>
+                            </v-window-item>
+
+                            <!-- Installed Tab -->
+                            <v-window-item value="installed" data-component-id="chat-mcp.dialog.skill-installed-tab">
+                                <div class="pa-4">
+                                    <v-alert v-if="skillStore.installedSkills.length === 0"
+                                        type="info" variant="tonal" class="mb-4">
+                                        {{ $t('$vuetify.dataIterator.skill.noInstalled') }}
+                                    </v-alert>
+
+                                    <v-list lines="two" class="bg-transparent">
+                                        <v-list-item v-for="installed in skillStore.installedSkills" :key="installed.name"
+                                            class="mb-2" variant="outlined" rounded="lg">
+                                            <template v-slot:prepend>
+                                                <v-icon :icon="skillStore.registrySkills.find(s => s.name === installed.name)?.icon || 'mdi-puzzle'"
+                                                    color="primary" class="mr-3"></v-icon>
+                                            </template>
+                                            <v-list-item-title class="font-weight-bold">
+                                                {{ skillStore.registrySkills.find(s => s.name === installed.name)?.displayName?.zh || installed.name }}
+                                            </v-list-item-title>
+                                            <v-list-item-subtitle>
+                                                <span class="text-caption text-grey">
+                                                    {{ $t('$vuetify.dataIterator.skill.usageCount') }}: {{ installed.usageCount }}
+                                                    <span v-if="installed.lastUsedAt"> | {{ $t('$vuetify.dataIterator.skill.lastUsed') }}: {{ new Date(installed.lastUsedAt).toLocaleDateString() }}</span>
+                                                </span>
+                                            </v-list-item-subtitle>
+                                            <template v-slot:append>
+                                                <div class="d-flex align-center ga-2">
+                                                    <v-switch v-model="installed.enabled"
+                                                        color="success" density="compact" hide-details
+                                                        @update:model-value="skillStore.toggleSkill(installed.name, $event)"></v-switch>
+                                                    <v-btn size="small" variant="text" icon="mdi-cog"
+                                                        @click="skillStore.skillConfigTarget = installed; skillStore.skillConfigDialog = true;"></v-btn>
+                                                    <v-btn size="small" variant="text" icon="mdi-download"
+                                                        @click="skillStore.exportSkillPack([installed.name]).then(result => { if(result.success) snackbarStore.showSuccessMessage(result.message); else snackbarStore.showErrorMessage(result.message); })"></v-btn>
+                                                    <v-btn size="small" variant="text" icon="mdi-delete" color="error"
+                                                        @click="skillStore.uninstallSkill(installed.name)"></v-btn>
+                                                </div>
+                                            </template>
+                                        </v-list-item>
+                                    </v-list>
+                                </div>
+                            </v-window-item>
+
+                            <!-- Workflow Tab -->
+                            <v-window-item value="workflow" data-component-id="chat-mcp.dialog.skill-workflow-tab">
+                                <div class="pa-4">
+                                    <v-alert v-if="skillStore.installedSkills.filter(s => s.enabled).length === 0"
+                                        type="info" variant="tonal" class="mb-4">
+                                        {{ $t('$vuetify.dataIterator.skill.noEnabledForWorkflow') }}
+                                    </v-alert>
+
+                                    <div v-else>
+                                        <div class="d-flex align-center justify-space-between mb-3">
+                                            <span class="text-subtitle-2 font-weight-bold">{{ $t('$vuetify.dataIterator.skill.workflowSteps') }}</span>
+                                            <div class="d-flex ga-2">
+                                                <v-btn size="small" variant="outlined" @click="skillStore.workflowSteps = []">
+                                                    <v-icon start>mdi-delete-sweep</v-icon>{{ $t('$vuetify.dataIterator.skill.clearWorkflow') }}
+                                                </v-btn>
+                                            </div>
+                                        </div>
+
+                                        <v-list class="bg-transparent" style="min-height: 100px;">
+                                            <v-list-item v-for="(step, idx) in skillStore.workflowSteps" :key="idx"
+                                                class="mb-2" variant="outlined" rounded="lg" draggable="true"
+                                                @dragstart="skillStore.workflowDragIndex = idx"
+                                                @dragover.prevent
+                                                @drop="skillStore.reorderWorkflowStep(skillStore.workflowDragIndex, idx)">
+                                                <template v-slot:prepend>
+                                                    <v-icon icon="mdi-drag-vertical" class="mr-2 cursor-move" style="cursor: move;"></v-icon>
+                                                    <v-chip size="small" variant="tonal" color="primary" class="mr-2">{{ idx + 1 }}</v-chip>
+                                                    <v-icon :icon="skillStore.registrySkills.find(s => s.name === step)?.icon || 'mdi-puzzle'" color="primary"></v-icon>
+                                                </template>
+                                                <v-list-item-title>
+                                                    {{ skillStore.registrySkills.find(s => s.name === step)?.displayName?.zh || step }}
+                                                </v-list-item-title>
+                                                <template v-slot:append>
+                                                    <v-btn size="x-small" variant="text" icon="mdi-close" color="error"
+                                                        @click="skillStore.workflowSteps.splice(idx, 1)"></v-btn>
+                                                </template>
+                                            </v-list-item>
+                                        </v-list>
+
+                                        <v-divider class="my-3"></v-divider>
+
+                                        <p class="text-caption text-grey mb-2">{{ $t('$vuetify.dataIterator.skill.addStepHint') }}</p>
+                                        <div class="d-flex flex-wrap ga-2">
+                                            <v-chip v-for="installed in skillStore.installedSkills.filter(s => s.enabled && !skillStore.workflowSteps.includes(s.name))"
+                                                :key="installed.name" size="small" variant="tonal"
+                                                @click="skillStore.workflowSteps.push(installed.name)">
+                                                <v-icon start size="small">{{ skillStore.registrySkills.find(s => s.name === installed.name)?.icon || 'mdi-puzzle' }}</v-icon>
+                                                {{ skillStore.registrySkills.find(s => s.name === installed.name)?.displayName?.zh || installed.name }}
+                                                <v-icon end size="small">mdi-plus</v-icon>
+                                            </v-chip>
+                                        </div>
+
+                                        <v-divider class="my-3" v-if="skillStore.workflowSteps.length > 1"></v-divider>
+
+                                        <div v-if="skillStore.workflowSteps.length > 1" class="d-flex ga-2">
+                                            <v-btn size="small" variant="flat" color="primary"
+                                                @click="skillStore.activateWorkflow()">
+                                                <v-icon start>mdi-play</v-icon>{{ $t('$vuetify.dataIterator.skill.runWorkflow') }}
+                                            </v-btn>
+                                        </div>
+                                    </div>
+                                </div>
+                            </v-window-item>
+                        </v-window>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-btn variant="text" prepend-icon="mdi-import" @click="settingStore.skillImportDialog = true">{{ $t('$vuetify.dataIterator.skill.import') }}</v-btn>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="outlined" @click="settingStore.skillDialog = false">{{ $t('$vuetify.dataIterator.skill.close') }}</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- Skill Config Dialog -->
+            <v-dialog v-model="skillStore.skillConfigDialog" max-width="600" class="dialog-card">
+                <v-card prepend-icon="mdi-cog" :title="$t('$vuetify.dataIterator.skill.config')">
+                    <v-divider></v-divider>
+                    <v-card-text v-if="skillStore.skillConfigTarget">
+                        <p class="text-subtitle-2 mb-3">{{ skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name)?.displayName?.zh || skillStore.skillConfigTarget.name }}</p>
+                        <div v-if="skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name)?.configSchema">
+                            <div v-for="(schema, key) in skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name).configSchema.properties" :key="key" class="mb-3">
+                                <v-select v-if="schema.enum"
+                                    v-model="skillStore.skillConfigTarget.config[key]"
+                                    :items="schema.enum"
+                                    :label="schema.description || key"
+                                    density="compact" variant="outlined"></v-select>
+                                <v-switch v-else-if="schema.type === 'boolean'"
+                                    v-model="skillStore.skillConfigTarget.config[key]"
+                                    :label="schema.description || key"
+                                    color="primary" density="compact"></v-switch>
+                                <v-text-field v-else-if="schema.type === 'number'"
+                                    v-model.number="skillStore.skillConfigTarget.config[key]"
+                                    :label="schema.description || key"
+                                    type="number" density="compact" variant="outlined"></v-text-field>
+                                <v-text-field v-else
+                                    v-model="skillStore.skillConfigTarget.config[key]"
+                                    :label="schema.description || key"
+                                    density="compact" variant="outlined"></v-text-field>
+                            </div>
+                        </div>
+                        <p v-else class="text-body-2 text-grey">{{ $t('$vuetify.dataIterator.skill.noConfig') }}</p>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="outlined" @click="skillStore.skillConfigDialog = false">{{ $t('$vuetify.dataIterator.skill.close') }}</v-btn>
+                        <v-btn variant="flat" color="primary" @click="skillStore.updateSkillConfig(skillStore.skillConfigTarget.name, skillStore.skillConfigTarget.config).then(() => { skillStore.skillConfigDialog = false; snackbarStore.showSuccessMessage($t('$vuetify.dataIterator.skill.configSaved')); })">{{ $t('$vuetify.dataIterator.skill.save') }}</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- Skill Import Dialog -->
+            <v-dialog v-model="settingStore.skillImportDialog" max-width="700" class="dialog-card">
+                <v-card prepend-icon="mdi-import" :title="$t('$vuetify.dataIterator.skill.importTitle')">
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        <v-tabs v-model="settingStore.skillImportTab" class="mb-3">
+                            <v-tab value="json">JSON</v-tab>
+                            <v-tab value="file">.skill</v-tab>
+                        </v-tabs>
+                        <v-window v-model="settingStore.skillImportTab">
+                            <v-window-item value="json">
+                                <p class="text-caption text-grey mb-3">{{ $t('$vuetify.dataIterator.skill.importHint') }}</p>
+                                <v-textarea v-model="settingStore.skillImportJson"
+                                    density="compact" variant="outlined"
+                                    :placeholder='$t("$vuetify.dataIterator.skill.importPlaceholder")'
+                                    rows="10" auto-grow clearable hide-details></v-textarea>
+                            </v-window-item>
+                            <v-window-item value="file">
+                                <p class="text-caption text-grey mb-3">{{ $t('$vuetify.dataIterator.skill.importPackHint') }}</p>
+                                <v-file-input v-model="settingStore.skillPackFile"
+                                    accept=".skill,.zip"
+                                    :label="$t('$vuetify.dataIterator.skill.selectSkillPack')"
+                                    prepend-icon="mdi-package-variant"
+                                    variant="outlined"
+                                    density="compact"
+                                    show-size></v-file-input>
+                            </v-window-item>
+                        </v-window>
+                        <v-alert v-if="settingStore.skillImportError" type="error" class="mt-3" closable
+                            @click:close="settingStore.skillImportError = ''">
+                            {{ settingStore.skillImportError }}
+                        </v-alert>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="outlined" @click="settingStore.skillImportDialog = false; settingStore.skillImportJson = ''; settingStore.skillImportError = ''; settingStore.skillPackFile = null;">{{ $t('$vuetify.dataIterator.skill.close') }}</v-btn>
+                        <v-btn v-if="settingStore.skillImportTab === 'json'" variant="flat" color="primary" :disabled="!settingStore.skillImportJson"
+                            @click="skillStore.importSkill(settingStore.skillImportJson).then(result => { if(result.success) { settingStore.skillImportDialog = false; settingStore.skillImportJson = ''; settingStore.skillImportError = ''; skillStore.loadRegistrySkills(); snackbarStore.showSuccessMessage(result.message); } else { settingStore.skillImportError = result.message; } })">{{ $t('$vuetify.dataIterator.skill.import') }}</v-btn>
+                        <v-btn v-if="settingStore.skillImportTab === 'file'" variant="flat" color="primary" :disabled="!settingStore.skillPackFile"
+                            @click="skillStore.importSkillPack(settingStore.skillPackFile).then(result => { if(result.success) { settingStore.skillImportDialog = false; settingStore.skillPackFile = null; settingStore.skillImportError = ''; skillStore.loadRegistrySkills(); snackbarStore.showSuccessMessage(result.message); } else { settingStore.skillImportError = result.message; } })">{{ $t('$vuetify.dataIterator.skill.importPack') }}</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
             <!-- <div v-if="settingStore.toolboxShow !== true" class="toolbox-button"
                 @click="settingStore.toolboxShow = true">
                 <v-icon class="rotation text-white">mdi-tools</v-icon>
@@ -1277,7 +1647,9 @@
                                     <div v-for="(item, index) in group.message.content" :key="index">
                                         <tuui-img-dialog v-if="item.type=='image_url'"
                                             :src="item.image_url.url"></tuui-img-dialog>
-                                        <v-textarea class="conversation-area" variant="plain" density='compact'
+                                        <tuui-img-dialog v-else-if="item.type=='image'"
+                                            :src="`data:${item.source.media_type};base64,${item.source.data}`"></tuui-img-dialog>
+                                        <v-textarea v-else-if="item.type=='text'" class="conversation-area" variant="plain" density='compact'
                                             auto-grow :counter="showmodify" :hide-details="!showmodify" rows="1"
                                             :readonly="!showmodify" v-model="item.text"></v-textarea>
                                     </div>
@@ -1297,7 +1669,7 @@
                     <div class="message">
                         <v-avatar :size=size class="mt-3 mr-3 mr-lg-6" color="teal" icon="mdi-lightning-bolt-circle">
                         </v-avatar>
-                        <tuui-chat-card :index="group.index" :messages="messages" :show-content="true">
+                        <tuui-chat-card :index="group.index" :messages="messages" :show-content="true" :show-regenerate="true" :generating="generating" @regenerate="$emit('regenerate', $event)">
                             <template v-slot:default="{ showcontent }">
                                 <v-card-text v-if="group.message.reasoning_content" class="md-preview pt-1">
                                     <v-textarea class="conversation-area text-disabled font-italic" variant="plain"
@@ -1403,6 +1775,11 @@
                         <div v-if="isHovering">
                             <v-divider></v-divider>
                             <v-card-actions data-component-id="chat-mcp.chat.message-actions">
+                                <v-btn v-if="showRegenerate" color="primary" icon="mdi-autorenew" size="x-small"
+                                    variant="plain" :disabled="generating"
+                                    v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
+                                    @click="regenerateFromIndex(index)"
+                                    data-component-id="chat-mcp.chat.regenerate-button"></v-btn>
                                 <v-btn v-if="showCopy" color="primary" icon="mdi-content-copy" size="x-small"
                                     variant="plain" @click="copyToClipboard(messages[index])"></v-btn>
                                 <v-btn v-if="showModify" color="primary"
@@ -1422,6 +1799,51 @@
                 </v-card>
             </template>
         </v-hover>
+    </template>
+
+    <template id="chat-mcp-chat-attachment-item-template">
+        <v-card class="attachment-item" variant="outlined" width="80" height="80">
+            <v-img v-if="attachment.category === 'image' && attachment.thumbnail"
+                :src="attachment.thumbnail" cover width="80" height="60"
+                @click="$emit('preview', attachment)" class="cursor-pointer" />
+            <div v-else-if="attachment.category === 'image' && !attachment.thumbnail"
+                class="d-flex align-center justify-center bg-grey-lighten-3" style="width:80px;height:60px;">
+                <v-icon size="24" color="grey">mdi-image-broken-variant</v-icon>
+            </div>
+            <div v-else class="d-flex align-center justify-center bg-grey-lighten-3" style="width:80px;height:60px;">
+                <v-icon size="28" :color="getDocIconColor(attachment.type)">
+                    {{ getDocIcon(attachment.type) }}
+                </v-icon>
+            </div>
+            <div class="d-flex align-center px-1" style="height:20px;">
+                <span class="text-truncate text-caption flex-grow-1">{{ attachment.name }}</span>
+                <v-btn size="x-small" variant="plain" icon="mdi-close" density="compact"
+                    @click.stop="$emit('remove', attachment.id)" />
+            </div>
+            <v-progress-linear v-if="attachment.status === 'processing'" indeterminate color="primary" absolute bottom />
+            <v-icon v-if="attachment.status === 'error'" size="16" color="error" style="position:absolute;top:2px;right:2px;">
+                mdi-alert-circle
+            </v-icon>
+        </v-card>
+    </template>
+
+    <template id="chat-mcp-chat-attachment-bar-template">
+        <v-container v-if="attachments.length > 0" class="attachment-bar pa-0" fluid>
+            <v-row dense class="ma-0">
+                <v-col v-for="attachment in attachments" :key="attachment.id" cols="auto">
+                    <chat-mcp-chat-attachment-item :attachment="attachment"
+                        @remove="$emit('remove', $event)"
+                        @preview="$emit('preview', $event)" />
+                </v-col>
+            </v-row>
+            <v-row dense class="ma-0 mt-1" justify="end">
+                <v-btn size="x-small" variant="text" color="grey"
+                    @click="$emit('clear')">
+                    <v-icon start size="16">mdi-close-circle-outline</v-icon>
+                    {{ $t('$vuetify.dataIterator.g.clearAll') }}
+                </v-btn>
+            </v-row>
+        </v-container>
     </template>
 
     <script lang="ts" setup>
@@ -2297,12 +2719,20 @@
                         ))
                         .join('\n\n');
 
+                    const systemParts = [];
                     if (result) {
-                        return [{ content: result, role: "system" }, ...conversation]
+                        systemParts.push(result);
+                    }
+                    const _skillStore = useSkillStore();
+                    if (_skillStore.activeSkillPrompt) {
+                        systemParts.push(_skillStore.activeSkillPrompt);
+                    }
+
+                    if (systemParts.length > 0) {
+                        return [{ content: systemParts.join('\n\n---\n\n'), role: "system" }, ...conversation]
                     } else {
                         return [...conversation]
                     }
-                    return [...conversation]
 
                 },
                 initAgent() {
@@ -2400,6 +2830,16 @@
                 // MCP Server config viewer
                 mcpConfigViewerDialog: false,
                 mcpConfigViewerServer: null, // The server being viewed
+                
+                // Skill management
+                skillDialog: false,
+                skillTab: 'registry', // 'registry' or 'installed' or 'workflow'
+                skillImportDialog: false,
+                skillImportJson: '',
+                skillImportError: '',
+                skillImportTab: 'json',
+                skillPackFile: null,
+                skillDragOver: false,
                 
                 // Registry Manager state
                 registryRunning: false,
@@ -2882,6 +3322,265 @@
             },
         });
 
+        const useSkillStore = defineStore("skillStore", {
+            state: () => ({
+                registrySkills: [],
+                installedSkills: [],
+                skillSearchQuery: '',
+                skillCategoryFilter: 'all',
+                loadingRegistry: false,
+
+                matchedSkill: null,
+                skillConfigDialog: false,
+                skillConfigTarget: null,
+                activeSkill: null,
+                activeSkillPrompt: '',
+                matchDebounceTimer: null,
+                workflowSteps: [],
+                workflowDragIndex: null,
+            }),
+            getters: {
+                filteredRegistrySkills(state) {
+                    let skills = state.registrySkills;
+                    if (state.skillCategoryFilter !== 'all') {
+                        skills = skills.filter(s => s.category === state.skillCategoryFilter);
+                    }
+                    if (state.skillSearchQuery) {
+                        const q = state.skillSearchQuery.toLowerCase();
+                        skills = skills.filter(s =>
+                            s.name.toLowerCase().includes(q) ||
+                            s.displayName.zh.includes(q) ||
+                            s.displayName.en.toLowerCase().includes(q) ||
+                            s.tags.some(t => t.toLowerCase().includes(q))
+                        );
+                    }
+                    return skills;
+                },
+                installedSkillNames(state) {
+                    return state.installedSkills.map(s => s.name);
+                },
+                skillCategories(state) {
+                    const cats = new Set(state.registrySkills.map(s => s.category));
+                    return ['all', ...Array.from(cats)];
+                },
+            },
+            actions: {
+                _rawInstalled() {
+                    return JSON.parse(JSON.stringify(this.installedSkills));
+                },
+                async loadRegistrySkills() {
+                    this.loadingRegistry = true;
+                    try {
+                        this.registrySkills = await window.skillsAPI.listRegistry();
+                    } catch (error) {
+                        console.error('Failed to load registry skills:', error);
+                    } finally {
+                        this.loadingRegistry = false;
+                    }
+                },
+                async installSkill(name) {
+                    try {
+                        const result = await window.skillsAPI.install(name, this._rawInstalled());
+                        if (result.success && result.installedSkills) {
+                            this.installedSkills = result.installedSkills;
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message };
+                    }
+                },
+                async uninstallSkill(name) {
+                    try {
+                        const result = await window.skillsAPI.uninstall(name, this._rawInstalled());
+                        if (result.success && result.installedSkills) {
+                            this.installedSkills = result.installedSkills;
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message };
+                    }
+                },
+                async toggleSkill(name, enabled) {
+                    try {
+                        const result = await window.skillsAPI.toggle(name, enabled, this._rawInstalled());
+                        if (result.success && result.installedSkills) {
+                            this.installedSkills = result.installedSkills;
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message };
+                    }
+                },
+                async updateSkillConfig(name, config) {
+                    try {
+                        const result = await window.skillsAPI.updateConfig(name, config, this._rawInstalled());
+                        if (result.success && result.installedSkills) {
+                            this.installedSkills = result.installedSkills;
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message };
+                    }
+                },
+                async matchSkill(input) {
+                    try {
+                        this.matchedSkill = await window.skillsAPI.match(input, this._rawInstalled());
+                        return this.matchedSkill;
+                    } catch (error) {
+                        console.error('Failed to match skill:', error);
+                        return null;
+                    }
+                },
+                async getSkillSystemPrompt(name) {
+                    try {
+                        return await window.skillsAPI.getSystemPrompt(name, this._rawInstalled());
+                    } catch (error) {
+                        console.error('Failed to get skill system prompt:', error);
+                        return null;
+                    }
+                },
+                async recordSkillUsage(name) {
+                    try {
+                        const result = await window.skillsAPI.recordUsage(name, this._rawInstalled());
+                        if (result.installedSkills) {
+                            this.installedSkills = result.installedSkills;
+                        }
+                    } catch (error) {
+                        console.error('Failed to record skill usage:', error);
+                    }
+                },
+                async exportSkill(name) {
+                    try {
+                        return await window.skillsAPI.exportSkill(name);
+                    } catch (error) {
+                        console.error('Failed to export skill:', error);
+                        return null;
+                    }
+                },
+                async importSkill(manifestJson) {
+                    try {
+                        const result = await window.skillsAPI.importSkill(manifestJson);
+                        if (result.success) {
+                            await this.loadRegistrySkills();
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message };
+                    }
+                },
+                async importSkillPack(file) {
+                    try {
+                        if (!file) {
+                            return { success: false, message: 'No file selected' };
+                        }
+                        const arrayBuffer = await file.arrayBuffer();
+                        const fileData = {
+                            name: file.name,
+                            data: Array.from(new Uint8Array(arrayBuffer))
+                        };
+                        const result = await window.skillsAPI.importPack(fileData);
+                        if (result.success) {
+                            await this.loadRegistrySkills();
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message || 'Failed to read file' };
+                    }
+                },
+                async exportSkillPack(skillNames) {
+                    try {
+                        const result = await window.skillsAPI.exportPack(skillNames);
+                        if (result.success && result.filePath) {
+                            const data = await window.skillsAPI.readFileForExport(result.filePath);
+                            if (data && data.length > 0) {
+                                const blob = new Blob([new Uint8Array(data)], { type: 'application/zip' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${skillNames.length === 1 ? skillNames[0] : 'skill-pack'}.skill`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }
+                        }
+                        return result;
+                    } catch (error) {
+                        return { success: false, message: error.message || 'Failed to export' };
+                    }
+                },
+                async activateSkill(name) {
+                    try {
+                        const prompt = await window.skillsAPI.getSystemPrompt(name, this._rawInstalled());
+                        if (prompt) {
+                            this.activeSkill = name;
+                            this.activeSkillPrompt = prompt;
+                            await this.recordSkillUsage(name);
+                            return true;
+                        }
+                        return false;
+                    } catch (error) {
+                        console.error('Failed to activate skill:', error);
+                        return false;
+                    }
+                },
+                deactivateSkill() {
+                    this.activeSkill = null;
+                    this.activeSkillPrompt = '';
+                },
+                async matchAndSuggest(input) {
+                    if (this.matchDebounceTimer) {
+                        clearTimeout(this.matchDebounceTimer);
+                    }
+                    this.matchDebounceTimer = setTimeout(async () => {
+                        if (!input || input.trim().length < 2) {
+                            this.matchedSkill = null;
+                            return;
+                        }
+                        try {
+                            this.matchedSkill = await window.skillsAPI.match(input, this._rawInstalled());
+                        } catch (error) {
+                            console.error('Failed to match skill:', error);
+                            this.matchedSkill = null;
+                        }
+                    }, 500);
+                },
+                getActiveSkillManifest() {
+                    if (!this.activeSkill) return null;
+                    return this.registrySkills.find(s => s.name === this.activeSkill) || null;
+                },
+                reorderWorkflowStep(fromIndex, toIndex) {
+                    if (fromIndex === null || fromIndex === toIndex) return;
+                    const step = this.workflowSteps.splice(fromIndex, 1)[0];
+                    this.workflowSteps.splice(toIndex, 0, step);
+                },
+                async activateWorkflow() {
+                    if (this.workflowSteps.length === 0) return;
+                    const prompts = [];
+                    for (const stepName of this.workflowSteps) {
+                        try {
+                            const prompt = await window.skillsAPI.getSystemPrompt(stepName, this._rawInstalled());
+                            if (prompt) {
+                                prompts.push(`[${stepName}]\n${prompt}`);
+                                await this.recordSkillUsage(stepName);
+                            }
+                        } catch (error) {
+                            console.error(`Failed to get prompt for workflow step ${stepName}:`, error);
+                        }
+                    }
+                    if (prompts.length > 0) {
+                        this.activeSkill = this.workflowSteps.join(' → ');
+                        this.activeSkillPrompt = prompts.join('\n\n---\n\n');
+                    }
+                },
+            },
+            persist: {
+                enabled: true,
+                strategies: [{ storage: localStorage }],
+                paths: ['installedSkills', 'workflowSteps'],
+            },
+        });
+
         const useSnackbarStore = defineStore("snackbarStore", {
             state: () => ({
                 isShow: false,
@@ -2926,9 +3625,59 @@
             props: { src: { type: String, required: true } }
         };
 
+        const ChatAttachmentItem = {
+            template: '#chat-mcp-chat-attachment-item-template',
+            props: {
+                attachment: { type: Object, required: true }
+            },
+            emits: ['remove', 'preview'],
+            methods: {
+                getDocIcon(type) {
+                    const iconMap = {
+                        'application/pdf': 'mdi-file-pdf-box',
+                        'application/msword': 'mdi-file-word-box',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'mdi-file-word-box',
+                        'application/vnd.ms-excel': 'mdi-file-excel-box',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'mdi-file-excel-box',
+                        'application/vnd.ms-powerpoint': 'mdi-file-powerpoint-box',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'mdi-file-powerpoint-box',
+                        'text/plain': 'mdi-file-document-outline',
+                        'text/markdown': 'mdi-language-markdown',
+                        'text/csv': 'mdi-file-delimited',
+                    };
+                    return iconMap[type] || 'mdi-file-document';
+                },
+                getDocIconColor(type) {
+                    const colorMap = {
+                        'application/pdf': 'red',
+                        'application/msword': 'blue',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'blue',
+                        'application/vnd.ms-excel': 'green',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'green',
+                        'application/vnd.ms-powerpoint': 'orange',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'orange',
+                        'text/plain': 'grey',
+                        'text/markdown': 'teal',
+                        'text/csv': 'green',
+                    };
+                    return colorMap[type] || 'grey';
+                }
+            }
+        };
+
+        const ChatAttachmentBar = {
+            template: '#chat-mcp-chat-attachment-bar-template',
+            components: { ChatAttachmentItem },
+            props: {
+                attachments: { type: Array, required: true }
+            },
+            emits: ['remove', 'preview', 'clear'],
+        };
+
 
         const TuuiChatCard = defineComponent({
             template: '#tuui-chat-card-template',
+            emits: ['regenerate'],
             props: {
                 index: { type: Number, required: true },
                 range: { type: Number, required: false, default: 1 },
@@ -2938,8 +3687,10 @@
                 showReduce: { type: Boolean, default: true },
                 showModify: { type: Boolean, default: false },
                 showCopy: { type: Boolean, default: true },
+                showRegenerate: { type: Boolean, default: false },
+                generating: { type: Boolean, default: false },
             },
-            setup(props) {
+            setup(props, { emit }) {
                 const showcontent = ref(false);
                 const showmodify = ref(false);
                 const snackbarStore = useSnackbarStore();
@@ -2963,15 +3714,21 @@
                     }
                 };
 
+                const regenerateFromIndex = (index) => {
+                    emit('regenerate', index);
+                };
+
                 return {
                     copyToClipboard,
                     showcontent,
                     showmodify,
+                    regenerateFromIndex,
                 };
             }
         });
         const TuuiChatBox = {
             template: '#tuui-chat-box-template',
+            emits: ['regenerate'],
             components: {
                 TuuiImgDialog,
                 TuuiChatCard,
@@ -2979,10 +3736,12 @@
             props: {
                 messages: { type: Array, required: true },
                 size: { type: Number },
-                language: { type: String }
+                language: { type: String },
+                generating: { type: Boolean, default: false }
             },
             setup(props) {
                 const dialogs = reactive({});
+
                 const groupMessages = computed(() => {
                     const groups = [];
                     props.messages.forEach((message, index) => {
@@ -3031,7 +3790,9 @@
             components: {
                 vuedraggable,
                 TuuiChatBox,
-                TuuiChatCard
+                TuuiChatCard,
+                ChatAttachmentBar,
+                ChatAttachmentItem
             },
             setup() {
 
@@ -3040,6 +3801,39 @@
                 const agentStore = useAgentStore();
                 const settingStore = useSettingStore();
                 const resourceStore = useResourceStore();
+                const skillStore = useSkillStore();
+
+                const isDragging = ref(false);
+
+                function onDragOver(e) {
+                    isDragging.value = true;
+                }
+                function onDragLeave(e) {
+                    isDragging.value = false;
+                }
+                function onDrop(e) {
+                    isDragging.value = false;
+                    const files = e.dataTransfer?.files;
+                    if (files) {
+                        const messageStore = useMessageStore();
+                        Array.from(files).forEach(file => {
+                            messageStore.addAttachment(file);
+                        });
+                    }
+                }
+                function previewAttachment(attachment) {
+                    if (attachment.category === 'image' && attachment.base64Data) {
+                        const dialog = document.createElement('div');
+                        const img = document.createElement('img');
+                        img.src = attachment.base64Data;
+                        img.style.cssText = 'max-width:80vw;max-height:80vh;cursor:pointer;';
+                        img.onclick = () => dialog.remove();
+                        dialog.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+                        dialog.appendChild(img);
+                        dialog.onclick = (e) => { if (e.target === dialog) dialog.remove(); };
+                        document.body.appendChild(dialog);
+                    }
+                }
 
                 const { locale } = useI18n({ useScope: 'global' });
 
@@ -3071,6 +3865,241 @@
                     },
                 });
 
+                const FileValidator = {
+                    ACCEPTED_TYPES: {
+                        image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'],
+                        document: ['.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.pdf', '.md', '.csv']
+                    },
+                    BLOCKED_EXTENSIONS: ['.exe', '.bat', '.sh', '.cmd', '.ps1', '.com', '.vbs', '.js', '.wsf'],
+                    MAX_FILE_SIZE: 10 * 1024 * 1024,
+                    MAX_ATTACHMENT_COUNT: 10,
+                    validate(file) {
+                        const ext = '.' + file.name.split('.').pop().toLowerCase();
+                        if (this.BLOCKED_EXTENSIONS.includes(ext)) {
+                            return { valid: false, reason: 'security_blocked' };
+                        }
+                        if (file.type && this.ACCEPTED_TYPES.image.includes(file.type)) {
+                            if (file.size > this.MAX_FILE_SIZE) {
+                                return { valid: false, reason: 'file_too_large' };
+                            }
+                            return { valid: true };
+                        }
+                        const docExts = this.ACCEPTED_TYPES.document;
+                        if (docExts.includes(ext)) {
+                            if (file.size > this.MAX_FILE_SIZE) {
+                                return { valid: false, reason: 'file_too_large' };
+                            }
+                            return { valid: true };
+                        }
+                        if (file.type && file.type.startsWith('image/')) {
+                            if (file.size > this.MAX_FILE_SIZE) {
+                                return { valid: false, reason: 'file_too_large' };
+                            }
+                            return { valid: true };
+                        }
+                        return { valid: false, reason: 'unsupported_type' };
+                    },
+                    isDuplicate(file, attachments) {
+                        return attachments.some(a => a.name === file.name && a.size === file.size);
+                    },
+                    getCategory(file) {
+                        if (file.type && (this.ACCEPTED_TYPES.image.includes(file.type) || file.type.startsWith('image/'))) {
+                            return 'image';
+                        }
+                        return 'document';
+                    }
+                };
+
+                const ImageProcessor = {
+                    MAX_WIDTH: 2048,
+                    MAX_HEIGHT: 2048,
+                    QUALITY: 0.8,
+                    MAX_COMPRESSED_SIZE: 1024 * 1024,
+                    async compress(file) {
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    let width = img.width;
+                                    let height = img.height;
+                                    let quality = this.QUALITY;
+                                    if (width > this.MAX_WIDTH || height > this.MAX_HEIGHT) {
+                                        const scaleFactor = Math.min(this.MAX_WIDTH / width, this.MAX_HEIGHT / height);
+                                        width = Math.round(width * scaleFactor);
+                                        height = Math.round(height * scaleFactor);
+                                        quality = Math.min(quality, quality * scaleFactor);
+                                    }
+                                    const canvas = document.createElement('canvas');
+                                    const ctx = canvas.getContext('2d');
+                                    canvas.width = width;
+                                    canvas.height = height;
+                                    ctx.drawImage(img, 0, 0, width, height);
+                                    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                                    if (dataUrl.length > this.MAX_COMPRESSED_SIZE * 1.37) {
+                                        for (let q = quality * 0.7; q > 0.1; q -= 0.1) {
+                                            dataUrl = canvas.toDataURL('image/jpeg', q);
+                                            if (dataUrl.length <= this.MAX_COMPRESSED_SIZE * 1.37) break;
+                                        }
+                                    }
+                                    resolve(dataUrl);
+                                };
+                                img.onerror = () => reject(new Error('Image load failed'));
+                                img.src = e.target.result;
+                            };
+                            reader.onerror = () => reject(new Error('File read failed'));
+                            reader.readAsDataURL(file);
+                        });
+                    },
+                    async generateThumbnail(file) {
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    const maxThumb = 200;
+                                    let w = img.width;
+                                    let h = img.height;
+                                    if (w > maxThumb || h > maxThumb) {
+                                        const scale = Math.min(maxThumb / w, maxThumb / h);
+                                        w = Math.round(w * scale);
+                                        h = Math.round(h * scale);
+                                    }
+                                    const canvas = document.createElement('canvas');
+                                    const ctx = canvas.getContext('2d');
+                                    canvas.width = w;
+                                    canvas.height = h;
+                                    ctx.drawImage(img, 0, 0, w, h);
+                                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                                };
+                                img.onerror = () => resolve('');
+                                img.src = e.target.result;
+                            };
+                            reader.onerror = () => resolve('');
+                            reader.readAsDataURL(file);
+                        });
+                    }
+                };
+
+                const DocProcessor = {
+                    async extractText(file) {
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        if (ext === 'docx') {
+                            try {
+                                const arrayBuffer = await file.arrayBuffer();
+                                const result = await mammoth.extractRawText({ arrayBuffer });
+                                return result.value;
+                            } catch (e) {
+                                return `[Document: ${file.name}]`;
+                            }
+                        }
+                        if (['txt', 'md', 'csv'].includes(ext)) {
+                            return new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => resolve(e.target.result);
+                                reader.onerror = () => resolve(`[Document: ${file.name}]`);
+                                reader.readAsText(file);
+                            });
+                        }
+                        return `[Document: ${file.name}]`;
+                    },
+                    getDocTypeName(extension) {
+                        const map = {
+                            'doc': 'Word', 'docx': 'Word',
+                            'ppt': 'PowerPoint', 'pptx': 'PowerPoint',
+                            'xls': 'Excel', 'xlsx': 'Excel',
+                            'txt': 'Text', 'pdf': 'PDF',
+                            'md': 'Markdown', 'csv': 'CSV'
+                        };
+                        return map[extension] || 'Document';
+                    }
+                };
+
+                const MultimodalAdapter = {
+                    OPENAI_PROVIDERS: ['openai-compatible', 'glm', 'qwen', 'kimi', 'minimax', 'doubao-seed'],
+                    buildContent(attachments, text, providerType) {
+                        if (this.OPENAI_PROVIDERS.includes(providerType)) {
+                            return this.buildOpenAIContent(attachments, text);
+                        }
+                        if (providerType === 'anthropic-compatible') {
+                            return this.buildAnthropicContent(attachments, text);
+                        }
+                        return this.buildFallbackContent(attachments, text);
+                    },
+                    buildOpenAIContent(attachments, text) {
+                        const content = [];
+                        const imageAttachments = attachments.filter(a => a.category === 'image' && a.base64Data);
+                        const docAttachments = attachments.filter(a => a.category === 'document');
+                        imageAttachments.forEach(a => {
+                            content.push({ type: 'image_url', image_url: { url: a.base64Data } });
+                        });
+                        let textParts = [];
+                        docAttachments.forEach(a => {
+                            const ext = a.name.split('.').pop().toLowerCase();
+                            const docType = DocProcessor.getDocTypeName(ext);
+                            if (a.textContent && !a.textContent.startsWith('[Document:')) {
+                                textParts.push(`[${docType} Document: ${a.name}]\n\n${a.textContent}`);
+                            } else {
+                                textParts.push(a.textContent || `[${docType} Document: ${a.name}]`);
+                            }
+                        });
+                        if (text) textParts.push(text);
+                        if (textParts.length > 0) {
+                            content.push({ type: 'text', text: textParts.join('\n\n') });
+                        } else if (imageAttachments.length > 0) {
+                            content.push({ type: 'text', text: imageAttachments.map(a => `[Image: ${a.name}]`).join(', ') });
+                        }
+                        return content;
+                    },
+                    buildAnthropicContent(attachments, text) {
+                        const content = [];
+                        const imageAttachments = attachments.filter(a => a.category === 'image' && a.base64Data);
+                        const docAttachments = attachments.filter(a => a.category === 'document');
+                        imageAttachments.forEach(a => {
+                            const matches = a.base64Data.match(/^data:(.+);base64,(.+)$/);
+                            if (matches) {
+                                content.push({
+                                    type: 'image',
+                                    source: { type: 'base64', media_type: matches[1], data: matches[2] }
+                                });
+                            }
+                        });
+                        let textParts = [];
+                        docAttachments.forEach(a => {
+                            const ext = a.name.split('.').pop().toLowerCase();
+                            const docType = DocProcessor.getDocTypeName(ext);
+                            if (a.textContent && !a.textContent.startsWith('[Document:')) {
+                                textParts.push(`[${docType} Document: ${a.name}]\n\n${a.textContent}`);
+                            } else {
+                                textParts.push(a.textContent || `[${docType} Document: ${a.name}]`);
+                            }
+                        });
+                        if (text) textParts.push(text);
+                        if (textParts.length > 0) {
+                            content.push({ type: 'text', text: textParts.join('\n\n') });
+                        }
+                        return content;
+                    },
+                    buildFallbackContent(attachments, text) {
+                        const parts = [];
+                        attachments.forEach(a => {
+                            if (a.category === 'image') {
+                                parts.push(`[Image: ${a.name}]`);
+                            } else {
+                                const ext = a.name.split('.').pop().toLowerCase();
+                                const docType = DocProcessor.getDocTypeName(ext);
+                                if (a.textContent && !a.textContent.startsWith('[Document:')) {
+                                    parts.push(`[${docType} Document: ${a.name}]\n\n${a.textContent}`);
+                                } else {
+                                    parts.push(a.textContent || `[${docType} Document: ${a.name}]`);
+                                }
+                            }
+                        });
+                        if (text) parts.push(text);
+                        return parts.join('\n\n');
+                    }
+                };
+
                 const useMessageStore = defineStore("messageStore", {
                     state: () => ({
                         userMessage: "",
@@ -3079,8 +4108,23 @@
                         base64: '',
                         documentContent: '',
                         documentType: '',
-                        generating: false
+                        generating: false,
+                        attachments: [],
+                        isProcessingFiles: false
                     }),
+                    getters: {
+                        allAttachmentsReady() {
+                            return this.attachments.length > 0 && this.attachments.every(a => a.status === 'ready');
+                        },
+                        totalEncodedSize() {
+                            return this.attachments.reduce((sum, a) => {
+                                if (a.category === 'image' && a.base64Data) {
+                                    return sum + a.base64Data.length * 0.75;
+                                }
+                                return sum + (a.size || 0);
+                            }, 0);
+                        }
+                    },
                     actions: {
                         init() {
                             if (this.conversation.length === 0) {
@@ -3115,6 +4159,78 @@
                             this.images = [];
                             this.documentContent = '';
                             this.documentType = '';
+                            this.attachments = [];
+                            this.isProcessingFiles = false;
+                        },
+                        addAttachment(file) {
+                            const validation = FileValidator.validate(file);
+                            if (!validation.valid) {
+                                const reasonMap = {
+                                    'security_blocked': '$vuetify.dataIterator.snackbar.securityBlocked',
+                                    'file_too_large': '$vuetify.dataIterator.snackbar.fileTooLarge',
+                                    'unsupported_type': '$vuetify.dataIterator.snackbar.unsupportedType'
+                                };
+                                snackbarStore.showWarningMessage(reasonMap[validation.reason] || validation.reason);
+                                return;
+                            }
+                            if (this.attachments.length >= FileValidator.MAX_ATTACHMENT_COUNT) {
+                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.attachmentLimit');
+                                return;
+                            }
+                            if (FileValidator.isDuplicate(file, this.attachments)) {
+                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.duplicateFile');
+                                return;
+                            }
+                            const category = FileValidator.getCategory(file);
+                            const attachment = {
+                                id: crypto.randomUUID(),
+                                file: file,
+                                name: file.name,
+                                type: file.type,
+                                size: file.size,
+                                category: category,
+                                thumbnail: '',
+                                status: 'processing',
+                                errorMessage: '',
+                                base64Data: '',
+                                textContent: ''
+                            };
+                            this.attachments.push(attachment);
+                            this.isProcessingFiles = true;
+                            const idx = this.attachments.length - 1;
+                            (async () => {
+                                try {
+                                    if (category === 'image') {
+                                        const [compressed, thumb] = await Promise.all([
+                                            ImageProcessor.compress(file),
+                                            ImageProcessor.generateThumbnail(file)
+                                        ]);
+                                        this.attachments[idx].base64Data = compressed;
+                                        this.attachments[idx].thumbnail = thumb;
+                                    } else {
+                                        const text = await DocProcessor.extractText(file);
+                                        this.attachments[idx].textContent = text;
+                                    }
+                                    this.attachments[idx].status = 'ready';
+                                } catch (e) {
+                                    this.attachments[idx].status = 'error';
+                                    this.attachments[idx].errorMessage = e.message || 'Processing failed';
+                                } finally {
+                                    this.isProcessingFiles = this.attachments.some(a => a.status === 'processing');
+                                }
+                            })();
+                        },
+                        removeAttachment(id) {
+                            this.attachments = this.attachments.filter(a => a.id !== id);
+                            this.isProcessingFiles = this.attachments.some(a => a.status === 'processing');
+                        },
+                        clearAttachments() {
+                            this.attachments = [];
+                            this.isProcessingFiles = false;
+                            this.images = [];
+                        },
+                        buildMultimodalContent(text) {
+                            return MultimodalAdapter.buildContent(this.attachments, text, chatbotStore.provider);
                         },
                         handleKeydown(e) {
                             if (e.key === "Enter" && e.shiftKey) {
@@ -3126,59 +4242,96 @@
                             }
                         },
                         resendMessage() {
-                            // const conversation = this.conversation.reduce((newConversation, item) => {
                             let index = this.conversation.length - 1;
                             while (index >= 0 && this.conversation[index].role !== "user") {
                                 index--;
                             }
 
-                            // when role == "user" is found，drop followings
                             if (index >= 0) {
                                 this.conversation.splice(index + 1);;
                                 this.startInference();
                             }
                         },
+                        regenerateFromIndex(index) {
+                            if (index < 0 || index >= this.conversation.length || this.conversation.length === 0) {
+                                return;
+                            }
+                            if (this.conversation[index].role !== 'assistant') {
+                                return;
+                            }
+                            if (this.generating) {
+                                this.generating = false;
+                            }
+                            const removedCount = this.conversation.length - index;
+                            this.conversation.splice(index);
+                            console.log(`[regenerateFromIndex] index=${index}, removedCount=${removedCount}`);
+                            const hasUserMessage = this.conversation.some(msg => msg.role === 'user');
+                            if (!hasUserMessage) {
+                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.regenerateNoUser');
+                                return;
+                            }
+                            this.startInference();
+                        },
                         sendMessage() {
-                            if (this.userMessage || this.documentContent) {
-                                // Add the message to the list
+                            const hasAttachments = this.attachments.length > 0;
+                            const hasText = !!this.userMessage;
+                            const hasLegacyFile = !!this.base64 || !!this.documentContent;
 
+                            if (!hasText && !hasAttachments && !hasLegacyFile) return;
+
+                            if (this.isProcessingFiles) {
+                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.filesProcessing');
+                                return;
+                            }
+
+                            if (hasAttachments && this.totalEncodedSize > 20 * 1024 * 1024) {
+                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.totalSizeExceeded');
+                                return;
+                            }
+
+                            let content;
+                            if (hasAttachments) {
+                                content = this.buildMultimodalContent(this.userMessage);
+                            } else if (hasLegacyFile) {
                                 const imageBase64 = this.base64;
                                 const docContent = this.documentContent;
-
-                                let content = this.userMessage;
-
-                                // If document is provided, add it to the message
+                                let textContent = this.userMessage;
                                 if (docContent) {
                                     const typeMap = {
-                                        'doc': 'Word',
-                                        'docx': 'Word',
-                                        'ppt': 'PowerPoint',
-                                        'pptx': 'PowerPoint',
-                                        'xls': 'Excel',
-                                        'xlsx': 'Excel',
-                                        'txt': 'Text',
-                                        'pdf': 'PDF',
-                                        'md': 'Markdown'
+                                        'doc': 'Word', 'docx': 'Word',
+                                        'ppt': 'PowerPoint', 'pptx': 'PowerPoint',
+                                        'xls': 'Excel', 'xlsx': 'Excel',
+                                        'txt': 'Text', 'pdf': 'PDF',
+                                        'md': 'Markdown', 'csv': 'CSV'
                                     };
                                     const docType = typeMap[this.documentType] || 'Document';
-                                    content = `[${docType} Document Content]\n\n${docContent}\n\n${this.userMessage}`;
+                                    textContent = `[${docType} Document Content]\n\n${docContent}\n\n${this.userMessage}`;
                                 }
-
-                                this.conversation.push({
-                                    content: imageBase64
-                                        ? [
-                                            { type: "image_url", image_url: { url: imageBase64 } },
-                                            { type: "text", text: content }
-                                        ] : content,
-                                    role: "user",
-                                });
-
-                                if (this.conversation.length == 1) {
-                                    historyStore.init(this.conversation)
-                                }
-
-                                this.startInference();
+                                content = imageBase64
+                                    ? [
+                                        { type: "image_url", image_url: { url: imageBase64 } },
+                                        { type: "text", text: textContent }
+                                    ] : textContent;
+                            } else {
+                                content = this.userMessage;
                             }
+
+                            this.conversation.push({ role: "user", content });
+
+                            if (this.conversation.length == 1) {
+                                historyStore.init(this.conversation)
+                            }
+
+                            if (hasAttachments) {
+                                this.clearAttachments();
+                            } else {
+                                this.base64 = '';
+                                this.documentContent = '';
+                                this.documentType = '';
+                                this.images = [];
+                            }
+                            this.userMessage = '';
+                            this.startInference();
                         },
                         startInference: async function () {
                             console.log('[startInference] begin');
@@ -3725,68 +4878,17 @@
                 watch(computed(() => messageStore.images),
                     (newValue, oldValue) => {
                         if (newValue.length === 0) {
-                            messageStore.base64 = '';
-                            messageStore.documentContent = '';
-                            messageStore.documentType = '';
-                        } else {
-                            const file = messageStore.images; // Assuming you're working with a single file
-
-                            // Check if it's an image file
-                            if (file.type.startsWith('image/')) {
-                                const reader = new FileReader();
-                                const MAX_WIDTH = 2048;
-                                const MAX_HEIGHT = 2048; // adjust these values as needed
-
-                                reader.onload = (e) => {
-                                    const img = new Image();
-                                    img.onload = () => {
-                                        let width = img.width;
-                                        let height = img.height;
-                                        let quality = 0.8;
-
-                                        // Check if the image exceeds the maximum dimensions
-                                        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-                                            // Calculate the scaling factor
-                                            const scaleFactor = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-
-                                            // Resize the image
-                                            width *= scaleFactor;
-                                            height *= scaleFactor;
-                                            quality *= scaleFactor;
-
-                                        }
-
-                                        const canvas = document.createElement('canvas');
-                                        const ctx = canvas.getContext('2d');
-
-                                        // Set canvas dimensions to match the resized image
-                                        canvas.width = width;
-                                        canvas.height = height;
-
-                                        // Draw the image on the canvas
-                                        ctx.drawImage(img, 0, 0, width, height);
-
-                                        // Convert the canvas to a PNG data URL
-                                        const pngDataUrl = canvas.toDataURL('image/jpeg', quality);
-
-                                        // Store the PNG data URL in messageStore.base64
-                                        messageStore.base64 = pngDataUrl;
-                                        messageStore.documentType = '';
-                                    };
-                                    img.src = e.target.result;
-                                };
-                                reader.readAsDataURL(file);
-                            } else {
-                                // Handle document files (text-based)
-                                const reader = new FileReader();
-                                reader.onload = (e) => {
-                                    messageStore.documentContent = e.target.result;
-                                    messageStore.documentType = file.name.split('.').pop().toLowerCase();
-                                    messageStore.base64 = '';
-                                };
-                                reader.readAsText(file);
-                            }
+                            return;
                         }
+                        const files = Array.isArray(newValue) ? newValue : [newValue];
+                        files.forEach(file => {
+                            if (file && file instanceof File) {
+                                messageStore.addAttachment(file);
+                            }
+                        });
+                        nextTick(() => {
+                            messageStore.images = [];
+                        });
                     }, { deep: true });
 
                 const asyncScrollToBottom = async () => {
@@ -4097,6 +5199,25 @@
                     deleteTargetName.value = '';
                 };
 
+                const handleSkillDrop = async (event) => {
+                    const files = event.dataTransfer?.files;
+                    if (!files || files.length === 0) return;
+
+                    for (const file of files) {
+                        const name = file.name.toLowerCase();
+                        if (name.endsWith('.skill') || name.endsWith('.zip')) {
+                            const result = await skillStore.importSkillPack(file);
+                            if (result.success) {
+                                snackbarStore.showSuccessMessage(result.message);
+                            } else {
+                                snackbarStore.showErrorMessage(result.message);
+                            }
+                        } else {
+                            snackbarStore.showWarningMessage(`Skipped: ${file.name} (not a .skill/.zip file)`);
+                        }
+                    }
+                };
+
                 return {
                     importFileInput,
                     triggerImport,
@@ -4110,12 +5231,19 @@
                     confirmExport,
                     cancelExport,
                     getProviderDisplayName,
+                    handleSkillDrop,
+                    isDragging,
+                    onDragOver,
+                    onDragLeave,
+                    onDrop,
+                    previewAttachment,
 
                     settingStore,
                     resourceStore,
                     agentStore,
                     snackbarStore,
                     mcpStore,
+                    skillStore,
 
                     messageStore,
                     defaultChoiceStore,
@@ -4157,9 +5285,45 @@
                         r: { title: 'Resources' },
                         ag: { title: 'Agent' },
                         mcp: { title: 'MCP Management' },
+                        skill: {
+                            title: 'Skills',
+                            registry: 'Skill Registry',
+                            installed: 'Installed Skills',
+                            workflow: 'Skill Workflow',
+                            searchPlaceholder: 'Search skills...',
+                            category: 'Category',
+                            allCategories: 'All',
+                            install: 'Install',
+                            installedLabel: 'Installed',
+                            noSkillsFound: 'No skills found matching your criteria.',
+                            noInstalled: 'No skills installed yet. Browse the registry to install skills.',
+                            usageCount: 'Uses',
+                            lastUsed: 'Last used',
+                            config: 'Skill Configuration',
+                            noConfig: 'This skill has no configurable options.',
+                            save: 'Save',
+                            close: 'Close',
+                            exported: 'Skill exported to clipboard',
+                            configSaved: 'Configuration saved',
+                            clickToActivate: 'Click to activate',
+                            noEnabledForWorkflow: 'No enabled skills available for workflow. Install and enable skills first.',
+                            workflowSteps: 'Workflow Steps',
+                            clearWorkflow: 'Clear',
+                            addStepHint: 'Click a skill chip below to add it as a workflow step:',
+                            runWorkflow: 'Run Workflow',
+                            import: 'Import',
+                            importTitle: 'Import Custom Skill',
+                            importHint: 'Paste a skill manifest JSON to import a custom skill. The manifest must include name, version, and systemPrompt fields.',
+                            importPlaceholder: '{"name": "my-skill", "version": "1.0.0", "displayName": {"zh": "My Skill", "en": "My Skill"}, "description": {"zh": "...", "en": "..."}, "icon": "mdi-puzzle", "category": "custom", "tags": [], "author": "user", "triggers": [], "systemPrompt": "..."}',
+                            importPackHint: 'Select a .skill package file to import. A .skill file is a zip archive containing a manifest.json with skill definitions.',
+                            selectSkillPack: 'Select .skill package',
+                            importPack: 'Import Pack',
+                            dropToInstall: 'Drop .skill file here to install'
+                        },
                         g: {
                             new: 'New Conversation',
-                            reg: 'Regeneration'
+                            reg: 'Regeneration',
+                            clearAll: 'Clear All'
                         },
                         i: {
                             title: 'Model Integration',
@@ -4197,7 +5361,15 @@
                             copied: 'Copied to clipboard.',
                             importSuccess: 'Config imported successfully',
                             exportSuccess: 'Config exported successfully',
-                            exportFail: 'Export failed, data serialization error'
+                            exportFail: 'Export failed, data serialization error',
+                            regenerateNoUser: 'Cannot regenerate: no user message found.',
+                            securityBlocked: 'Security: executable files are not allowed.',
+                            fileTooLarge: 'File size exceeds 10MB limit.',
+                            unsupportedType: 'Unsupported file type.',
+                            attachmentLimit: 'Maximum 10 attachments allowed.',
+                            duplicateFile: 'File already exists.',
+                            filesProcessing: 'Files are being processed, please wait...',
+                            totalSizeExceeded: 'Total attachment size exceeds 20MB limit.'
                         }
                     },
                 },
@@ -4212,9 +5384,45 @@
                         r: { title: '资源' },
                         ag: { title: 'Agent' },
                         mcp: { title: 'MCP管理' },
+                        skill: {
+                            title: '技能管理',
+                            registry: '技能仓库',
+                            installed: '已安装技能',
+                            workflow: '技能编排',
+                            searchPlaceholder: '搜索技能...',
+                            category: '分类',
+                            allCategories: '全部',
+                            install: '安装',
+                            installedLabel: '已安装',
+                            noSkillsFound: '未找到匹配的技能。',
+                            noInstalled: '尚未安装任何技能。请浏览仓库安装技能。',
+                            usageCount: '使用次数',
+                            lastUsed: '最后使用',
+                            config: '技能配置',
+                            noConfig: '该技能没有可配置项。',
+                            save: '保存',
+                            close: '关闭',
+                            exported: '技能已导出到剪贴板',
+                            configSaved: '配置已保存',
+                            clickToActivate: '点击激活',
+                            noEnabledForWorkflow: '没有已启用的技能可用于编排。请先安装并启用技能。',
+                            workflowSteps: '工作流步骤',
+                            clearWorkflow: '清空',
+                            addStepHint: '点击下方技能标签添加为工作流步骤：',
+                            runWorkflow: '运行工作流',
+                            import: '导入',
+                            importTitle: '导入自定义技能',
+                            importHint: '粘贴技能清单JSON以导入自定义技能。清单必须包含 name、version 和 systemPrompt 字段。',
+                            importPlaceholder: '{"name": "my-skill", "version": "1.0.0", "displayName": {"zh": "我的技能", "en": "My Skill"}, "description": {"zh": "...", "en": "..."}, "icon": "mdi-puzzle", "category": "custom", "tags": [], "author": "user", "triggers": [], "systemPrompt": "..."}',
+                            importPackHint: '选择 .skill 技能包文件导入。.skill 文件是包含 manifest.json 技能定义的 zip 压缩包。',
+                            selectSkillPack: '选择 .skill 技能包',
+                            importPack: '导入技能包',
+                            dropToInstall: '拖拽 .skill 文件到此处安装'
+                        },
                         g: {
                             new: '新对话',
-                            reg: '重新生成'
+                            reg: '重新生成',
+                            clearAll: '清除全部'
                         },
                         i: {
                             title: '模型接入',
@@ -4251,7 +5459,15 @@
                             copied: '已复制到剪切板',
                             importSuccess: '配置导入成功',
                             exportSuccess: '配置导出成功',
-                            exportFail: '导出失败，数据序列化异常'
+                            exportFail: '导出失败，数据序列化异常',
+                            regenerateNoUser: '无法重新生成：缺少用户消息',
+                            securityBlocked: '安全限制：不允许上传可执行文件',
+                            fileTooLarge: '文件大小超过10MB限制',
+                            unsupportedType: '不支持的文件类型',
+                            attachmentLimit: '附件数量已达上限（10个）',
+                            duplicateFile: '文件已存在',
+                            filesProcessing: '文件处理中，请稍候...',
+                            totalSizeExceeded: '附件总大小超过20MB限制'
                         }
                     },
                 },

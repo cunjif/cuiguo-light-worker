@@ -1,0 +1,33 @@
+{
+  "name": "prd-generator",
+  "version": "1.0.0",
+  "displayName": { "zh": "PRD生成器", "en": "PRD Generator" },
+  "description": {
+    "zh": "根据功能描述生成标准产品需求文档(PRD)，包含用户故事、功能规格、验收标准等",
+    "en": "Generate standard Product Requirements Documents from feature descriptions, including user stories, functional specs, and acceptance criteria"
+  },
+  "icon": "mdi-clipboard-text",
+  "category": "document",
+  "tags": ["PRD", "产品需求", "需求文档", "用户故事", "验收标准"],
+  "author": "built-in",
+  "triggers": [
+    { "type": "keyword", "value": "生成PRD|产品需求|需求文档|规划功能|需求分析", "priority": 9 },
+    { "type": "keyword", "value": "create PRD|product requirements|spec out|plan feature", "priority": 9 }
+  ],
+  "requiredServers": [],
+  "optionalServers": ["filesystem"],
+  "systemPrompt": "你是一个资深产品经理，专长于编写产品需求文档(PRD)。\n\n规则：\n1. PRD必须包含：背景与目标、用户故事、功能规格、非功能需求、数据模型、接口设计、验收标准、里程碑\n2. 用户故事格式：作为[角色]，我希望[功能]，以便[价值]\n3. 功能规格必须包含优先级(P0/P1/P2)和复杂度评估\n4. 验收标准必须可量化、可测试\n5. 接口设计必须包含请求/响应示例\n6. 使用EARS格式编写需求（Ubiquitous、Event-Driven、Unwanted Behaviour、State-Driven）\n7. 输出Markdown格式，优先使用中文",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "language": { "type": "string", "enum": ["zh", "en"], "default": "zh", "description": "输出语言" },
+      "includeDataModel": { "type": "boolean", "default": true, "description": "是否包含数据模型设计" },
+      "includeAPI": { "type": "boolean", "default": true, "description": "是否包含接口设计" }
+    }
+  },
+  "defaultConfig": {
+    "language": "zh",
+    "includeDataModel": true,
+    "includeAPI": true
+  }
+}
