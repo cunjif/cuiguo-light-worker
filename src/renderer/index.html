@@ -349,6 +349,55 @@
         .cursor-pointer {
             cursor: pointer;
         }
+
+        .thumbnail-strip {
+            max-width: 60%;
+            height: 32px;
+            margin-left: 8px;
+            overflow: hidden;
+            flex-shrink: 1;
+        }
+
+        .thumbnail-scroll-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .thumbnail-scroll-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .thumbnail-item {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            cursor: default;
+        }
+
+        .thumbnail-item.on-hover {
+            opacity: 0.9;
+        }
+
+        .thumbnail-remove-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 16px;
+            min-height: 16px;
+            width: 16px;
+            height: 16px;
+            z-index: 1;
+        }
+
+        .thumbnail-overflow-badge {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+            margin-left: 4px;
+            font-size: 11px;
+        }
     </style>
 </head>
 
@@ -374,10 +423,13 @@
                             <div class="function-panel">
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
                                     <div class="d-flex align-center">
-                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
-                                            v-model="messageStore.images" prepend-icon="mdi-paperclip"
+                                        <v-file-input @click.stop @change="onFileSelected" accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
+                                            prepend-icon="mdi-paperclip"
                                             density="compact" variant="plain"
                                             data-component-id="chat-mcp.chat.file-upload"></v-file-input>
+                                        <chat-mcp-chat-thumbnail-strip
+                                            :attachments="messageStore.attachments"
+                                            @remove="messageStore.removeAttachment($event)" />
                                     </div>
                                     <v-btn size="small" variant="text" icon
                                         @click="!settingStore.panelTransitioning && settingStore.switchPanel()"
@@ -404,7 +456,7 @@
                                     <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
                                         clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
                                         @input="skillStore.matchAndSuggest(messageStore.userMessage)"
-                                        :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                        :label="messageStore.attachments.length > 0 ? $t('$vuetify.dataIterator.attachment.attachedCount', { count: messageStore.attachments.length }) : ''" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
@@ -415,9 +467,9 @@
                                             <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
-                                                        :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
+                                                        :src="messageStore.base64" @click="messageStore.clearAttachments()"></v-img>
                                                     <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
-                                                        @click="messageStore.images=[]" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                        @click="messageStore.clearAttachments()" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
                                                         <v-icon size="24" color="primary">mdi-file-document</v-icon>
                                                         <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
                                                             {{ messageStore.documentType.toUpperCase() }}
@@ -554,10 +606,13 @@
                             <div class="function-panel">
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
                                     <div class="d-flex align-center">
-                                        <v-file-input @click.stop accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
-                                            v-model="messageStore.images" prepend-icon="mdi-paperclip"
+                                        <v-file-input @click.stop @change="onFileSelected" accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
+                                            prepend-icon="mdi-paperclip"
                                             density="compact" variant="plain"
                                             data-component-id="chat-mcp.chat.file-upload"></v-file-input>
+                                        <chat-mcp-chat-thumbnail-strip
+                                            :attachments="messageStore.attachments"
+                                            @remove="messageStore.removeAttachment($event)" />
                                     </div>
                                     <v-btn size="small" variant="text" icon
                                         @click="!settingStore.panelTransitioning && settingStore.switchPanel()"
@@ -584,7 +639,7 @@
                                     <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
                                         clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
                                         @input="skillStore.matchAndSuggest(messageStore.userMessage)"
-                                        :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                        :label="messageStore.attachments.length > 0 ? $t('$vuetify.dataIterator.attachment.attachedCount', { count: messageStore.attachments.length }) : ''" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
@@ -595,9 +650,9 @@
                                             <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
-                                                        :src="messageStore.base64" @click="messageStore.images=[]"></v-img>
+                                                        :src="messageStore.base64" @click="messageStore.clearAttachments()"></v-img>
                                                     <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
-                                                        @click="messageStore.images=[]" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                        @click="messageStore.clearAttachments()" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
                                                         <v-icon size="24" color="primary">mdi-file-document</v-icon>
                                                         <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
                                                             {{ messageStore.documentType.toUpperCase() }}
@@ -1844,6 +1899,70 @@
                 </v-btn>
             </v-row>
         </v-container>
+    </template>
+
+    <template id="chat-mcp-chat-thumbnail-item-template">
+        <v-hover v-slot="{ isHovering, props: hoverProps }">
+            <div v-bind="hoverProps"
+                 class="thumbnail-item position-relative rounded"
+                 :class="{ 'on-hover': isHovering }">
+                <v-img v-if="attachment.category === 'image' && attachment.thumbnail"
+                       :src="attachment.thumbnail"
+                       width="32" height="32"
+                       cover class="rounded" />
+                <div v-else-if="attachment.category === 'image' && !attachment.thumbnail"
+                     class="d-flex align-center justify-center rounded bg-grey-lighten-3"
+                     style="width:32px;height:32px;">
+                    <v-icon size="16" color="grey">mdi-image-broken-variant</v-icon>
+                </div>
+                <div v-else
+                     class="d-flex align-center justify-center rounded bg-grey-lighten-3"
+                     style="width:32px;height:32px;">
+                    <v-icon size="18" :color="getDocIconColor(attachment.type)">
+                        {{ getDocIcon(attachment.type) }}
+                    </v-icon>
+                </div>
+                <v-progress-circular v-if="attachment.status === 'processing'"
+                                     size="32" width="2" color="primary" indeterminate
+                                     style="position:absolute;top:0;left:0;" />
+                <v-icon v-if="attachment.status === 'error'"
+                        size="12" color="error"
+                        style="position:absolute;top:-2px;right:-2px;">
+                    mdi-alert-circle
+                </v-icon>
+                <v-btn v-show="isHovering"
+                       size="x-small" variant="flat" density="compact"
+                       icon="mdi-close" color="grey-darken-3"
+                       class="thumbnail-remove-btn"
+                       @click.stop="$emit('remove', attachment.id)" />
+                <v-tooltip activator="parent" location="top">
+                    {{ attachment.name }} ({{ formatSize(attachment.size) }})
+                    <template v-if="attachment.status === 'error'">
+                        <br />{{ attachment.errorMessage }}
+                    </template>
+                </v-tooltip>
+            </div>
+        </v-hover>
+    </template>
+
+    <template id="chat-mcp-chat-thumbnail-strip-template">
+        <div v-if="attachments.length > 0"
+             ref="stripRef"
+             class="thumbnail-strip d-flex align-center"
+             @wheel.prevent="onWheel">
+            <div ref="scrollContainerRef"
+                 class="d-flex align-center ga-1 thumbnail-scroll-container">
+                <chat-mcp-chat-thumbnail-item
+                    v-for="attachment in attachments"
+                    :key="attachment.id"
+                    :attachment="attachment"
+                    @remove="$emit('remove', $event)" />
+            </div>
+            <div v-if="overflowCount > 0"
+                 class="thumbnail-overflow-badge text-caption font-weight-bold text-white bg-grey-darken-2 rounded-circle d-flex align-center justify-center">
+                +{{ overflowCount }}
+            </div>
+        </div>
     </template>
 
     <script lang="ts" setup>
@@ -3667,11 +3786,122 @@
 
         const ChatAttachmentBar = {
             template: '#chat-mcp-chat-attachment-bar-template',
-            components: { ChatAttachmentItem },
+            components: { 'chat-mcp-chat-attachment-item': ChatAttachmentItem },
             props: {
                 attachments: { type: Array, required: true }
             },
             emits: ['remove', 'preview', 'clear'],
+        };
+
+        const ChatThumbnailItem = {
+            template: '#chat-mcp-chat-thumbnail-item-template',
+            props: {
+                attachment: { type: Object, required: true }
+            },
+            emits: ['remove'],
+            methods: {
+                getDocIcon(type) {
+                    const iconMap = {
+                        'application/pdf': 'mdi-file-pdf-box',
+                        'application/msword': 'mdi-file-word-box',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'mdi-file-word-box',
+                        'application/vnd.ms-excel': 'mdi-file-excel-box',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'mdi-file-excel-box',
+                        'application/vnd.ms-powerpoint': 'mdi-file-powerpoint-box',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'mdi-file-powerpoint-box',
+                        'text/plain': 'mdi-file-document-outline',
+                        'text/markdown': 'mdi-language-markdown',
+                        'text/csv': 'mdi-file-delimited',
+                    };
+                    return iconMap[type] || 'mdi-file-document';
+                },
+                getDocIconColor(type) {
+                    const colorMap = {
+                        'application/pdf': 'red',
+                        'application/msword': 'blue',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'blue',
+                        'application/vnd.ms-excel': 'green',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'green',
+                        'application/vnd.ms-powerpoint': 'orange',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'orange',
+                        'text/plain': 'grey',
+                        'text/markdown': 'teal',
+                        'text/csv': 'green',
+                    };
+                    return colorMap[type] || 'grey';
+                },
+                formatSize(bytes) {
+                    if (bytes < 1024) return bytes + ' B';
+                    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                }
+            }
+        };
+
+        const ChatThumbnailStrip = {
+            template: '#chat-mcp-chat-thumbnail-strip-template',
+            components: { 'chat-mcp-chat-thumbnail-item': ChatThumbnailItem },
+            props: {
+                attachments: { type: Array, required: true }
+            },
+            emits: ['remove'],
+            data() {
+                return {
+                    overflowCount: 0,
+                    resizeObserver: null
+                };
+            },
+            watch: {
+                attachments: {
+                    handler() {
+                        this.$nextTick(() => {
+                            this.updateOverflowCount();
+                            this.scrollToEnd();
+                        });
+                    },
+                    deep: true
+                }
+            },
+            mounted() {
+                this.resizeObserver = new ResizeObserver(() => {
+                    this.updateOverflowCount();
+                });
+                if (this.$refs.stripRef) {
+                    this.resizeObserver.observe(this.$refs.stripRef);
+                }
+            },
+            beforeUnmount() {
+                if (this.resizeObserver) {
+                    this.resizeObserver.disconnect();
+                }
+            },
+            methods: {
+                onWheel(e) {
+                    const container = this.$refs.scrollContainerRef;
+                    if (container) {
+                        container.scrollLeft += e.deltaY;
+                    }
+                },
+                updateOverflowCount() {
+                    const container = this.$refs.scrollContainerRef;
+                    if (!container) { this.overflowCount = 0; return; }
+                    const visibleWidth = this.$refs.stripRef ? this.$refs.stripRef.clientWidth : 0;
+                    const totalWidth = container.scrollWidth;
+                    if (totalWidth <= visibleWidth) {
+                        this.overflowCount = 0;
+                        return;
+                    }
+                    const itemWidth = 36;
+                    const hiddenWidth = totalWidth - visibleWidth;
+                    this.overflowCount = Math.ceil(hiddenWidth / itemWidth);
+                },
+                scrollToEnd() {
+                    const container = this.$refs.scrollContainerRef;
+                    if (container) {
+                        container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+                    }
+                }
+            }
         };
 
 
@@ -3791,8 +4021,10 @@
                 vuedraggable,
                 TuuiChatBox,
                 TuuiChatCard,
-                ChatAttachmentBar,
-                ChatAttachmentItem
+                'chat-mcp-chat-attachment-bar': ChatAttachmentBar,
+                'chat-mcp-chat-attachment-item': ChatAttachmentItem,
+                'chat-mcp-chat-thumbnail-strip': ChatThumbnailStrip,
+                'chat-mcp-chat-thumbnail-item': ChatThumbnailItem
             },
             setup() {
 
@@ -4104,7 +4336,7 @@
                     state: () => ({
                         userMessage: "",
                         conversation: [],
-                        images: [],
+
                         base64: '',
                         documentContent: '',
                         documentType: '',
@@ -4875,21 +5107,15 @@
                         }
                     }, { deep: true });
 
-                watch(computed(() => messageStore.images),
-                    (newValue, oldValue) => {
-                        if (newValue.length === 0) {
-                            return;
+                const onFileSelected = (files) => {
+                    if (!files || files.length === 0) return;
+                    const fileArray = Array.isArray(files) ? files : [files];
+                    fileArray.forEach(file => {
+                        if (file && file instanceof File) {
+                            messageStore.addAttachment(file);
                         }
-                        const files = Array.isArray(newValue) ? newValue : [newValue];
-                        files.forEach(file => {
-                            if (file && file instanceof File) {
-                                messageStore.addAttachment(file);
-                            }
-                        });
-                        nextTick(() => {
-                            messageStore.images = [];
-                        });
-                    }, { deep: true });
+                    });
+                };
 
                 const asyncScrollToBottom = async () => {
                     // await nextTick();
@@ -5370,6 +5596,9 @@
                             duplicateFile: 'File already exists.',
                             filesProcessing: 'Files are being processed, please wait...',
                             totalSizeExceeded: 'Total attachment size exceeds 20MB limit.'
+                        },
+                        attachment: {
+                            attachedCount: '{count} attachment(s) added'
                         }
                     },
                 },
@@ -5468,6 +5697,9 @@
                             duplicateFile: '文件已存在',
                             filesProcessing: '文件处理中，请稍候...',
                             totalSizeExceeded: '附件总大小超过20MB限制'
+                        },
+                        attachment: {
+                            attachedCount: '已添加 {count} 个附件'
                         }
                     },
                 },
