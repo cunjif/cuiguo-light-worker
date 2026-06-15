@@ -25,6 +25,8 @@
 3. **不负责**：MCP 工具的文件操作（由 MCP 协议层负责）
 4. **不负责**：Agent 卡片中的参考文件上传（已有独立实现）
 5. **不负责**：技能包/插件包的上传安装（已有独立实现）
+6. **不负责**：`v-file-input` 组件本身的渲染细节（经评估 `v-file-input + hide-input + @click.stop` 组合会破坏文件选择委托，已替换为自定义 `v-btn + <input type="file">` 实现）
+7. **渐进式迁移期**：当前 `panel-header` 旁 `chat-mcp-chat-thumbnail-strip`（按钮旁 32×32 行内缩略图）与 `v-textarea` 内 `attachment-chip-strip`（80×80 卡片条被替换为 chip 标签条）并存，迁移完成后下线 chip 条，仅保留行内缩略图条。
 
 # 2. 领域术语
 

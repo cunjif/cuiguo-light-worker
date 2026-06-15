@@ -149,21 +149,20 @@
 ## 8. 修改 v-file-input 支持多文件
 
 - [ ] **8.1 修改 v-file-input 组件属性**
-  - 修改 `src/renderer/index.html` ~行 350-353 和 ~行 521-524 的两处 `v-file-input`
+  - ~~修改 `src/renderer/index.html` ~行 350-353 和 ~行 521-524 的两处 `v-file-input`~~
+  - **实施变更**：经过评估，`v-file-input` 的 `@click.stop` + `hide-input` 组合会拦截内部 input 的 click 事件，导致文件选择对话框无法打开。因此放弃 v-file-input 方案，**改用自定义 v-btn + 隐藏原生 `<input type="file">` + @change** 事件的双面板实现（左右面板各一个独立 ref）。详见 §11.4。
   - 添加 `multiple` 属性，支持多文件选择
   - 扩展 `accept` 列表，增加 `.csv` 和 `.svg` 等缺失格式
-  - 添加 `data-component-id="chat-mcp.chat.file-upload"` 属性（如未添加）
-  - 涉及文件：`src/renderer/index.html` ~行 350-353, ~行 521-524
+  - 涉及文件：`src/renderer/index.html` `panel-header` 区域
   - 依赖：无
-  - 验收：文件选择器可一次选择多个文件；accept 列表包含所有支持的格式
+  - 验收：点击回形针图标能稳定打开系统文件选择器；左右面板可独立选择文件
 
-- [ ] **8.2 修改 watch(messageStore.images) watcher**
-  - 修改 `src/renderer/index.html` ~行 4362-4427 的 watcher
-  - 改为遍历 `messageStore.images`（多文件数组），对每个文件调用 `messageStore.addAttachment(file)`
-  - 当 images 清空时，不再清空 base64/documentContent（由 clearAttachments 管理）
-  - 涉及文件：`src/renderer/index.html` ~行 4362-4427
-  - 依赖：5.1, 8.1
-  - 验收：选择多个文件后，所有文件均添加到 attachments 列表
+- [ ] **8.2 ~~修改 watch(messageStore.images) watcher~~**（**已废弃**）
+  - 废弃原因：v-file-input 方案已被替换为自定义按钮 + @change 事件，images 数组不再是选择入口。
+  - 当前实现：`onFilePickerChange` 直接遍历 `e.target.files` 数组，对每个 File 调用 `messageStore.addAttachments([file])`；`addAttachments` 内部已包含校验、数量/重复检查、并返回 `{accepted, failures}`，调用方按需 snackbar。
+  - 涉及文件：`src/renderer/index.html` setup 区域
+  - 依赖：5.1
+  - 验收：选择多个文件后，所有文件均尝试添加到 attachments 列表；失败原因（类型/大小/数量/重复）汇总为单条 snackbar 提示
 
 ## 9. 新增 UI 组件：ChatAttachmentItem
 

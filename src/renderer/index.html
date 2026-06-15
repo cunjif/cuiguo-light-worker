@@ -398,6 +398,17 @@
             margin-left: 4px;
             font-size: 11px;
         }
+
+        .drag-over-panel {
+            background-color: rgba(var(--v-theme-primary), 0.06);
+            box-shadow: inset 0 0 0 2px rgba(var(--v-theme-primary), 0.55);
+            border-radius: 6px;
+        }
+
+        .attachment-chip-strip {
+            max-width: 100%;
+            border-bottom: 1px dashed rgba(var(--v-theme-primary), 0.25);
+        }
     </style>
 </head>
 
@@ -421,12 +432,15 @@
                         </template>
                         <template v-else>
                             <div class="function-panel">
-                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
-                                    <div class="d-flex align-center">
-                                        <v-file-input @click.stop @change="onFileSelected" accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
-                                            prepend-icon="mdi-paperclip"
-                                            density="compact" variant="plain"
-                                            data-component-id="chat-mcp.chat.file-upload"></v-file-input>
+                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2" :class="{ 'drag-over-panel': isDragging }">
+                                    <div class="d-flex align-center flex-grow-1" style="min-width:0;">
+                                        <v-btn icon size="small" variant="text" :disabled="messageStore.isProcessingFiles"
+                                            @click="triggerFilePicker('left')"
+                                            data-component-id="chat-mcp.chat.file-upload">
+                                            <v-icon>mdi-paperclip</v-icon>
+                                            <v-tooltip activator="parent" location="bottom">{{ $t('$vuetify.dataIterator.attachment.addTooltip') }} (Ctrl+Alt+A)</v-tooltip>
+                                        </v-btn>
+                                        <input ref="filePickerRefLeft" type="file" multiple :accept="attachmentAccept" style="display:none" @change="onFilePickerChange($event, 'left')" />
                                         <chat-mcp-chat-thumbnail-strip
                                             :attachments="messageStore.attachments"
                                             @remove="messageStore.removeAttachment($event)" />
@@ -438,7 +452,7 @@
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                <div class="input-section px-3 py-2" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
+                                <div class="input-section px-3 py-2" @dragenter.prevent="onDragEnter" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
                                     <div v-if="skillStore.activeSkill" class="d-flex align-center mb-2 ga-1 flex-wrap">
                                         <v-chip size="small" color="primary" variant="flat" closable @click:close="skillStore.deactivateSkill()">
                                             <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon || 'mdi-auto-fix' }}</v-icon>
@@ -460,10 +474,18 @@
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
-                                            <chat-mcp-chat-attachment-bar :attachments="messageStore.attachments"
-                                                @remove="messageStore.removeAttachment($event)"
-                                                @preview="previewAttachment($event)"
-                                                @clear="messageStore.clearAttachments()" />
+                                            <div v-if="messageStore.attachments.length > 0" class="attachment-chip-strip d-flex align-center flex-wrap ga-1 pa-1">
+                                                <v-chip v-for="attachment in messageStore.attachments" :key="attachment.id" size="x-small" variant="tonal" closable
+                                                    @click:close="messageStore.removeAttachment(attachment.id)">
+                                                    <v-icon start size="x-small">{{ messageStore.getAttachmentIcon(attachment) }}</v-icon>
+                                                    <span class="text-truncate" style="max-width:120px;">{{ attachment.name }}</span>
+                                                </v-chip>
+                                                <v-btn size="x-small" variant="text" color="grey" class="ml-auto"
+                                                    @click="messageStore.clearAttachments()">
+                                                    <v-icon start size="x-small">mdi-close-circle-outline</v-icon>
+                                                    {{ $t('$vuetify.dataIterator.g.clearAll') }}
+                                                </v-btn>
+                                            </div>
                                             <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
@@ -604,12 +626,15 @@
                     <v-col :cols="settingStore.rightColValue" :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <div class="function-panel">
-                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2">
-                                    <div class="d-flex align-center">
-                                        <v-file-input @click.stop @change="onFileSelected" accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg" multiple hide-input
-                                            prepend-icon="mdi-paperclip"
-                                            density="compact" variant="plain"
-                                            data-component-id="chat-mcp.chat.file-upload"></v-file-input>
+                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2" :class="{ 'drag-over-panel': isDragging }">
+                                    <div class="d-flex align-center flex-grow-1" style="min-width:0;">
+                                        <v-btn icon size="small" variant="text" :disabled="messageStore.isProcessingFiles"
+                                            @click="triggerFilePicker('right')"
+                                            data-component-id="chat-mcp.chat.file-upload">
+                                            <v-icon>mdi-paperclip</v-icon>
+                                            <v-tooltip activator="parent" location="bottom">{{ $t('$vuetify.dataIterator.attachment.addTooltip') }} (Ctrl+Alt+A)</v-tooltip>
+                                        </v-btn>
+                                        <input ref="filePickerRefRight" type="file" multiple :accept="attachmentAccept" style="display:none" @change="onFilePickerChange($event, 'right')" />
                                         <chat-mcp-chat-thumbnail-strip
                                             :attachments="messageStore.attachments"
                                             @remove="messageStore.removeAttachment($event)" />
@@ -621,7 +646,7 @@
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                <div class="input-section px-3 py-2" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
+                                <div class="input-section px-3 py-2" @dragenter.prevent="onDragEnter" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
                                     <div v-if="skillStore.activeSkill" class="d-flex align-center mb-2 ga-1 flex-wrap">
                                         <v-chip size="small" color="primary" variant="flat" closable @click:close="skillStore.deactivateSkill()">
                                             <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon || 'mdi-auto-fix' }}</v-icon>
@@ -643,10 +668,18 @@
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
-                                            <chat-mcp-chat-attachment-bar :attachments="messageStore.attachments"
-                                                @remove="messageStore.removeAttachment($event)"
-                                                @preview="previewAttachment($event)"
-                                                @clear="messageStore.clearAttachments()" />
+                                            <div v-if="messageStore.attachments.length > 0" class="attachment-chip-strip d-flex align-center flex-wrap ga-1 pa-1">
+                                                <v-chip v-for="attachment in messageStore.attachments" :key="attachment.id" size="x-small" variant="tonal" closable
+                                                    @click:close="messageStore.removeAttachment(attachment.id)">
+                                                    <v-icon start size="x-small">{{ messageStore.getAttachmentIcon(attachment) }}</v-icon>
+                                                    <span class="text-truncate" style="max-width:120px;">{{ attachment.name }}</span>
+                                                </v-chip>
+                                                <v-btn size="x-small" variant="text" color="grey" class="ml-auto"
+                                                    @click="messageStore.clearAttachments()">
+                                                    <v-icon start size="x-small">mdi-close-circle-outline</v-icon>
+                                                    {{ $t('$vuetify.dataIterator.g.clearAll') }}
+                                                </v-btn>
+                                            </div>
                                             <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
@@ -3744,6 +3777,31 @@
             props: { src: { type: String, required: true } }
         };
 
+        const ATTACHMENT_ICON_MAP = {
+            'application/pdf': 'mdi-file-pdf-box',
+            'application/msword': 'mdi-file-word-box',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'mdi-file-word-box',
+            'application/vnd.ms-excel': 'mdi-file-excel-box',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'mdi-file-excel-box',
+            'application/vnd.ms-powerpoint': 'mdi-file-powerpoint-box',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'mdi-file-powerpoint-box',
+            'text/plain': 'mdi-file-document-outline',
+            'text/markdown': 'mdi-language-markdown',
+            'text/csv': 'mdi-file-delimited',
+        };
+        const ATTACHMENT_ICON_COLOR_MAP = {
+            'application/pdf': 'red',
+            'application/msword': 'blue',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'blue',
+            'application/vnd.ms-excel': 'green',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'green',
+            'application/vnd.ms-powerpoint': 'orange',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'orange',
+            'text/plain': 'grey',
+            'text/markdown': 'teal',
+            'text/csv': 'green',
+        };
+
         const ChatAttachmentItem = {
             template: '#chat-mcp-chat-attachment-item-template',
             props: {
@@ -3752,34 +3810,10 @@
             emits: ['remove', 'preview'],
             methods: {
                 getDocIcon(type) {
-                    const iconMap = {
-                        'application/pdf': 'mdi-file-pdf-box',
-                        'application/msword': 'mdi-file-word-box',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'mdi-file-word-box',
-                        'application/vnd.ms-excel': 'mdi-file-excel-box',
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'mdi-file-excel-box',
-                        'application/vnd.ms-powerpoint': 'mdi-file-powerpoint-box',
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'mdi-file-powerpoint-box',
-                        'text/plain': 'mdi-file-document-outline',
-                        'text/markdown': 'mdi-language-markdown',
-                        'text/csv': 'mdi-file-delimited',
-                    };
-                    return iconMap[type] || 'mdi-file-document';
+                    return ATTACHMENT_ICON_MAP[type] || 'mdi-file-document';
                 },
                 getDocIconColor(type) {
-                    const colorMap = {
-                        'application/pdf': 'red',
-                        'application/msword': 'blue',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'blue',
-                        'application/vnd.ms-excel': 'green',
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'green',
-                        'application/vnd.ms-powerpoint': 'orange',
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'orange',
-                        'text/plain': 'grey',
-                        'text/markdown': 'teal',
-                        'text/csv': 'green',
-                    };
-                    return colorMap[type] || 'grey';
+                    return ATTACHMENT_ICON_COLOR_MAP[type] || 'grey';
                 }
             }
         };
@@ -3801,34 +3835,10 @@
             emits: ['remove'],
             methods: {
                 getDocIcon(type) {
-                    const iconMap = {
-                        'application/pdf': 'mdi-file-pdf-box',
-                        'application/msword': 'mdi-file-word-box',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'mdi-file-word-box',
-                        'application/vnd.ms-excel': 'mdi-file-excel-box',
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'mdi-file-excel-box',
-                        'application/vnd.ms-powerpoint': 'mdi-file-powerpoint-box',
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'mdi-file-powerpoint-box',
-                        'text/plain': 'mdi-file-document-outline',
-                        'text/markdown': 'mdi-language-markdown',
-                        'text/csv': 'mdi-file-delimited',
-                    };
-                    return iconMap[type] || 'mdi-file-document';
+                    return ATTACHMENT_ICON_MAP[type] || 'mdi-file-document';
                 },
                 getDocIconColor(type) {
-                    const colorMap = {
-                        'application/pdf': 'red',
-                        'application/msword': 'blue',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'blue',
-                        'application/vnd.ms-excel': 'green',
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'green',
-                        'application/vnd.ms-powerpoint': 'orange',
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'orange',
-                        'text/plain': 'grey',
-                        'text/markdown': 'teal',
-                        'text/csv': 'green',
-                    };
-                    return colorMap[type] || 'grey';
+                    return ATTACHMENT_ICON_COLOR_MAP[type] || 'grey';
                 },
                 formatSize(bytes) {
                     if (bytes < 1024) return bytes + ' B';
@@ -4036,22 +4046,90 @@
                 const skillStore = useSkillStore();
 
                 const isDragging = ref(false);
+                const dragCounter = ref(0);
 
+                const attachmentAccept = 'image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.pdf,.md,.csv,.svg';
+
+                const filePickerRefLeft = ref(null);
+                const filePickerRefRight = ref(null);
+
+                function triggerFilePicker(side) {
+                    if (messageStore.isProcessingFiles) return;
+                    const refName = side === 'right' ? filePickerRefRight : filePickerRefLeft;
+                    if (refName.value) refName.value.click();
+                }
+
+                function onFilePickerChange(event, side) {
+                    const input = event.target;
+                    if (!input || !input.files || input.files.length === 0) return;
+                    const files = Array.from(input.files);
+                    const result = messageStore.addAttachments(files);
+                    input.value = '';
+                    nextTick(() => {
+                        const textarea = document.querySelector('.message-input textarea');
+                        if (textarea && document.activeElement !== textarea) {
+                            textarea.focus();
+                        }
+                    });
+                    if (result.failures && result.failures.length > 0) {
+                        const messages = result.failures.map(f => f.userMessage).join('; ');
+                        snackbarStore.showWarningMessage(messages);
+                    }
+                }
+
+                function onDragEnter(e) {
+                    if (!hasFileInDataTransfer(e)) return;
+                    dragCounter.value += 1;
+                    isDragging.value = true;
+                }
                 function onDragOver(e) {
+                    if (!hasFileInDataTransfer(e)) return;
+                    e.dataTransfer.dropEffect = isDropAllowed(e) ? 'copy' : 'none';
                     isDragging.value = true;
                 }
                 function onDragLeave(e) {
-                    isDragging.value = false;
+                    if (!hasFileInDataTransfer(e)) return;
+                    dragCounter.value = Math.max(0, dragCounter.value - 1);
+                    if (dragCounter.value === 0) {
+                        isDragging.value = false;
+                    }
                 }
                 function onDrop(e) {
                     isDragging.value = false;
-                    const files = e.dataTransfer?.files;
-                    if (files) {
-                        const messageStore = useMessageStore();
-                        Array.from(files).forEach(file => {
-                            messageStore.addAttachment(file);
-                        });
+                    dragCounter.value = 0;
+                    const dt = e.dataTransfer;
+                    if (!dt || !dt.files || dt.files.length === 0) return;
+                    if (!isDropAllowed(e)) {
+                        snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.unsupportedType');
+                        return;
                     }
+                    const files = Array.from(dt.files).filter(f => f && f.size >= 0 && f.type !== '');
+                    if (files.length === 0) {
+                        snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.unsupportedType');
+                        return;
+                    }
+                    const result = messageStore.addAttachments(files);
+                    if (result.failures && result.failures.length > 0) {
+                        const messages = result.failures.map(f => f.userMessage).join('; ');
+                        snackbarStore.showWarningMessage(messages);
+                    }
+                }
+                function hasFileInDataTransfer(e) {
+                    if (!e || !e.dataTransfer) return false;
+                    const types = e.dataTransfer.types;
+                    if (!types) return false;
+                    return Array.from(types).includes('Files');
+                }
+                function isDropAllowed(e) {
+                    if (!e || !e.dataTransfer || !e.dataTransfer.items) return false;
+                    const items = Array.from(e.dataTransfer.items);
+                    if (items.length === 0) return false;
+                    return items.every(item => {
+                        if (item.kind !== 'file') return true;
+                        const f = item.getAsFile();
+                        if (!f) return false;
+                        return FileValidator.validate(f).valid;
+                    });
                 }
                 function previewAttachment(attachment) {
                     if (attachment.category === 'image' && attachment.base64Data) {
@@ -4142,12 +4220,47 @@
                     }
                 };
 
+                const BASE64_OVERHEAD_RATIO = 3 / 4;
+
                 const ImageProcessor = {
                     MAX_WIDTH: 2048,
                     MAX_HEIGHT: 2048,
                     QUALITY: 0.8,
                     MAX_COMPRESSED_SIZE: 1024 * 1024,
                     async compress(file) {
+                        const ext = (file.name.split('.').pop() || '').toLowerCase();
+                        if (ext === 'svg') {
+                            return new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => resolve(e.target.result);
+                                reader.onerror = () => reject(new Error('Failed to read SVG file'));
+                                reader.readAsDataURL(file);
+                            });
+                        }
+                        if (ext === 'gif') {
+                            return new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = img.width;
+                                        canvas.height = img.height;
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.drawImage(img, 0, 0);
+                                        try {
+                                            resolve(canvas.toDataURL('image/png'));
+                                        } catch (err) {
+                                            resolve(e.target.result);
+                                        }
+                                    };
+                                    img.onerror = () => resolve(e.target.result);
+                                    img.src = e.target.result;
+                                };
+                                reader.onerror = () => reject(new Error('Failed to read GIF file'));
+                                reader.readAsDataURL(file);
+                            });
+                        }
                         return new Promise((resolve, reject) => {
                             const reader = new FileReader();
                             reader.onload = (e) => {
@@ -4168,10 +4281,10 @@
                                     canvas.height = height;
                                     ctx.drawImage(img, 0, 0, width, height);
                                     let dataUrl = canvas.toDataURL('image/jpeg', quality);
-                                    if (dataUrl.length > this.MAX_COMPRESSED_SIZE * 1.37) {
+                                    if (dataUrl.length > this.MAX_COMPRESSED_SIZE / BASE64_OVERHEAD_RATIO) {
                                         for (let q = quality * 0.7; q > 0.1; q -= 0.1) {
                                             dataUrl = canvas.toDataURL('image/jpeg', q);
-                                            if (dataUrl.length <= this.MAX_COMPRESSED_SIZE * 1.37) break;
+                                            if (dataUrl.length <= this.MAX_COMPRESSED_SIZE / BASE64_OVERHEAD_RATIO) break;
                                         }
                                     }
                                     resolve(dataUrl);
@@ -4184,7 +4297,16 @@
                         });
                     },
                     async generateThumbnail(file) {
-                        return new Promise((resolve, reject) => {
+                        const ext = (file.name.split('.').pop() || '').toLowerCase();
+                        if (ext === 'svg') {
+                            return new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => resolve(e.target.result);
+                                reader.onerror = () => reject(new Error('Failed to read SVG'));
+                                reader.readAsDataURL(file);
+                            });
+                        }
+                        return new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onload = (e) => {
                                 const img = new Image();
@@ -4220,20 +4342,29 @@
                             try {
                                 const arrayBuffer = await file.arrayBuffer();
                                 const result = await mammoth.extractRawText({ arrayBuffer });
-                                return result.value;
+                                return { text: result.value, error: '' };
                             } catch (e) {
-                                return `[Document: ${file.name}]`;
+                                return {
+                                    text: `[Document: ${file.name}]`,
+                                    error: `Failed to parse docx: ${e.message || 'unknown error'}`
+                                };
                             }
                         }
                         if (['txt', 'md', 'csv'].includes(ext)) {
                             return new Promise((resolve) => {
                                 const reader = new FileReader();
-                                reader.onload = (e) => resolve(e.target.result);
-                                reader.onerror = () => resolve(`[Document: ${file.name}]`);
+                                reader.onload = (e) => resolve({ text: e.target.result, error: '' });
+                                reader.onerror = () => resolve({
+                                    text: `[Document: ${file.name}]`,
+                                    error: `Failed to read text: ${reader.error?.message || 'read error'}`
+                                });
                                 reader.readAsText(file);
                             });
                         }
-                        return `[Document: ${file.name}]`;
+                        return {
+                            text: `[Document: ${file.name}]`,
+                            error: `Format .${ext} is not supported for content extraction; the file name will be sent as context.`
+                        };
                     },
                     getDocTypeName(extension) {
                         const map = {
@@ -4342,16 +4473,18 @@
                         documentType: '',
                         generating: false,
                         attachments: [],
-                        isProcessingFiles: false
+                        isProcessingFiles: false,
+                        processingCount: 0
                     }),
                     getters: {
                         allAttachmentsReady() {
                             return this.attachments.length > 0 && this.attachments.every(a => a.status === 'ready');
                         },
                         totalEncodedSize() {
+                            const BASE64_OVERHEAD_RATIO = 3 / 4;
                             return this.attachments.reduce((sum, a) => {
                                 if (a.category === 'image' && a.base64Data) {
-                                    return sum + a.base64Data.length * 0.75;
+                                    return sum + a.base64Data.length * BASE64_OVERHEAD_RATIO;
                                 }
                                 return sum + (a.size || 0);
                             }, 0);
@@ -4393,29 +4526,38 @@
                             this.documentType = '';
                             this.attachments = [];
                             this.isProcessingFiles = false;
+                            this.processingCount = 0;
+                        },
+                        addAttachments(files) {
+                            const failures = [];
+                            const accepted = [];
+                            for (const file of files) {
+                                if (!file || !(file instanceof File)) continue;
+                                const validation = FileValidator.validate(file);
+                                if (!validation.valid) {
+                                    failures.push({ file, reason: validation.reason, userMessage: this._validationMessage(validation.reason) });
+                                    continue;
+                                }
+                                if (this.attachments.length + accepted.length >= FileValidator.MAX_ATTACHMENT_COUNT) {
+                                    failures.push({ file, reason: 'attachmentLimit', userMessage: this._validationMessage('attachmentLimit') });
+                                    continue;
+                                }
+                                if (FileValidator.isDuplicate(file, this.attachments) || accepted.some(a => a.file.name === file.name && a.file.size === file.size)) {
+                                    failures.push({ file, reason: 'duplicateFile', userMessage: this._validationMessage('duplicateFile') });
+                                    continue;
+                                }
+                                accepted.push({ file, category: FileValidator.getCategory(file) });
+                            }
+                            accepted.forEach(({ file, category }) => this._enqueueAttachment(file, category));
+                            return { accepted: accepted.length, failures };
                         },
                         addAttachment(file) {
-                            const validation = FileValidator.validate(file);
-                            if (!validation.valid) {
-                                const reasonMap = {
-                                    'security_blocked': '$vuetify.dataIterator.snackbar.securityBlocked',
-                                    'file_too_large': '$vuetify.dataIterator.snackbar.fileTooLarge',
-                                    'unsupported_type': '$vuetify.dataIterator.snackbar.unsupportedType'
-                                };
-                                snackbarStore.showWarningMessage(reasonMap[validation.reason] || validation.reason);
-                                return;
-                            }
-                            if (this.attachments.length >= FileValidator.MAX_ATTACHMENT_COUNT) {
-                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.attachmentLimit');
-                                return;
-                            }
-                            if (FileValidator.isDuplicate(file, this.attachments)) {
-                                snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.duplicateFile');
-                                return;
-                            }
-                            const category = FileValidator.getCategory(file);
+                            return this.addAttachments([file]);
+                        },
+                        _enqueueAttachment(file, category) {
+                            const id = crypto.randomUUID();
                             const attachment = {
-                                id: crypto.randomUUID(),
+                                id,
                                 file: file,
                                 name: file.name,
                                 type: file.type,
@@ -4428,8 +4570,8 @@
                                 textContent: ''
                             };
                             this.attachments.push(attachment);
+                            this.processingCount += 1;
                             this.isProcessingFiles = true;
-                            const idx = this.attachments.length - 1;
                             (async () => {
                                 try {
                                     if (category === 'image') {
@@ -4437,29 +4579,65 @@
                                             ImageProcessor.compress(file),
                                             ImageProcessor.generateThumbnail(file)
                                         ]);
-                                        this.attachments[idx].base64Data = compressed;
-                                        this.attachments[idx].thumbnail = thumb;
+                                        this._updateAttachment(id, a => {
+                                            a.base64Data = compressed;
+                                            a.thumbnail = thumb;
+                                        });
                                     } else {
-                                        const text = await DocProcessor.extractText(file);
-                                        this.attachments[idx].textContent = text;
+                                        const result = await DocProcessor.extractText(file);
+                                        this._updateAttachment(id, a => {
+                                            a.textContent = result.text;
+                                            if (result.error) a.errorMessage = result.error;
+                                        });
                                     }
-                                    this.attachments[idx].status = 'ready';
+                                    this._updateAttachment(id, a => {
+                                        a.status = 'ready';
+                                    });
                                 } catch (e) {
-                                    this.attachments[idx].status = 'error';
-                                    this.attachments[idx].errorMessage = e.message || 'Processing failed';
+                                    this._updateAttachment(id, a => {
+                                        a.status = 'error';
+                                        a.errorMessage = e.message || 'Processing failed';
+                                    });
                                 } finally {
-                                    this.isProcessingFiles = this.attachments.some(a => a.status === 'processing');
+                                    this.processingCount = Math.max(0, this.processingCount - 1);
+                                    this.isProcessingFiles = this.processingCount > 0;
                                 }
                             })();
                         },
+                        _updateAttachment(id, mutator) {
+                            const idx = this.attachments.findIndex(a => a.id === id);
+                            if (idx < 0) return;
+                            const next = { ...this.attachments[idx] };
+                            mutator(next);
+                            this.attachments.splice(idx, 1, next);
+                        },
+                        _validationMessage(reason) {
+                            const map = {
+                                'security_blocked': '$vuetify.dataIterator.snackbar.securityBlocked',
+                                'file_too_large': '$vuetify.dataIterator.snackbar.fileTooLarge',
+                                'unsupported_type': '$vuetify.dataIterator.snackbar.unsupportedType',
+                                'attachmentLimit': '$vuetify.dataIterator.snackbar.attachmentLimit',
+                                'duplicateFile': '$vuetify.dataIterator.snackbar.duplicateFile'
+                            };
+                            return map[reason] || reason;
+                        },
                         removeAttachment(id) {
+                            const target = this.attachments.find(a => a.id === id);
+                            if (target && target.status === 'processing') {
+                                this.processingCount = Math.max(0, this.processingCount - 1);
+                                this.isProcessingFiles = this.processingCount > 0;
+                            }
                             this.attachments = this.attachments.filter(a => a.id !== id);
-                            this.isProcessingFiles = this.attachments.some(a => a.status === 'processing');
                         },
                         clearAttachments() {
                             this.attachments = [];
                             this.isProcessingFiles = false;
+                            this.processingCount = 0;
                             this.images = [];
+                        },
+                        getAttachmentIcon(attachment) {
+                            if (attachment.category === 'image') return 'mdi-image';
+                            return ATTACHMENT_ICON_MAP[attachment.type] || 'mdi-file-document';
                         },
                         buildMultimodalContent(text) {
                             return MultimodalAdapter.buildContent(this.attachments, text, chatbotStore.provider);
@@ -4566,10 +4744,8 @@
                             this.startInference();
                         },
                         startInference: async function () {
-                            console.log('[startInference] begin');
                             this.clear();
                             await createCompletion(this.conversation);
-                            console.log('[startInference] after createCompletion');
                             await this.postToolCall()
                         },
                         postToolCall: async function () {
@@ -4869,7 +5045,6 @@
                 const languageStore = useLanguageStore();
 
                 const createCompletion = async (rawconversation) => {
-                    console.log('[createCompletion] called', { length: rawconversation?.length });
                     const conversation = rawconversation.reduce((newConversation, item) => {
                         if (item.role === "assistant") {
                             const { reasoning_content, ...rest } = item;
@@ -5107,6 +5282,8 @@
                         }
                     }, { deep: true });
 
+                const fileInputValue = ref([]);
+
                 const onFileSelected = (files) => {
                     if (!files || files.length === 0) return;
                     const fileArray = Array.isArray(files) ? files : [files];
@@ -5114,6 +5291,9 @@
                         if (file && file instanceof File) {
                             messageStore.addAttachment(file);
                         }
+                    });
+                    nextTick(() => {
+                        fileInputValue.value = [];
                     });
                 };
 
@@ -5176,6 +5356,14 @@
                     nextTick(() => { initLottie(); });
                 };
 
+                function onGlobalKeydown(e) {
+                    if (e.ctrlKey && e.altKey && (e.key === 'a' || e.key === 'A')) {
+                        e.preventDefault();
+                        const side = settingStore.activePanel === 'chat' ? 'right' : 'left';
+                        triggerFilePicker(side);
+                    }
+                }
+
                 onMounted(async () => {
                     initLottie();
                     agentStore.initAgent();
@@ -5183,10 +5371,12 @@
                     resizeAvatar()
                     window.onresize = () => resizeAvatar()
                     resizeInputBox()
+                    window.addEventListener('keydown', onGlobalKeydown);
                 });
 
                 onUnmounted(() => {
                     destroyLottie();
+                    window.removeEventListener('keydown', onGlobalKeydown);
                 });
 
                 watch(
@@ -5459,10 +5649,17 @@
                     getProviderDisplayName,
                     handleSkillDrop,
                     isDragging,
+                    onDragEnter,
                     onDragOver,
                     onDragLeave,
                     onDrop,
                     previewAttachment,
+
+                    filePickerRefLeft,
+                    filePickerRefRight,
+                    triggerFilePicker,
+                    onFilePickerChange,
+                    attachmentAccept,
 
                     settingStore,
                     resourceStore,
@@ -5598,9 +5795,9 @@
                             totalSizeExceeded: 'Total attachment size exceeds 20MB limit.'
                         },
                         attachment: {
-                            attachedCount: '{count} attachment(s) added'
-                        }
-                    },
+                            attachedCount: '{count} attachment(s) added',
+                            addTooltip: 'Add attachment'
+                        },
                 },
             },
             zhHans: {
@@ -5699,9 +5896,9 @@
                             totalSizeExceeded: '附件总大小超过20MB限制'
                         },
                         attachment: {
-                            attachedCount: '已添加 {count} 个附件'
-                        }
-                    },
+                            attachedCount: '已添加 {count} 个附件',
+                            addTooltip: '添加附件'
+                        },
                 },
             },
         }
