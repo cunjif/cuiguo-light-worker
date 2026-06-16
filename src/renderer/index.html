@@ -4,8 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description"
-        content="CUIGUO supplies a common offical workstation by mcp servers.">
+    <meta name="description" content="CUIGUO supplies a common offical workstation by mcp servers.">
     <title>Chatbot</title>
     <style>
         ::-webkit-scrollbar {
@@ -86,7 +85,7 @@
 
         // Suppress specific DevTools autofill errors
         const originalConsoleError = console.error;
-        console.error = function(...args) {
+        console.error = function (...args) {
             if (args.some(arg => typeof arg === 'string' &&
                 (arg.includes('Autofill.enable') || arg.includes('Autofill.setAddresses')))) {
                 return;
@@ -117,7 +116,8 @@
             max-height: calc(70vh + 3rem);
         }
 
-        #lottie, #lottie-alt {
+        #lottie,
+        #lottie-alt {
             display: none;
             height: calc(99vh - 50px);
             max-height: calc(100% - 100px);
@@ -417,32 +417,40 @@
         <v-app>
             <v-container fluid class="main-layout pa-0">
                 <v-row no-gutters class="main-row">
-                    <v-col :cols="settingStore.leftColValue" :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
+                    <v-col :cols="settingStore.leftColValue"
+                        :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
-                                <div id="lottie" class="text-center text-h5" data-component-id="chat-mcp.chat.loading-animation">
+                                <div id="lottie" class="text-center text-h5"
+                                    data-component-id="chat-mcp.chat.loading-animation">
                                     {{$t('$vuetify.dataIterator.title')}}
                                 </div>
                             </v-container>
                             <v-container v-show="messageStore.conversation.length > 0" class="chat-bot">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
-                                    :language="languageStore.getLocale" :generating="messageStore.generating" @regenerate="messageStore.regenerateFromIndex($event)" data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
+                                    :language="languageStore.getLocale" :generating="messageStore.generating"
+                                    @regenerate="messageStore.regenerateFromIndex($event)"
+                                    data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
                                 <div class="fill-area"></div>
                             </v-container>
                         </template>
                         <template v-else>
                             <div class="function-panel">
-                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2" :class="{ 'drag-over-panel': isDragging }">
+                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
+                                    :class="{ 'drag-over-panel': isDragging }">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
-                                        <v-btn icon size="small" variant="text" :disabled="messageStore.isProcessingFiles"
+                                        <v-btn icon size="small" variant="text"
+                                            :disabled="messageStore.isProcessingFiles"
                                             @click="triggerFilePicker('left')"
                                             data-component-id="chat-mcp.chat.file-upload">
                                             <v-icon>mdi-paperclip</v-icon>
-                                            <v-tooltip activator="parent" location="bottom">{{ $t('$vuetify.dataIterator.attachment.addTooltip') }} (Ctrl+Alt+A)</v-tooltip>
+                                            <v-tooltip activator="parent" location="bottom">{{
+                                                $t('$vuetify.dataIterator.attachment.addTooltip') }}
+                                                (Ctrl+Alt+A)</v-tooltip>
                                         </v-btn>
-                                        <input ref="filePickerRefLeft" type="file" multiple :accept="attachmentAccept" style="display:none" @change="onFilePickerChange($event, 'left')" />
-                                        <chat-mcp-chat-thumbnail-strip
-                                            :attachments="messageStore.attachments"
+                                        <input ref="filePickerRefLeft" type="file" multiple :accept="attachmentAccept"
+                                            style="display:none" @change="onFilePickerChange($event, 'left')" />
+                                        <chat-mcp-chat-thumbnail-strip :attachments="messageStore.attachments"
                                             @remove="messageStore.removeAttachment($event)" />
                                     </div>
                                     <v-btn size="small" variant="text" icon
@@ -452,33 +460,46 @@
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                <div class="input-section px-3 py-2" @dragenter.prevent="onDragEnter" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
+                                <div class="input-section px-3 py-2" @dragenter.prevent="onDragEnter"
+                                    @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave"
+                                    @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
                                     <div v-if="skillStore.activeSkill" class="d-flex align-center mb-2 ga-1 flex-wrap">
-                                        <v-chip size="small" color="primary" variant="flat" closable @click:close="skillStore.deactivateSkill()">
-                                            <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon || 'mdi-auto-fix' }}</v-icon>
-                                            {{ skillStore.getActiveSkillManifest()?.displayName?.zh || skillStore.activeSkill }}
+                                        <v-chip size="small" color="primary" variant="flat" closable
+                                            @click:close="skillStore.deactivateSkill()">
+                                            <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon ||
+                                                'mdi-auto-fix' }}</v-icon>
+                                            {{ skillStore.getActiveSkillManifest()?.displayName?.zh ||
+                                            skillStore.activeSkill }}
                                         </v-chip>
                                     </div>
                                     <div v-else-if="skillStore.matchedSkill" class="d-flex align-center mb-2 ga-1">
-                                        <v-chip size="small" color="info" variant="tonal" @click="skillStore.activateSkill(skillStore.matchedSkill.name)">
+                                        <v-chip size="small" color="info" variant="tonal"
+                                            @click="skillStore.activateSkill(skillStore.matchedSkill.name)">
                                             <v-icon start size="small">{{ skillStore.matchedSkill.icon }}</v-icon>
                                             {{ skillStore.matchedSkill.displayName.zh }}
                                             <v-icon end size="small">mdi-plus-circle</v-icon>
                                         </v-chip>
-                                        <span class="text-caption text-grey">{{ $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
+                                        <span class="text-caption text-grey">{{
+                                            $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
                                     </div>
-                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
-                                        clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
+                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo"
+                                        counter clearable @keydown="messageStore.handleKeydown"
+                                        v-model="messageStore.userMessage"
                                         @input="skillStore.matchAndSuggest(messageStore.userMessage)"
-                                        :label="messageStore.attachments.length > 0 ? $t('$vuetify.dataIterator.attachment.attachedCount', { count: messageStore.attachments.length }) : ''" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                        :label="messageStore.attachments.length > 0 ? $t('$vuetify.dataIterator.attachment.attachedCount', { count: messageStore.attachments.length }) : ''"
+                                        @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
-                                            <div v-if="messageStore.attachments.length > 0" class="attachment-chip-strip d-flex align-center flex-wrap ga-1 pa-1">
-                                                <v-chip v-for="attachment in messageStore.attachments" :key="attachment.id" size="x-small" variant="tonal" closable
+                                            <div v-if="messageStore.attachments.length > 0"
+                                                class="attachment-chip-strip d-flex align-center flex-wrap ga-1 pa-1">
+                                                <v-chip v-for="attachment in messageStore.attachments"
+                                                    :key="attachment.id" size="x-small" variant="tonal" closable
                                                     @click:close="messageStore.removeAttachment(attachment.id)">
-                                                    <v-icon start size="x-small">{{ messageStore.getAttachmentIcon(attachment) }}</v-icon>
-                                                    <span class="text-truncate" style="max-width:120px;">{{ attachment.name }}</span>
+                                                    <v-icon start size="x-small">{{
+                                                        messageStore.getAttachmentIcon(attachment) }}</v-icon>
+                                                    <span class="text-truncate" style="max-width:120px;">{{
+                                                        attachment.name }}</span>
                                                 </v-chip>
                                                 <v-btn size="x-small" variant="text" color="grey" class="ml-auto"
                                                     @click="messageStore.clearAttachments()">
@@ -489,11 +510,15 @@
                                             <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
-                                                        :src="messageStore.base64" @click="messageStore.clearAttachments()"></v-img>
-                                                    <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
-                                                        @click="messageStore.clearAttachments()" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                        :src="messageStore.base64"
+                                                        @click="messageStore.clearAttachments()"></v-img>
+                                                    <div v-else-if="messageStore.documentContent"
+                                                        class="chat-images mt-1"
+                                                        @click="messageStore.clearAttachments()"
+                                                        style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
                                                         <v-icon size="24" color="primary">mdi-file-document</v-icon>
-                                                        <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+                                                        <span class="ml-2 text-caption"
+                                                            style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
                                                             {{ messageStore.documentType.toUpperCase() }}
                                                         </span>
                                                     </div>
@@ -502,29 +527,35 @@
                                         </template>
                                         <template v-slot:append-inner>
                                             <div class="d-flex flex-column ga-1 mr-1 mb-4">
-                                                <v-btn v-if="messageStore.userMessage && !messageStore.isProcessingFiles" size="small" color="primary" variant="elevated"
+                                                <v-btn
+                                                    v-if="messageStore.userMessage && !messageStore.isProcessingFiles"
+                                                    size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating" size="small" color="primary" variant="elevated"
+                                                <v-btn
+                                                    v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating"
+                                                    size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small" color="grey" variant="elevated" disabled
-                                                    icon="mdi-arrow-up" v-tooltip:start="'Files processing...'"></v-btn>
-                                                <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
-                                                    @click="messageStore.stop" icon="mdi-stop"
+                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small"
+                                                    color="grey" variant="elevated" disabled icon="mdi-arrow-up"
+                                                    v-tooltip:start="'Files processing...'"></v-btn>
+                                                <v-btn v-else-if="messageStore.generating" size="small" color="primary"
+                                                    variant="elevated" @click="messageStore.stop" icon="mdi-stop"
                                                     data-component-id="chat-mcp.chat.stop-button"></v-btn>
                                                 <v-speed-dial v-else location="bottom center"
                                                     transition="expand-transition">
                                                     <template v-slot:activator="{ props: activatorProps }">
-                                                        <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
-                                                            color="primary"></v-btn>
+                                                        <v-btn v-bind="activatorProps" size="small"
+                                                            icon="mdi-dots-horizontal" color="primary"></v-btn>
                                                     </template>
                                                     <v-btn key="2" size="small" color="primary" variant="elevated"
                                                         @click="messageStore.resendMessage" icon="mdi-autorenew"
                                                         v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
                                                         data-component-id="chat-mcp.chat.resend-button"></v-btn>
-                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.startNew()"
-                                                        icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
+                                                    <v-btn key="1" color="primary" variant="elevated"
+                                                        @click="messageStore.startNew()" icon="mdi-pencil-plus"
+                                                        v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
                                                         data-component-id="chat-mcp.chat.new-conversation-button"></v-btn>
                                                 </v-speed-dial>
                                             </div>
@@ -533,9 +564,9 @@
                                 </div>
                                 <v-divider></v-divider>
                                 <div class="nav-section d-flex align-center justify-center ga-2 px-3 py-2">
-                                    <v-btn size="small" variant="tonal"
-                                        @click="messageStore.startNew()"
-                                        prepend-icon="mdi-plus-circle-outline" v-tooltip:bottom="$t('$vuetify.dataIterator.g.new')"
+                                    <v-btn size="small" variant="tonal" @click="messageStore.startNew()"
+                                        prepend-icon="mdi-plus-circle-outline"
+                                        v-tooltip:bottom="$t('$vuetify.dataIterator.g.new')"
                                         data-component-id="chat-mcp.chat.new-conversation-nav-button">
                                         {{ $t('$vuetify.dataIterator.g.new') }}
                                     </v-btn>
@@ -546,20 +577,24 @@
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
                                         @click="settingStore.addMcpDialog = true; settingStore.mcpTab = 'add-server';"
-                                        prepend-icon="mdi-lan-connect" v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
+                                        prepend-icon="mdi-lan-connect"
+                                        v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
                                         data-component-id="chat-mcp.chat.mcp-button-nav">
                                         {{ $t('$vuetify.dataIterator.mcp.title') }}
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
                                         @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills();"
-                                        prepend-icon="mdi-auto-fix" v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
+                                        prepend-icon="mdi-auto-fix"
+                                        v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
                                         data-component-id="chat-mcp.chat.skill-button-nav">
                                         {{ $t('$vuetify.dataIterator.skill.title') }}
                                     </v-btn>
-                                    <v-menu transition="fade-transition" data-component-id="chat-mcp.chat.language-menu">
+                                    <v-menu transition="fade-transition"
+                                        data-component-id="chat-mcp.chat.language-menu">
                                         <template v-slot:activator="{ props }">
                                             <v-btn size="small" variant="tonal" v-bind="props"
-                                                prepend-icon="mdi-translate" v-tooltip:bottom="$t('$vuetify.dataIterator.l.title')"
+                                                prepend-icon="mdi-translate"
+                                                v-tooltip:bottom="$t('$vuetify.dataIterator.l.title')"
                                                 data-component-id="chat-mcp.chat.language-button">
                                                 {{ $t('$vuetify.dataIterator.l.title') }}
                                             </v-btn>
@@ -592,30 +627,36 @@
                                     </div>
                                     <div class="history-list-scrollable">
                                         <transition-group name="fade">
-                                            <v-card v-for="(item, index) in historyStore.conversation" variant="plain" :key="item.id"
-                                                class="mb-1">
+                                            <v-card v-for="(item, index) in historyStore.conversation" variant="plain"
+                                                :key="item.id" class="mb-1">
                                                 <v-card-item>
                                                     <template v-slot:prepend>
-                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon size="x-small"
-                                                            @click="historyStore.select(index)" density="compact">
+                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon
+                                                            size="x-small" @click="historyStore.select(index)"
+                                                            density="compact">
                                                             <b>{{item.history.length}}</b>
                                                         </v-btn>
                                                     </template>
-                                                    <v-card-subtitle class="font-weight-bold text-truncate" style="max-width: 200px;">
-                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content || "NA" }}
+                                                    <v-card-subtitle class="font-weight-bold text-truncate"
+                                                        style="max-width: 200px;">
+                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content
+                                                        || "NA" }}
                                                     </v-card-subtitle>
                                                     <template v-slot:append>
                                                         <div class="d-flex" style="gap: 20px;">
-                                                            <v-btn size="x-small" color="primary" icon="mdi-download" variant="text"
-                                                                @click="historyStore.downloadById(index)" density="compact"></v-btn>
-                                                            <v-btn size="x-small" icon="mdi-delete-outline" variant="text"
-                                                                @click="historyStore.deleteById(index)" density="compact"></v-btn>
+                                                            <v-btn size="x-small" color="primary" icon="mdi-download"
+                                                                variant="text" @click="historyStore.downloadById(index)"
+                                                                density="compact"></v-btn>
+                                                            <v-btn size="x-small" icon="mdi-delete-outline"
+                                                                variant="text" @click="historyStore.deleteById(index)"
+                                                                density="compact"></v-btn>
                                                         </div>
                                                     </template>
                                                 </v-card-item>
                                             </v-card>
                                         </transition-group>
-                                        <div v-if="historyStore.conversation.length === 0" class="text-center text-disabled py-4 text-caption">
+                                        <div v-if="historyStore.conversation.length === 0"
+                                            class="text-center text-disabled py-4 text-caption">
                                             No history
                                         </div>
                                     </div>
@@ -623,20 +664,25 @@
                             </div>
                         </template>
                     </v-col>
-                    <v-col :cols="settingStore.rightColValue" :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
+                    <v-col :cols="settingStore.rightColValue"
+                        :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <div class="function-panel">
-                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2" :class="{ 'drag-over-panel': isDragging }">
+                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
+                                    :class="{ 'drag-over-panel': isDragging }">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
-                                        <v-btn icon size="small" variant="text" :disabled="messageStore.isProcessingFiles"
+                                        <v-btn icon size="small" variant="text"
+                                            :disabled="messageStore.isProcessingFiles"
                                             @click="triggerFilePicker('right')"
                                             data-component-id="chat-mcp.chat.file-upload">
                                             <v-icon>mdi-paperclip</v-icon>
-                                            <v-tooltip activator="parent" location="bottom">{{ $t('$vuetify.dataIterator.attachment.addTooltip') }} (Ctrl+Alt+A)</v-tooltip>
+                                            <v-tooltip activator="parent" location="bottom">{{
+                                                $t('$vuetify.dataIterator.attachment.addTooltip') }}
+                                                (Ctrl+Alt+A)</v-tooltip>
                                         </v-btn>
-                                        <input ref="filePickerRefRight" type="file" multiple :accept="attachmentAccept" style="display:none" @change="onFilePickerChange($event, 'right')" />
-                                        <chat-mcp-chat-thumbnail-strip
-                                            :attachments="messageStore.attachments"
+                                        <input ref="filePickerRefRight" type="file" multiple :accept="attachmentAccept"
+                                            style="display:none" @change="onFilePickerChange($event, 'right')" />
+                                        <chat-mcp-chat-thumbnail-strip :attachments="messageStore.attachments"
                                             @remove="messageStore.removeAttachment($event)" />
                                     </div>
                                     <v-btn size="small" variant="text" icon
@@ -646,33 +692,46 @@
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                <div class="input-section px-3 py-2" @dragenter.prevent="onDragEnter" @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
+                                <div class="input-section px-3 py-2" @dragenter.prevent="onDragEnter"
+                                    @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave"
+                                    @drop.prevent="onDrop" :class="{ 'drag-over': isDragging }">
                                     <div v-if="skillStore.activeSkill" class="d-flex align-center mb-2 ga-1 flex-wrap">
-                                        <v-chip size="small" color="primary" variant="flat" closable @click:close="skillStore.deactivateSkill()">
-                                            <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon || 'mdi-auto-fix' }}</v-icon>
-                                            {{ skillStore.getActiveSkillManifest()?.displayName?.zh || skillStore.activeSkill }}
+                                        <v-chip size="small" color="primary" variant="flat" closable
+                                            @click:close="skillStore.deactivateSkill()">
+                                            <v-icon start size="small">{{ skillStore.getActiveSkillManifest()?.icon ||
+                                                'mdi-auto-fix' }}</v-icon>
+                                            {{ skillStore.getActiveSkillManifest()?.displayName?.zh ||
+                                            skillStore.activeSkill }}
                                         </v-chip>
                                     </div>
                                     <div v-else-if="skillStore.matchedSkill" class="d-flex align-center mb-2 ga-1">
-                                        <v-chip size="small" color="info" variant="tonal" @click="skillStore.activateSkill(skillStore.matchedSkill.name)">
+                                        <v-chip size="small" color="info" variant="tonal"
+                                            @click="skillStore.activateSkill(skillStore.matchedSkill.name)">
                                             <v-icon start size="small">{{ skillStore.matchedSkill.icon }}</v-icon>
                                             {{ skillStore.matchedSkill.displayName.zh }}
                                             <v-icon end size="small">mdi-plus-circle</v-icon>
                                         </v-chip>
-                                        <span class="text-caption text-grey">{{ $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
+                                        <span class="text-caption text-grey">{{
+                                            $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
                                     </div>
-                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
-                                        clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
+                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo"
+                                        counter clearable @keydown="messageStore.handleKeydown"
+                                        v-model="messageStore.userMessage"
                                         @input="skillStore.matchAndSuggest(messageStore.userMessage)"
-                                        :label="messageStore.attachments.length > 0 ? $t('$vuetify.dataIterator.attachment.attachedCount', { count: messageStore.attachments.length }) : ''" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                        :label="messageStore.attachments.length > 0 ? $t('$vuetify.dataIterator.attachment.attachedCount', { count: messageStore.attachments.length }) : ''"
+                                        @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                         :rows="settingStore.inputRow" auto-grow max-rows="15"
                                         data-component-id="chat-mcp.chat.input-textarea">
                                         <template v-slot:prepend-inner>
-                                            <div v-if="messageStore.attachments.length > 0" class="attachment-chip-strip d-flex align-center flex-wrap ga-1 pa-1">
-                                                <v-chip v-for="attachment in messageStore.attachments" :key="attachment.id" size="x-small" variant="tonal" closable
+                                            <div v-if="messageStore.attachments.length > 0"
+                                                class="attachment-chip-strip d-flex align-center flex-wrap ga-1 pa-1">
+                                                <v-chip v-for="attachment in messageStore.attachments"
+                                                    :key="attachment.id" size="x-small" variant="tonal" closable
                                                     @click:close="messageStore.removeAttachment(attachment.id)">
-                                                    <v-icon start size="x-small">{{ messageStore.getAttachmentIcon(attachment) }}</v-icon>
-                                                    <span class="text-truncate" style="max-width:120px;">{{ attachment.name }}</span>
+                                                    <v-icon start size="x-small">{{
+                                                        messageStore.getAttachmentIcon(attachment) }}</v-icon>
+                                                    <span class="text-truncate" style="max-width:120px;">{{
+                                                        attachment.name }}</span>
                                                 </v-chip>
                                                 <v-btn size="x-small" variant="text" color="grey" class="ml-auto"
                                                     @click="messageStore.clearAttachments()">
@@ -683,11 +742,15 @@
                                             <v-container v-if="messageStore.base64 || messageStore.documentContent">
                                                 <v-row>
                                                     <v-img v-if="messageStore.base64" class="chat-images mt-1"
-                                                        :src="messageStore.base64" @click="messageStore.clearAttachments()"></v-img>
-                                                    <div v-else-if="messageStore.documentContent" class="chat-images mt-1"
-                                                        @click="messageStore.clearAttachments()" style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                                                        :src="messageStore.base64"
+                                                        @click="messageStore.clearAttachments()"></v-img>
+                                                    <div v-else-if="messageStore.documentContent"
+                                                        class="chat-images mt-1"
+                                                        @click="messageStore.clearAttachments()"
+                                                        style="display: flex; align-items: center; background: #f0f0f0; padding: 8px; border-radius: 4px;">
                                                         <v-icon size="24" color="primary">mdi-file-document</v-icon>
-                                                        <span class="ml-2 text-caption" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+                                                        <span class="ml-2 text-caption"
+                                                            style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
                                                             {{ messageStore.documentType.toUpperCase() }}
                                                         </span>
                                                     </div>
@@ -696,29 +759,35 @@
                                         </template>
                                         <template v-slot:append-inner>
                                             <div class="d-flex flex-column ga-1 mr-1 mb-4">
-                                                <v-btn v-if="messageStore.userMessage && !messageStore.isProcessingFiles" size="small" color="primary" variant="elevated"
+                                                <v-btn
+                                                    v-if="messageStore.userMessage && !messageStore.isProcessingFiles"
+                                                    size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating" size="small" color="primary" variant="elevated"
+                                                <v-btn
+                                                    v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating"
+                                                    size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small" color="grey" variant="elevated" disabled
-                                                    icon="mdi-arrow-up" v-tooltip:start="'Files processing...'"></v-btn>
-                                                <v-btn v-else-if="messageStore.generating" size="small" color="primary" variant="elevated"
-                                                    @click="messageStore.stop" icon="mdi-stop"
+                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small"
+                                                    color="grey" variant="elevated" disabled icon="mdi-arrow-up"
+                                                    v-tooltip:start="'Files processing...'"></v-btn>
+                                                <v-btn v-else-if="messageStore.generating" size="small" color="primary"
+                                                    variant="elevated" @click="messageStore.stop" icon="mdi-stop"
                                                     data-component-id="chat-mcp.chat.stop-button"></v-btn>
                                                 <v-speed-dial v-else location="bottom center"
                                                     transition="expand-transition">
                                                     <template v-slot:activator="{ props: activatorProps }">
-                                                        <v-btn v-bind="activatorProps" size="small" icon="mdi-dots-horizontal"
-                                                            color="primary"></v-btn>
+                                                        <v-btn v-bind="activatorProps" size="small"
+                                                            icon="mdi-dots-horizontal" color="primary"></v-btn>
                                                     </template>
                                                     <v-btn key="2" size="small" color="primary" variant="elevated"
                                                         @click="messageStore.resendMessage" icon="mdi-autorenew"
                                                         v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
                                                         data-component-id="chat-mcp.chat.resend-button"></v-btn>
-                                                    <v-btn key="1" color="primary" variant="elevated" @click="messageStore.startNew()"
-                                                        icon="mdi-pencil-plus" v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
+                                                    <v-btn key="1" color="primary" variant="elevated"
+                                                        @click="messageStore.startNew()" icon="mdi-pencil-plus"
+                                                        v-tooltip:start="$t('$vuetify.dataIterator.g.new')"
                                                         data-component-id="chat-mcp.chat.new-conversation-button"></v-btn>
                                                 </v-speed-dial>
                                             </div>
@@ -727,9 +796,9 @@
                                 </div>
                                 <v-divider></v-divider>
                                 <div class="nav-section d-flex align-center justify-center ga-2 px-3 py-2">
-                                    <v-btn size="small" variant="tonal"
-                                        @click="messageStore.startNew()"
-                                        prepend-icon="mdi-plus-circle-outline" v-tooltip:bottom="$t('$vuetify.dataIterator.g.new')"
+                                    <v-btn size="small" variant="tonal" @click="messageStore.startNew()"
+                                        prepend-icon="mdi-plus-circle-outline"
+                                        v-tooltip:bottom="$t('$vuetify.dataIterator.g.new')"
                                         data-component-id="chat-mcp.chat.new-conversation-nav-button">
                                         {{ $t('$vuetify.dataIterator.g.new') }}
                                     </v-btn>
@@ -740,20 +809,24 @@
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
                                         @click="settingStore.addMcpDialog = true; settingStore.mcpTab = 'add-server';"
-                                        prepend-icon="mdi-lan-connect" v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
+                                        prepend-icon="mdi-lan-connect"
+                                        v-tooltip:bottom="$t('$vuetify.dataIterator.mcp.title')"
                                         data-component-id="chat-mcp.chat.mcp-button-nav">
                                         {{ $t('$vuetify.dataIterator.mcp.title') }}
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
                                         @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills();"
-                                        prepend-icon="mdi-auto-fix" v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
+                                        prepend-icon="mdi-auto-fix"
+                                        v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
                                         data-component-id="chat-mcp.chat.skill-button-nav">
                                         {{ $t('$vuetify.dataIterator.skill.title') }}
                                     </v-btn>
-                                    <v-menu transition="fade-transition" data-component-id="chat-mcp.chat.language-menu">
+                                    <v-menu transition="fade-transition"
+                                        data-component-id="chat-mcp.chat.language-menu">
                                         <template v-slot:activator="{ props }">
                                             <v-btn size="small" variant="tonal" v-bind="props"
-                                                prepend-icon="mdi-translate" v-tooltip:bottom="$t('$vuetify.dataIterator.l.title')"
+                                                prepend-icon="mdi-translate"
+                                                v-tooltip:bottom="$t('$vuetify.dataIterator.l.title')"
                                                 data-component-id="chat-mcp.chat.language-button">
                                                 {{ $t('$vuetify.dataIterator.l.title') }}
                                             </v-btn>
@@ -786,30 +859,36 @@
                                     </div>
                                     <div class="history-list-scrollable">
                                         <transition-group name="fade">
-                                            <v-card v-for="(item, index) in historyStore.conversation" variant="plain" :key="item.id"
-                                                class="mb-1">
+                                            <v-card v-for="(item, index) in historyStore.conversation" variant="plain"
+                                                :key="item.id" class="mb-1">
                                                 <v-card-item>
                                                     <template v-slot:prepend>
-                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon size="x-small"
-                                                            @click="historyStore.select(index)" density="compact">
+                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon
+                                                            size="x-small" @click="historyStore.select(index)"
+                                                            density="compact">
                                                             <b>{{item.history.length}}</b>
                                                         </v-btn>
                                                     </template>
-                                                    <v-card-subtitle class="font-weight-bold text-truncate" style="max-width: 200px;">
-                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content || "NA" }}
+                                                    <v-card-subtitle class="font-weight-bold text-truncate"
+                                                        style="max-width: 200px;">
+                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content
+                                                        || "NA" }}
                                                     </v-card-subtitle>
                                                     <template v-slot:append>
                                                         <div class="d-flex" style="gap: 20px;">
-                                                            <v-btn size="x-small" color="primary" icon="mdi-download" variant="text"
-                                                                @click="historyStore.downloadById(index)" density="compact"></v-btn>
-                                                            <v-btn size="x-small" icon="mdi-delete-outline" variant="text"
-                                                                @click="historyStore.deleteById(index)" density="compact"></v-btn>
+                                                            <v-btn size="x-small" color="primary" icon="mdi-download"
+                                                                variant="text" @click="historyStore.downloadById(index)"
+                                                                density="compact"></v-btn>
+                                                            <v-btn size="x-small" icon="mdi-delete-outline"
+                                                                variant="text" @click="historyStore.deleteById(index)"
+                                                                density="compact"></v-btn>
                                                         </div>
                                                     </template>
                                                 </v-card-item>
                                             </v-card>
                                         </transition-group>
-                                        <div v-if="historyStore.conversation.length === 0" class="text-center text-disabled py-4 text-caption">
+                                        <div v-if="historyStore.conversation.length === 0"
+                                            class="text-center text-disabled py-4 text-caption">
                                             No history
                                         </div>
                                     </div>
@@ -818,13 +897,16 @@
                         </template>
                         <template v-else>
                             <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
-                                <div id="lottie-alt" class="text-center text-h5" data-component-id="chat-mcp.chat.loading-animation-alt">
+                                <div id="lottie-alt" class="text-center text-h5"
+                                    data-component-id="chat-mcp.chat.loading-animation-alt">
                                     {{$t('$vuetify.dataIterator.title')}}
                                 </div>
                             </v-container>
                             <v-container v-show="messageStore.conversation.length > 0" class="chat-bot-alt">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
-                                    :language="languageStore.getLocale" :generating="messageStore.generating" @regenerate="messageStore.regenerateFromIndex($event)" data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
+                                    :language="languageStore.getLocale" :generating="messageStore.generating"
+                                    @regenerate="messageStore.regenerateFromIndex($event)"
+                                    data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
                             </v-container>
                         </template>
                     </v-col>
@@ -832,7 +914,8 @@
             </v-container>
 
             <!-- snackbar -->
-            <v-snackbar v-model="snackbarStore.isShow" timeout="4000" :color="snackbarStore.type" location="top" v-if="snackbarStore" data-component-id="chat-mcp.chat.snackbar">
+            <v-snackbar v-model="snackbarStore.isShow" timeout="4000" :color="snackbarStore.type" location="top"
+                v-if="snackbarStore" data-component-id="chat-mcp.chat.snackbar">
                 <div class="d-flex align-center">
                     <v-icon class="mr-2">{{ snackbarStore.getIcon() }}</v-icon>
                     <span>{{$t(snackbarStore.message)}}</span>
@@ -845,7 +928,8 @@
                 </template>
             </v-snackbar>
 
-            <v-dialog v-model="settingStore.configHistory" class="dialog-card" data-component-id="chat-mcp.dialog.history">
+            <v-dialog v-model="settingStore.configHistory" class="dialog-card"
+                data-component-id="chat-mcp.dialog.history">
                 <v-card prepend-icon="mdi-history" :title="$t('$vuetify.dataIterator.q.title')" flat>
                     <template v-slot:append>
                         <v-card-actions>
@@ -890,27 +974,37 @@
 
             </v-dialog>
             <!-- dialog -->
-            <v-dialog v-model="settingStore.configDialog" class="dialog-card" data-component-id="chat-mcp.dialog.config">
+            <v-dialog v-model="settingStore.configDialog" class="dialog-card"
+                data-component-id="chat-mcp.dialog.config">
                 <v-card prepend-icon="mdi-cog-outline" :title="$t('$vuetify.dataIterator.i.title')">
-                    <input type="file" ref="importFileInput" accept=".json" style="display:none" @change="handleImportFile" />
+                    <input type="file" ref="importFileInput" accept=".json" style="display:none"
+                        @change="handleImportFile" />
                     <template v-slot:append>
-                        <v-btn icon="mdi-import" variant="text" :disabled="!!providerEditMode" @click="triggerImport" :title="$t('$vuetify.dataIterator.i.importConfig')"></v-btn>
-                        <v-btn icon="mdi-export" variant="text" :disabled="!!providerEditMode || chatbotStore.providers.length === 0" @click="showExportDialog = true" :title="$t('$vuetify.dataIterator.i.exportConfig')"></v-btn>
-                        <v-btn icon="mdi-refresh" variant="text" @click="chatbotStore.resetState" :title="$t('$vuetify.dataIterator.i.resetConfig')"></v-btn>
+                        <v-btn icon="mdi-import" variant="text" :disabled="!!providerEditMode" @click="triggerImport"
+                            :title="$t('$vuetify.dataIterator.i.importConfig')"></v-btn>
+                        <v-btn icon="mdi-export" variant="text"
+                            :disabled="!!providerEditMode || chatbotStore.providers.length === 0"
+                            @click="showExportDialog = true"
+                            :title="$t('$vuetify.dataIterator.i.exportConfig')"></v-btn>
+                        <v-btn icon="mdi-refresh" variant="text" @click="chatbotStore.resetState"
+                            :title="$t('$vuetify.dataIterator.i.resetConfig')"></v-btn>
                     </template>
 
                     <v-card-text class="pb-0">
                         <v-row no-gutters>
-                            <v-col cols="4" class="pr-2" style="border-right: 1px solid rgba(0,0,0,0.12); min-height: 400px;" data-component-id="chat-mcp.dialog.provider-list">
+                            <v-col cols="4" class="pr-2"
+                                style="border-right: 1px solid rgba(0,0,0,0.12); min-height: 400px;"
+                                data-component-id="chat-mcp.dialog.provider-list">
                                 <div class="text-subtitle-2 px-2 py-2"><span>Providers</span></div>
                                 <v-list density="compact" nav class="pa-0">
                                     <v-list-item v-for="pitem in chatbotStore.providers" :key="pitem.id"
-                                        density="compact"
-                                        :active="pitem.id === chatbotStore.activeProviderId"
+                                        density="compact" :active="pitem.id === chatbotStore.activeProviderId"
                                         color="primary"
                                         @click="!providerEditMode && chatbotStore.switchProvider(pitem.id)">
                                         <template v-slot:prepend>
-                                            <v-icon :icon="pitem.id === chatbotStore.activeProviderId ? 'mdi-check-circle' : 'mdi-circle-outline'" size="small" color="primary"></v-icon>
+                                            <v-icon
+                                                :icon="pitem.id === chatbotStore.activeProviderId ? 'mdi-check-circle' : 'mdi-circle-outline'"
+                                                size="small" color="primary"></v-icon>
                                         </template>
                                         <v-list-item-title>{{ pitem.name }}</v-list-item-title>
                                         <v-list-item-subtitle>
@@ -919,13 +1013,16 @@
                                             </v-chip>
                                         </v-list-item-subtitle>
                                         <template v-slot:append>
-                                            <v-btn icon="mdi-pencil" size="x-small" variant="text" @click.stop="startEditProvider(pitem)"></v-btn>
-                                            <v-btn icon="mdi-delete" size="x-small" variant="text" :disabled="chatbotStore.providers.length <= 1" @click.stop="confirmDeleteProvider(pitem)"></v-btn>
+                                            <v-btn icon="mdi-pencil" size="x-small" variant="text"
+                                                @click.stop="startEditProvider(pitem)"></v-btn>
+                                            <v-btn icon="mdi-delete" size="x-small" variant="text"
+                                                :disabled="chatbotStore.providers.length <= 1"
+                                                @click.stop="confirmDeleteProvider(pitem)"></v-btn>
                                         </template>
                                     </v-list-item>
                                 </v-list>
-                                <v-btn block class="mt-2" density="compact" variant="tonal" color="primary" prepend-icon="mdi-plus"
-                                    :disabled="chatbotStore.providers.length >= 20"
+                                <v-btn block class="mt-2" density="compact" variant="tonal" color="primary"
+                                    prepend-icon="mdi-plus" :disabled="chatbotStore.providers.length >= 20"
                                     @click="startCreateProvider()">
                                     Add Provider
                                 </v-btn>
@@ -933,62 +1030,125 @@
                             <!-- Right: Detail / Edit Form -->
                             <v-col cols="8" class="pl-4" data-component-id="chat-mcp.dialog.provider-form">
                                 <template v-if="providerEditMode === 'create' || providerEditMode === 'edit'">
-                                    <v-text-field density='compact' class="px-2 mb-2" label="Instance Name" v-model="providerFormData.name" variant="outlined" hide-details></v-text-field>
-                                    <v-select density='compact' class="px-2 mb-2" label="Provider Type" v-model="providerFormData.provider" :items="providerTypes" variant="outlined" @update:model-value="onFormProviderChange" hide-details prepend-inner-icon="mdi-cloud-outline"></v-select>
-                                    <v-text-field density='compact' class="px-2 mb-2" :append-inner-icon="settingStore.apiKeyShow ? 'mdi-eye-off' : 'mdi-eye'" :type="settingStore.apiKeyShow ? 'text' : 'password'" v-model="providerFormData.apiKey" label="API Key" prepend-inner-icon="mdi-key" clearable hide-details variant="outlined" @click:append-inner="settingStore.apiKeyShow = !settingStore.apiKeyShow"></v-text-field>
+                                    <v-text-field density='compact' class="px-2 mb-2" label="Instance Name"
+                                        v-model="providerFormData.name" variant="outlined" hide-details></v-text-field>
+                                    <v-select density='compact' class="px-2 mb-2" label="Provider Type"
+                                        v-model="providerFormData.provider" :items="providerTypes" variant="outlined"
+                                        @update:model-value="onFormProviderChange" hide-details
+                                        prepend-inner-icon="mdi-cloud-outline"></v-select>
+                                    <v-text-field density='compact' class="px-2 mb-2"
+                                        :append-inner-icon="settingStore.apiKeyShow ? 'mdi-eye-off' : 'mdi-eye'"
+                                        :type="settingStore.apiKeyShow ? 'text' : 'password'"
+                                        v-model="providerFormData.apiKey" label="API Key" prepend-inner-icon="mdi-key"
+                                        clearable hide-details variant="outlined"
+                                        @click:append-inner="settingStore.apiKeyShow = !settingStore.apiKeyShow"></v-text-field>
                                     <v-expansion-panels static tile variant="accordion" class="px-2 mb-2">
                                         <v-expansion-panel>
-                                            <v-expansion-panel-title><v-icon icon="mdi-web" start></v-icon> Endpoint </v-expansion-panel-title>
+                                            <v-expansion-panel-title><v-icon icon="mdi-web" start></v-icon> Endpoint
+                                            </v-expansion-panel-title>
                                             <v-expansion-panel-text>
-                                                <v-combobox density='compact' class="px-2" label="URL" :items="defaultChoiceStore.url" v-model="providerFormData.url" variant="outlined"></v-combobox>
-                                                <v-combobox density='compact' class="px-2" label="Path" :items="defaultChoiceStore.path" v-model="providerFormData.path" variant="outlined"></v-combobox>
-                                                <v-combobox density='compact' class="px-2" label="Model" :items="defaultChoiceStore.model" v-model="providerFormData.model" variant="outlined"></v-combobox>
+                                                <v-combobox density='compact' class="px-2" label="URL"
+                                                    :items="defaultChoiceStore.url" v-model="providerFormData.url"
+                                                    variant="outlined"></v-combobox>
+                                                <v-combobox density='compact' class="px-2" label="Path"
+                                                    :items="defaultChoiceStore.path" v-model="providerFormData.path"
+                                                    variant="outlined"></v-combobox>
+                                                <v-combobox density='compact' class="px-2" label="Model"
+                                                    :items="defaultChoiceStore.model" v-model="providerFormData.model"
+                                                    variant="outlined"></v-combobox>
                                             </v-expansion-panel-text>
                                         </v-expansion-panel>
                                         <v-expansion-panel>
-                                            <v-expansion-panel-title><v-icon icon="mdi-account-key" start></v-icon> Advanced </v-expansion-panel-title>
+                                            <v-expansion-panel-title><v-icon icon="mdi-account-key" start></v-icon>
+                                                Advanced </v-expansion-panel-title>
                                             <v-expansion-panel-text>
                                                 <v-row class="px-3 mt-2 mr-2">
-                                                    <v-combobox class="px-2" density='compact' label="Reasoning Effort" v-model="providerFormData.reasoning_effort" clearable :items="defaultChoiceStore.reasoning_efforts" variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="Reasoning Effort"
+                                                        v-model="providerFormData.reasoning_effort" clearable
+                                                        :items="defaultChoiceStore.reasoning_efforts"
+                                                        variant="outlined"></v-combobox>
                                                     <v-spacer></v-spacer>
-                                                    <v-checkbox v-model="providerFormData.stream" label="Stream" density='compact' color="primary"></v-checkbox>
-                                                    <v-checkbox v-if="mcpStore.getServers" v-model="providerFormData.mcp" label="MCP" density='compact' color="primary"></v-checkbox>
+                                                    <v-checkbox v-model="providerFormData.stream" label="Stream"
+                                                        density='compact' color="primary"></v-checkbox>
+                                                    <v-checkbox v-if="mcpStore.getServers"
+                                                        v-model="providerFormData.mcp" label="MCP" density='compact'
+                                                        color="primary"></v-checkbox>
                                                 </v-row>
                                                 <v-row class="px-3 mt-4 mb-0">
-                                                    <v-combobox class="px-2" density='compact' label="Max Tokens Prefix" :items="defaultChoiceStore.max_tokens_type" v-model="providerFormData.max_tokens_type" variant="outlined"></v-combobox>
-                                                    <v-combobox class="px-2" density='compact' label="MaxTokenValue" v-model="providerFormData.max_tokens_value" type='number' single-line variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="Max Tokens Prefix"
+                                                        :items="defaultChoiceStore.max_tokens_type"
+                                                        v-model="providerFormData.max_tokens_type"
+                                                        variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="MaxTokenValue"
+                                                        v-model="providerFormData.max_tokens_value" type='number'
+                                                        single-line variant="outlined"></v-combobox>
                                                 </v-row>
                                                 <v-row class="px-3 mt-0 mb-0">
-                                                    <v-combobox class="px-2" density='compact' label="Temperature" :items="defaultChoiceStore.temperature" type='number' v-model="providerFormData.temperature" variant="outlined"></v-combobox>
-                                                    <v-combobox class="px-2" density='compact' label="Top P" v-model="providerFormData.top_p" type='number' variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="Temperature"
+                                                        :items="defaultChoiceStore.temperature" type='number'
+                                                        v-model="providerFormData.temperature"
+                                                        variant="outlined"></v-combobox>
+                                                    <v-combobox class="px-2" density='compact' label="Top P"
+                                                        v-model="providerFormData.top_p" type='number'
+                                                        variant="outlined"></v-combobox>
                                                 </v-row>
-                                                <v-combobox class="px-2" density='compact' label="Content Type" v-model="providerFormData.contentType" variant="outlined"></v-combobox>
-                                                <v-combobox class="px-2" density='compact' label="Auth Prefix" :items="defaultChoiceStore.authPrefix" v-model="providerFormData.authPrefix" variant="outlined"></v-combobox>
-                                                <v-combobox class="px-2" density='compact' label="Auth Header Name" :items="['Authorization', 'x-api-key', 'Token']" v-model="providerFormData.authHeaderName" variant="outlined"></v-combobox>
-                                                <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2" density='compact' label="Seed" v-model.number="providerFormData.seed" type='number' variant="outlined"></v-text-field>
-                                                <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2" density='compact' label="Frequency Penalty" v-model.number="providerFormData.frequency_penalty" type='number' variant="outlined"></v-text-field>
-                                                <v-checkbox v-if="providerFormData.provider === 'minimax'" v-model="providerFormData.mask_sensitive_info" label="Mask Sensitive Info" density='compact' color="primary"></v-checkbox>
-                                                <div v-if="providerFormData.provider === 'anthropic-compatible'" class="px-2 text-caption text-grey">Auth Prefix not needed for Anthropic</div>
-                                                <div v-if="providerFormData.provider === 'glm'" class="px-2 text-caption text-grey">Temperature auto-adapted (do_sample)</div>
+                                                <v-combobox class="px-2" density='compact' label="Content Type"
+                                                    v-model="providerFormData.contentType"
+                                                    variant="outlined"></v-combobox>
+                                                <v-combobox class="px-2" density='compact' label="Auth Prefix"
+                                                    :items="defaultChoiceStore.authPrefix"
+                                                    v-model="providerFormData.authPrefix"
+                                                    variant="outlined"></v-combobox>
+                                                <v-combobox class="px-2" density='compact' label="Auth Header Name"
+                                                    :items="['Authorization', 'x-api-key', 'Token']"
+                                                    v-model="providerFormData.authHeaderName"
+                                                    variant="outlined"></v-combobox>
+                                                <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2"
+                                                    density='compact' label="Seed"
+                                                    v-model.number="providerFormData.seed" type='number'
+                                                    variant="outlined"></v-text-field>
+                                                <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2"
+                                                    density='compact' label="Frequency Penalty"
+                                                    v-model.number="providerFormData.frequency_penalty" type='number'
+                                                    variant="outlined"></v-text-field>
+                                                <v-checkbox v-if="providerFormData.provider === 'minimax'"
+                                                    v-model="providerFormData.mask_sensitive_info"
+                                                    label="Mask Sensitive Info" density='compact'
+                                                    color="primary"></v-checkbox>
+                                                <div v-if="providerFormData.provider === 'anthropic-compatible'"
+                                                    class="px-2 text-caption text-grey">Auth Prefix not needed for
+                                                    Anthropic</div>
+                                                <div v-if="providerFormData.provider === 'glm'"
+                                                    class="px-2 text-caption text-grey">Temperature auto-adapted
+                                                    (do_sample)</div>
                                             </v-expansion-panel-text>
                                         </v-expansion-panel>
                                     </v-expansion-panels>
                                     <v-row class="mt-2 px-2">
                                         <v-btn color="primary" variant="flat" @click="saveProviderForm">Save</v-btn>
-                                        <v-btn class="ml-2" variant="outlined" @click="cancelProviderForm">Cancel</v-btn>
+                                        <v-btn class="ml-2" variant="outlined"
+                                            @click="cancelProviderForm">Cancel</v-btn>
                                     </v-row>
                                 </template>
                                 <template v-else>
                                     <div v-if="chatbotStore.activeProvider" class="px-2">
                                         <div class="text-h6 mb-2">{{ chatbotStore.activeProvider.name }}</div>
-                                        <div class="text-body-2 mb-1"><strong>Type:</strong> {{ getProviderDisplayName(chatbotStore.activeProvider.provider) }}</div>
-                                        <div class="text-body-2 mb-1"><strong>API Key:</strong> {{ maskApiKey(chatbotStore.activeProvider.apiKey) }}</div>
-                                        <div class="text-body-2 mb-1"><strong>URL:</strong> {{ chatbotStore.activeProvider.url }}</div>
-                                        <div class="text-body-2 mb-1"><strong>Path:</strong> {{ chatbotStore.activeProvider.path }}</div>
-                                        <div class="text-body-2 mb-1"><strong>Model:</strong> {{ chatbotStore.activeProvider.model }}</div>
-                                        <div class="text-body-2 mb-1"><strong>Stream:</strong> {{ chatbotStore.activeProvider.stream ? 'On' : 'Off' }}</div>
-                                        <div class="text-body-2 mb-1"><strong>MCP:</strong> {{ chatbotStore.activeProvider.mcp ? 'On' : 'Off' }}</div>
-                                        <v-btn class="mt-4" color="primary" variant="tonal" density="compact" @click="startEditProvider(chatbotStore.activeProvider)">Edit</v-btn>
+                                        <div class="text-body-2 mb-1"><strong>Type:</strong> {{
+                                            getProviderDisplayName(chatbotStore.activeProvider.provider) }}</div>
+                                        <div class="text-body-2 mb-1"><strong>API Key:</strong> {{
+                                            maskApiKey(chatbotStore.activeProvider.apiKey) }}</div>
+                                        <div class="text-body-2 mb-1"><strong>URL:</strong> {{
+                                            chatbotStore.activeProvider.url }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Path:</strong> {{
+                                            chatbotStore.activeProvider.path }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Model:</strong> {{
+                                            chatbotStore.activeProvider.model }}</div>
+                                        <div class="text-body-2 mb-1"><strong>Stream:</strong> {{
+                                            chatbotStore.activeProvider.stream ? 'On' : 'Off' }}</div>
+                                        <div class="text-body-2 mb-1"><strong>MCP:</strong> {{
+                                            chatbotStore.activeProvider.mcp ? 'On' : 'Off' }}</div>
+                                        <v-btn class="mt-4" color="primary" variant="tonal" density="compact"
+                                            @click="startEditProvider(chatbotStore.activeProvider)">Edit</v-btn>
                                     </div>
                                     <div v-else class="px-2 text-body-2 text-grey">No provider selected</div>
                                 </template>
@@ -996,10 +1156,12 @@
                         </v-row>
 
                         <!-- Delete Confirm Dialog -->
-                        <v-dialog v-model="showDeleteDialog" max-width="400" data-component-id="chat-mcp.dialog.delete-confirm">
+                        <v-dialog v-model="showDeleteDialog" max-width="400"
+                            data-component-id="chat-mcp.dialog.delete-confirm">
                             <v-card>
                                 <v-card-title>Delete Provider</v-card-title>
-                                <v-card-text>Are you sure you want to delete "{{ deleteTargetName }}"? This action cannot be undone.</v-card-text>
+                                <v-card-text>Are you sure you want to delete "{{ deleteTargetName }}"? This action
+                                    cannot be undone.</v-card-text>
                                 <v-card-actions>
                                     <v-spacer></v-spacer>
                                     <v-btn variant="text" @click="showDeleteDialog = false">Cancel</v-btn>
@@ -1018,30 +1180,22 @@
                         <v-dialog v-model="showExportDialog" max-width="500">
                             <v-card :title="$t('$vuetify.dataIterator.i.exportTitle')">
                                 <v-card-text>
-                                    <v-checkbox
-                                        :label="$t('$vuetify.dataIterator.i.selectAll')"
-                                        :model-value="exportAllSelected"
-                                        :indeterminate="exportIndeterminate"
-                                        @click="toggleExportAll"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
+                                    <v-checkbox :label="$t('$vuetify.dataIterator.i.selectAll')"
+                                        :model-value="exportAllSelected" :indeterminate="exportIndeterminate"
+                                        @click="toggleExportAll" color="primary" hide-details></v-checkbox>
                                     <v-divider></v-divider>
-                                    <v-checkbox
-                                        v-for="pitem in chatbotStore.providers"
-                                        :key="pitem.id"
+                                    <v-checkbox v-for="pitem in chatbotStore.providers" :key="pitem.id"
                                         :label="pitem.name + ' (' + getProviderDisplayName(pitem.provider) + ')'"
                                         :model-value="exportSelectedIds.includes(pitem.id)"
-                                        @change="toggleExportItem(pitem.id)"
-                                        color="primary"
-                                        density="compact"
-                                        hide-details
-                                    ></v-checkbox>
+                                        @change="toggleExportItem(pitem.id)" color="primary" density="compact"
+                                        hide-details></v-checkbox>
                                 </v-card-text>
                                 <v-card-actions>
                                     <v-spacer></v-spacer>
-                                    <v-btn variant="text" @click="cancelExport">{{ $t('$vuetify.dataIterator.i.cancel') }}</v-btn>
-                                    <v-btn variant="flat" color="primary" :disabled="exportSelectedIds.length === 0" @click="confirmExport">{{ $t('$vuetify.dataIterator.i.confirmExport') }}</v-btn>
+                                    <v-btn variant="text" @click="cancelExport">{{ $t('$vuetify.dataIterator.i.cancel')
+                                        }}</v-btn>
+                                    <v-btn variant="flat" color="primary" :disabled="exportSelectedIds.length === 0"
+                                        @click="confirmExport">{{ $t('$vuetify.dataIterator.i.confirmExport') }}</v-btn>
                                 </v-card-actions>
                             </v-card>
                         </v-dialog>
@@ -1050,7 +1204,8 @@
                 </v-card>
             </v-dialog>
 
-            <v-dialog v-model="resourceStore.resourceDialog" class="dialog-card" scrollable data-component-id="chat-mcp.dialog.resource">
+            <v-dialog v-model="resourceStore.resourceDialog" class="dialog-card" scrollable
+                data-component-id="chat-mcp.dialog.resource">
                 <v-card prepend-icon="mdi-database" :title="$t('$vuetify.dataIterator.r.title')">
                     <v-tabs :items="mcpStore.listServerResources()" v-model="resourceStore.tab" color="primary">
                         <template v-slot:tab="{ item }">
@@ -1163,41 +1318,46 @@
                                     <h5 class="font-weight-bold mb-0">MCP</h5>
                                     <v-spacer></v-spacer>
                                     <v-btn variant="text" rounded icon="mdi-refresh" size="small" color="primary"
-                                        @click="settingStore.refreshMcpServersList()"
-                                        title="Refresh server list">
+                                        @click="settingStore.refreshMcpServersList()" title="Refresh server list">
                                     </v-btn>
                                     <v-btn variant="text" rounded icon="mdi-plus" size="small" color="primary"
                                         @click="settingStore.addMcpDialog = true">
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
-                                
+
                                 <!-- MCP Servers List -->
-                                <div v-if="settingStore.mcpServersList.length === 0" class="text-center pa-4 text-caption text-grey">
+                                <div v-if="settingStore.mcpServersList.length === 0"
+                                    class="text-center pa-4 text-caption text-grey">
                                     No MCP servers configured yet
                                 </div>
-                                
-                                <v-list v-else density="compact" class="mb-4" data-component-id="chat-mcp.dialog.mcp-server-list">
+
+                                <v-list v-else density="compact" class="mb-4"
+                                    data-component-id="chat-mcp.dialog.mcp-server-list">
                                     <v-list-item v-for="server in settingStore.mcpServersList" :key="server.name"
-                                        :title="server.name" class="mb-2" @dblclick="settingStore.showMcpServerConfig(server)" style="cursor: pointer;">
+                                        :title="server.name" class="mb-2"
+                                        @dblclick="settingStore.showMcpServerConfig(server)" style="cursor: pointer;">
                                         <template v-slot:prepend>
-                                            <v-icon v-if="settingStore.mcpServerStatus[server.name] === 'available'" 
+                                            <v-icon v-if="settingStore.mcpServerStatus[server.name] === 'available'"
                                                 color="success" icon="mdi-check-circle"></v-icon>
-                                            <v-icon v-else-if="settingStore.mcpServerStatus[server.name] === 'unavailable'" 
+                                            <v-icon
+                                                v-else-if="settingStore.mcpServerStatus[server.name] === 'unavailable'"
                                                 color="error" icon="mdi-alert-circle"></v-icon>
-                                            <v-progress-circular v-else-if="settingStore.mcpServerStatus[server.name] === 'testing'"
-                                                indeterminate size="24" color="primary" class="mr-2"></v-progress-circular>
+                                            <v-progress-circular
+                                                v-else-if="settingStore.mcpServerStatus[server.name] === 'testing'"
+                                                indeterminate size="24" color="primary"
+                                                class="mr-2"></v-progress-circular>
                                             <v-icon v-else color="warning" icon="mdi-help-circle"></v-icon>
                                         </template>
-                                        
+
                                         <v-list-item-subtitle class="text-caption">
-                                            {{ server.config.type === 'http' ? 
-                                                (server.config.url || 'No URL') : 
-                                                (server.config.command || 'No command') }}
+                                            {{ server.config.type === 'http' ?
+                                            (server.config.url || 'No URL') :
+                                            (server.config.command || 'No command') }}
                                         </v-list-item-subtitle>
-                                        
+
                                         <template v-slot:append>
-                                            <v-btn variant="text" size="x-small" icon="mdi-check-network" 
+                                            <v-btn variant="text" size="x-small" icon="mdi-check-network"
                                                 :disabled="settingStore.mcpTestingServers.includes(server.name)"
                                                 @click="settingStore.testMcpServer(server.name)"
                                                 title="Test server connection">
@@ -1209,12 +1369,11 @@
                                         </template>
                                     </v-list-item>
                                 </v-list>
-                                
+
                                 <!-- Tools List from Servers -->
                                 <v-data-table-server hide-default-footer hide-default-header hide-no-data disable-sort
-                                    v-if="mcpStore.getServers && mcpStore.serverTools.length > 0" 
-                                    :items="mcpStore.serverTools"
-                                    @update:options="mcpStore.loadTools"
+                                    v-if="mcpStore.getServers && mcpStore.serverTools.length > 0"
+                                    :items="mcpStore.serverTools" @update:options="mcpStore.loadTools"
                                     :loading="mcpStore.loading"></v-data-table-server>
                             </v-col>
                         </v-row>
@@ -1223,7 +1382,8 @@
                 </v-card>
             </v-dialog>
 
-            <v-dialog v-model="agentStore.editDialog" class="dialog-card" data-component-id="chat-mcp.dialog.agent-edit">
+            <v-dialog v-model="agentStore.editDialog" class="dialog-card"
+                data-component-id="chat-mcp.dialog.agent-edit">
                 <v-card>
                     <v-card-title class="pa-4 d-flex align-center">
                         <span class="flex-fill">Edit Card</span>
@@ -1256,8 +1416,10 @@
             </v-dialog>
 
             <!-- MCP Server Config Viewer Dialog -->
-            <v-dialog v-model="settingStore.mcpConfigViewerDialog" max-width="800" class="dialog-card" data-component-id="chat-mcp.dialog.mcp-config-viewer">
-                <v-card v-if="settingStore.mcpConfigViewerServer" prepend-icon="mdi-code-json" :title="'MCP Server Config - ' + settingStore.mcpConfigViewerServer.name">
+            <v-dialog v-model="settingStore.mcpConfigViewerDialog" max-width="800" class="dialog-card"
+                data-component-id="chat-mcp.dialog.mcp-config-viewer">
+                <v-card v-if="settingStore.mcpConfigViewerServer" prepend-icon="mdi-code-json"
+                    :title="'MCP Server Config - ' + settingStore.mcpConfigViewerServer.name">
                     <v-divider></v-divider>
                     <v-card-text class="pa-4">
                         <div class="d-flex align-center mb-3">
@@ -1268,7 +1430,8 @@
                                 title="Copy to clipboard">
                             </v-btn>
                         </div>
-                        <v-sheet class="pa-3 bg-surface-variant rounded" style="font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                        <v-sheet class="pa-3 bg-surface-variant rounded"
+                            style="font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 500px; overflow-y: auto;">
                             <pre>{{ JSON.stringify(settingStore.mcpConfigViewerServer.config, null, 2) }}</pre>
                         </v-sheet>
                     </v-card-text>
@@ -1281,7 +1444,8 @@
             </v-dialog>
 
             <!-- Add MCP Server Dialog -->
-            <v-dialog v-model="settingStore.addMcpDialog" max-width="900" class="dialog-card" data-component-id="chat-mcp.dialog.mcp-add">
+            <v-dialog v-model="settingStore.addMcpDialog" max-width="900" class="dialog-card"
+                data-component-id="chat-mcp.dialog.mcp-add">
                 <v-card prepend-icon="mdi-plus-circle" title="MCP工具管理">
                     <v-divider></v-divider>
                     <v-card-text>
@@ -1289,105 +1453,117 @@
                             <v-tab value="add-server">添加MCP服务配置</v-tab>
                             <v-tab value="registry-manager">插件管理</v-tab>
                         </v-tabs>
-                        
+
                         <v-window v-model="settingStore.mcpTab">
                             <!-- Add MCP Server Tab -->
                             <v-window-item value="add-server" data-component-id="chat-mcp.dialog.mcp-add-server-tab">
                                 <div class="pa-4">
                                     <p class="text-caption text-grey mb-3">粘贴您的MCP配置JSON，我们将为您提取服务配置：</p>
                                     <v-textarea class="mb-4" density='compact' color="primary" variant="outlined"
-                                        v-model="settingStore.mcpJsonConfig" 
+                                        v-model="settingStore.mcpJsonConfig"
                                         label='粘贴JSON (例如: {"mcpServers":{"playwright":{"url":"http://..."} or {"command":"..."}}})'
                                         rows="10" auto-grow clearable hide-details></v-textarea>
-                                    
-                                    <v-btn variant="flat" color="primary" class="mb-4" @click="settingStore.parseAndShowMcpServers()">
+
+                                    <v-btn variant="flat" color="primary" class="mb-4"
+                                        @click="settingStore.parseAndShowMcpServers()">
                                         <v-icon start>mdi-magnify</v-icon>提取MCP服务
                                     </v-btn>
-                                    
+
                                     <!-- Extracted Servers List -->
                                     <div v-if="settingStore.extractedMcpServers.length > 0" class="mb-4">
-                                        <p class="text-subtitle2 mb-2">找到 {{ settingStore.extractedMcpServers.length }} 个MCP服务器:</p>
+                                        <p class="text-subtitle2 mb-2">找到 {{ settingStore.extractedMcpServers.length }}
+                                            个MCP服务器:</p>
                                         <v-checkbox v-for="(server, idx) in settingStore.extractedMcpServers" :key="idx"
-                                            v-model="settingStore.selectedMcpServers" :value="idx"
-                                            class="mb-2" hide-details>
+                                            v-model="settingStore.selectedMcpServers" :value="idx" class="mb-2"
+                                            hide-details>
                                             <template #label>
                                                 <span class="font-weight-bold">{{ server.name }}</span>
                                                 <span class="text-caption text-grey ml-2">
-                                                    <v-icon size="small" :icon="server.type === 'http' ? 'mdi-cloud' : 'mdi-console'"></v-icon>
+                                                    <v-icon size="small"
+                                                        :icon="server.type === 'http' ? 'mdi-cloud' : 'mdi-console'"></v-icon>
                                                     {{ server.type === 'http' ? server.url : server.command }}
                                                     {{ server.args ? `(${server.args.length} 参数)` : '' }}
                                                 </span>
                                             </template>
                                         </v-checkbox>
                                     </div>
-                                    
-                                    <v-alert v-if="settingStore.mcpJsonError" type="error" class="mb-4" closable @input="settingStore.mcpJsonError = ''">
+
+                                    <v-alert v-if="settingStore.mcpJsonError" type="error" class="mb-4" closable
+                                        @input="settingStore.mcpJsonError = ''">
                                         {{ settingStore.mcpJsonError }}
                                     </v-alert>
                                 </div>
                             </v-window-item>
-                            
+
                             <!-- Registry Manager Tab -->
-                            <v-window-item value="registry-manager" data-component-id="chat-mcp.dialog.mcp-registry-tab">
+                            <v-window-item value="registry-manager"
+                                data-component-id="chat-mcp.dialog.mcp-registry-tab">
                                 <div class="pa-4">
                                     <!-- 仓库状态部分 -->
                                     <div class="mb-6">
                                         <h3 class="text-h6 mb-3">仓库状态</h3>
-                                        <v-card :class="settingStore.registryRunning ? 'bg-green-lighten-5' : 'bg-red-lighten-5'" class="pa-4" data-component-id="chat-mcp.dialog.registry-status">
+                                        <v-card
+                                            :class="settingStore.registryRunning ? 'bg-green-lighten-5' : 'bg-red-lighten-5'"
+                                            class="pa-4" data-component-id="chat-mcp.dialog.registry-status">
                                             <div class="d-flex align-center mb-2">
-                                                <v-icon :icon="settingStore.registryRunning ? 'mdi-server' : 'mdi-server-off'" 
-                                                    :color="settingStore.registryRunning ? 'green' : 'red'" class="mr-2"></v-icon>
-                                                <span class="font-weight-medium">{{ settingStore.registryRunning ? '运行中' : '已停止' }}</span>
+                                                <v-icon
+                                                    :icon="settingStore.registryRunning ? 'mdi-server' : 'mdi-server-off'"
+                                                    :color="settingStore.registryRunning ? 'green' : 'red'"
+                                                    class="mr-2"></v-icon>
+                                                <span class="font-weight-medium">{{ settingStore.registryRunning ? '运行中'
+                                                    : '已停止' }}</span>
                                             </div>
-                                            <div v-if="settingStore.registryRunning && settingStore.registryUrl" class="text-caption">
+                                            <div v-if="settingStore.registryRunning && settingStore.registryUrl"
+                                                class="text-caption">
                                                 URL: {{ settingStore.registryUrl }}
                                             </div>
                                         </v-card>
-                                        
+
                                         <div class="mt-3 d-flex gap-2">
-                                            <v-btn :disabled="settingStore.registryRunning" 
-                                                color="success" variant="elevated" @click="settingStore.startRegistry">
+                                            <v-btn :disabled="settingStore.registryRunning" color="success"
+                                                variant="elevated" @click="settingStore.startRegistry">
                                                 <v-icon start>mdi-play</v-icon>启动仓库
                                             </v-btn>
-                                            <v-btn :disabled="!settingStore.registryRunning" 
-                                                color="error" variant="elevated" @click="settingStore.stopRegistry">
+                                            <v-btn :disabled="!settingStore.registryRunning" color="error"
+                                                variant="elevated" @click="settingStore.stopRegistry">
                                                 <v-icon start>mdi-stop</v-icon>停止仓库
                                             </v-btn>
-                                            <v-btn color="primary" variant="outlined" @click="settingStore.updateRegistryStatus">
+                                            <v-btn color="primary" variant="outlined"
+                                                @click="settingStore.updateRegistryStatus">
                                                 <v-icon start>mdi-refresh</v-icon>刷新状态
                                             </v-btn>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- 依赖包管理部分 -->
                                     <div class="mb-6">
                                         <h3 class="text-h6 mb-3">依赖包管理</h3>
-                                        <v-file-input v-model="settingStore.registryZipFile" 
-                                            accept=".zip" 
-                                            label="选择包含.tgz文件的zip压缩包"
-                                            prepend-icon="mdi-file-upload"
-                                            variant="outlined"
-                                            density="compact"
-                                            class="mb-3">
+                                        <v-file-input v-model="settingStore.registryZipFile" accept=".zip"
+                                            label="选择包含.tgz文件的zip压缩包" prepend-icon="mdi-file-upload" variant="outlined"
+                                            density="compact" class="mb-3">
                                         </v-file-input>
-                                        
-                                        <v-btn :disabled="!settingStore.registryZipFile || settingStore.registryProcessing" 
-                                            color="primary" variant="elevated" @click="settingStore.processRegistryDependencies">
+
+                                        <v-btn
+                                            :disabled="!settingStore.registryZipFile || settingStore.registryProcessing"
+                                            color="primary" variant="elevated"
+                                            @click="settingStore.processRegistryDependencies">
                                             <v-icon start>mdi-cog</v-icon>处理依赖包
                                         </v-btn>
                                     </div>
-                                    
+
                                     <!-- 操作日志部分 -->
                                     <div>
                                         <h3 class="text-h6 mb-3">操作日志</h3>
-                                        <v-card variant="outlined" class="pa-3" height="200" style="overflow-y: auto;" data-component-id="chat-mcp.dialog.registry-log">
-                                            <pre class="text-caption" style="font-family: monospace; white-space: pre-wrap;">{{ settingStore.registryLog }}</pre>
+                                        <v-card variant="outlined" class="pa-3" height="200" style="overflow-y: auto;"
+                                            data-component-id="chat-mcp.dialog.registry-log">
+                                            <pre class="text-caption"
+                                                style="font-family: monospace; white-space: pre-wrap;">{{ settingStore.registryLog }}</pre>
                                         </v-card>
-                                        
+
                                         <!-- 进度条 -->
-                                        <div v-if="settingStore.registryProgress > 0 && settingStore.registryProgress < 100" class="mt-3">
-                                            <v-progress-linear v-model="settingStore.registryProgress" 
-                                                height="20" 
+                                        <div v-if="settingStore.registryProgress > 0 && settingStore.registryProgress < 100"
+                                            class="mt-3">
+                                            <v-progress-linear v-model="settingStore.registryProgress" height="20"
                                                 color="primary">
                                                 <template v-slot:default="{ value }">
                                                     <strong>{{ Math.ceil(value) }}%</strong>
@@ -1396,12 +1572,10 @@
                                             <div class="text-caption mt-1">{{ settingStore.registryProgressText }}</div>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- 通知 -->
-                                    <v-snackbar v-model="settingStore.registryNotification.show" 
-                                        :color="settingStore.registryNotification.type"
-                                        location="top"
-                                        timeout="3000">
+                                    <v-snackbar v-model="settingStore.registryNotification.show"
+                                        :color="settingStore.registryNotification.type" location="top" timeout="3000">
                                         {{ settingStore.registryNotification.message }}
                                     </v-snackbar>
                                 </div>
@@ -1412,7 +1586,7 @@
                     <v-card-actions>
                         <v-spacer></v-spacer>
                         <v-btn variant="outlined" @click="settingStore.addMcpDialog = false">取消</v-btn>
-                        <v-btn v-if="settingStore.mcpTab === 'add-server'" variant="flat" color="primary" 
+                        <v-btn v-if="settingStore.mcpTab === 'add-server'" variant="flat" color="primary"
                             :disabled="settingStore.selectedMcpServers.length === 0"
                             @click="settingStore.addExtractedMcpServers()">
                             添加所选 ({{ settingStore.selectedMcpServers.length }})
@@ -1422,12 +1596,14 @@
             </v-dialog>
 
             <!-- Skill Management Dialog -->
-            <v-dialog v-model="settingStore.skillDialog" max-width="900" class="dialog-card" data-component-id="chat-mcp.dialog.skill-manage">
+            <v-dialog v-model="settingStore.skillDialog" max-width="900" class="dialog-card"
+                data-component-id="chat-mcp.dialog.skill-manage">
                 <v-card prepend-icon="mdi-auto-fix" :title="$t('$vuetify.dataIterator.skill.title')"
                     @dragover.prevent="settingStore.skillDragOver = true"
                     @dragleave.prevent="settingStore.skillDragOver = false"
                     @drop.prevent="settingStore.skillDragOver = false; handleSkillDrop($event)">
-                    <v-overlay v-model="settingStore.skillDragOver" contained class="align-center justify-center" opacity="0.8">
+                    <v-overlay v-model="settingStore.skillDragOver" contained class="align-center justify-center"
+                        opacity="0.8">
                         <div class="text-center">
                             <v-icon size="64" color="primary">mdi-package-variant-closed</v-icon>
                             <p class="text-h6 mt-2">{{ $t('$vuetify.dataIterator.skill.dropToInstall') }}</p>
@@ -1447,23 +1623,22 @@
                                 <div class="pa-4">
                                     <v-row class="mb-4" dense>
                                         <v-col cols="8">
-                                            <v-text-field v-model="skillStore.skillSearchQuery"
-                                                density="compact" variant="outlined"
-                                                prepend-inner-icon="mdi-magnify"
+                                            <v-text-field v-model="skillStore.skillSearchQuery" density="compact"
+                                                variant="outlined" prepend-inner-icon="mdi-magnify"
                                                 :placeholder="$t('$vuetify.dataIterator.skill.searchPlaceholder')"
                                                 clearable hide-details></v-text-field>
                                         </v-col>
                                         <v-col cols="4">
                                             <v-select v-model="skillStore.skillCategoryFilter"
-                                                :items="skillStore.skillCategories"
-                                                density="compact" variant="outlined"
-                                                :label="$t('$vuetify.dataIterator.skill.category')"
-                                                hide-details>
+                                                :items="skillStore.skillCategories" density="compact" variant="outlined"
+                                                :label="$t('$vuetify.dataIterator.skill.category')" hide-details>
                                                 <template v-slot:item="{ props, item }">
-                                                    <v-list-item v-bind="props" :title="item.value === 'all' ? $t('$vuetify.dataIterator.skill.allCategories') : item.value"></v-list-item>
+                                                    <v-list-item v-bind="props"
+                                                        :title="item.value === 'all' ? $t('$vuetify.dataIterator.skill.allCategories') : item.value"></v-list-item>
                                                 </template>
                                                 <template v-slot:selection="{ item }">
-                                                    {{ item.value === 'all' ? $t('$vuetify.dataIterator.skill.allCategories') : item.value }}
+                                                    {{ item.value === 'all' ?
+                                                    $t('$vuetify.dataIterator.skill.allCategories') : item.value }}
                                                 </template>
                                             </v-select>
                                         </v-col>
@@ -1475,15 +1650,21 @@
                                             <v-card variant="outlined" class="mb-3" height="100%">
                                                 <v-card-item>
                                                     <template v-slot:prepend>
-                                                        <v-icon :icon="skill.icon" color="primary" size="large"></v-icon>
+                                                        <v-icon :icon="skill.icon" color="primary"
+                                                            size="large"></v-icon>
                                                     </template>
-                                                    <v-card-title class="text-body-1 font-weight-bold">{{ skill.displayName.zh }}</v-card-title>
-                                                    <v-card-subtitle class="text-caption">{{ skill.category }}</v-card-subtitle>
+                                                    <v-card-title class="text-body-1 font-weight-bold">{{
+                                                        skill.displayName.zh }}</v-card-title>
+                                                    <v-card-subtitle class="text-caption">{{ skill.category
+                                                        }}</v-card-subtitle>
                                                 </v-card-item>
                                                 <v-card-text class="pt-0 pb-2">
-                                                    <p class="text-caption text-grey mb-2" style="line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ skill.description.zh }}</p>
+                                                    <p class="text-caption text-grey mb-2"
+                                                        style="line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                                        {{ skill.description.zh }}</p>
                                                     <div class="d-flex flex-wrap ga-1">
-                                                        <v-chip v-for="tag in skill.tags.slice(0, 3)" :key="tag" size="x-small" variant="tonal" label>{{ tag }}</v-chip>
+                                                        <v-chip v-for="tag in skill.tags.slice(0, 3)" :key="tag"
+                                                            size="x-small" variant="tonal" label>{{ tag }}</v-chip>
                                                     </div>
                                                 </v-card-text>
                                                 <v-card-actions class="pt-0">
@@ -1491,17 +1672,20 @@
                                                     <v-btn v-if="!skillStore.installedSkillNames.includes(skill.name)"
                                                         size="small" variant="flat" color="primary"
                                                         @click="skillStore.installSkill(skill.name)">
-                                                        <v-icon start>mdi-download</v-icon>{{ $t('$vuetify.dataIterator.skill.install') }}
+                                                        <v-icon start>mdi-download</v-icon>{{
+                                                        $t('$vuetify.dataIterator.skill.install') }}
                                                     </v-btn>
                                                     <v-chip v-else size="small" color="success" variant="tonal">
-                                                        <v-icon start>mdi-check</v-icon>{{ $t('$vuetify.dataIterator.skill.installedLabel') }}
+                                                        <v-icon start>mdi-check</v-icon>{{
+                                                        $t('$vuetify.dataIterator.skill.installedLabel') }}
                                                     </v-chip>
                                                 </v-card-actions>
                                             </v-card>
                                         </v-col>
                                     </v-row>
 
-                                    <v-alert v-if="skillStore.filteredRegistrySkills.length === 0 && !skillStore.loadingRegistry"
+                                    <v-alert
+                                        v-if="skillStore.filteredRegistrySkills.length === 0 && !skillStore.loadingRegistry"
                                         type="info" variant="tonal" class="mt-4">
                                         {{ $t('$vuetify.dataIterator.skill.noSkillsFound') }}
                                     </v-alert>
@@ -1511,31 +1695,36 @@
                             <!-- Installed Tab -->
                             <v-window-item value="installed" data-component-id="chat-mcp.dialog.skill-installed-tab">
                                 <div class="pa-4">
-                                    <v-alert v-if="skillStore.installedSkills.length === 0"
-                                        type="info" variant="tonal" class="mb-4">
+                                    <v-alert v-if="skillStore.installedSkills.length === 0" type="info" variant="tonal"
+                                        class="mb-4">
                                         {{ $t('$vuetify.dataIterator.skill.noInstalled') }}
                                     </v-alert>
 
                                     <v-list lines="two" class="bg-transparent">
-                                        <v-list-item v-for="installed in skillStore.installedSkills" :key="installed.name"
-                                            class="mb-2" variant="outlined" rounded="lg">
+                                        <v-list-item v-for="installed in skillStore.installedSkills"
+                                            :key="installed.name" class="mb-2" variant="outlined" rounded="lg">
                                             <template v-slot:prepend>
-                                                <v-icon :icon="skillStore.registrySkills.find(s => s.name === installed.name)?.icon || 'mdi-puzzle'"
+                                                <v-icon
+                                                    :icon="skillStore.registrySkills.find(s => s.name === installed.name)?.icon || 'mdi-puzzle'"
                                                     color="primary" class="mr-3"></v-icon>
                                             </template>
                                             <v-list-item-title class="font-weight-bold">
-                                                {{ skillStore.registrySkills.find(s => s.name === installed.name)?.displayName?.zh || installed.name }}
+                                                {{ skillStore.registrySkills.find(s => s.name ===
+                                                installed.name)?.displayName?.zh || installed.name }}
                                             </v-list-item-title>
                                             <v-list-item-subtitle>
                                                 <span class="text-caption text-grey">
-                                                    {{ $t('$vuetify.dataIterator.skill.usageCount') }}: {{ installed.usageCount }}
-                                                    <span v-if="installed.lastUsedAt"> | {{ $t('$vuetify.dataIterator.skill.lastUsed') }}: {{ new Date(installed.lastUsedAt).toLocaleDateString() }}</span>
+                                                    {{ $t('$vuetify.dataIterator.skill.usageCount') }}: {{
+                                                    installed.usageCount }}
+                                                    <span v-if="installed.lastUsedAt"> | {{
+                                                        $t('$vuetify.dataIterator.skill.lastUsed') }}: {{ new
+                                                        Date(installed.lastUsedAt).toLocaleDateString() }}</span>
                                                 </span>
                                             </v-list-item-subtitle>
                                             <template v-slot:append>
                                                 <div class="d-flex align-center ga-2">
-                                                    <v-switch v-model="installed.enabled"
-                                                        color="success" density="compact" hide-details
+                                                    <v-switch v-model="installed.enabled" color="success"
+                                                        density="compact" hide-details
                                                         @update:model-value="skillStore.toggleSkill(installed.name, $event)"></v-switch>
                                                     <v-btn size="small" variant="text" icon="mdi-cog"
                                                         @click="skillStore.skillConfigTarget = installed; skillStore.skillConfigDialog = true;"></v-btn>
@@ -1560,10 +1749,13 @@
 
                                     <div v-else>
                                         <div class="d-flex align-center justify-space-between mb-3">
-                                            <span class="text-subtitle-2 font-weight-bold">{{ $t('$vuetify.dataIterator.skill.workflowSteps') }}</span>
+                                            <span class="text-subtitle-2 font-weight-bold">{{
+                                                $t('$vuetify.dataIterator.skill.workflowSteps') }}</span>
                                             <div class="d-flex ga-2">
-                                                <v-btn size="small" variant="outlined" @click="skillStore.workflowSteps = []">
-                                                    <v-icon start>mdi-delete-sweep</v-icon>{{ $t('$vuetify.dataIterator.skill.clearWorkflow') }}
+                                                <v-btn size="small" variant="outlined"
+                                                    @click="skillStore.workflowSteps = []">
+                                                    <v-icon start>mdi-delete-sweep</v-icon>{{
+                                                    $t('$vuetify.dataIterator.skill.clearWorkflow') }}
                                                 </v-btn>
                                             </div>
                                         </div>
@@ -1571,16 +1763,20 @@
                                         <v-list class="bg-transparent" style="min-height: 100px;">
                                             <v-list-item v-for="(step, idx) in skillStore.workflowSteps" :key="idx"
                                                 class="mb-2" variant="outlined" rounded="lg" draggable="true"
-                                                @dragstart="skillStore.workflowDragIndex = idx"
-                                                @dragover.prevent
+                                                @dragstart="skillStore.workflowDragIndex = idx" @dragover.prevent
                                                 @drop="skillStore.reorderWorkflowStep(skillStore.workflowDragIndex, idx)">
                                                 <template v-slot:prepend>
-                                                    <v-icon icon="mdi-drag-vertical" class="mr-2 cursor-move" style="cursor: move;"></v-icon>
-                                                    <v-chip size="small" variant="tonal" color="primary" class="mr-2">{{ idx + 1 }}</v-chip>
-                                                    <v-icon :icon="skillStore.registrySkills.find(s => s.name === step)?.icon || 'mdi-puzzle'" color="primary"></v-icon>
+                                                    <v-icon icon="mdi-drag-vertical" class="mr-2 cursor-move"
+                                                        style="cursor: move;"></v-icon>
+                                                    <v-chip size="small" variant="tonal" color="primary" class="mr-2">{{
+                                                        idx + 1 }}</v-chip>
+                                                    <v-icon
+                                                        :icon="skillStore.registrySkills.find(s => s.name === step)?.icon || 'mdi-puzzle'"
+                                                        color="primary"></v-icon>
                                                 </template>
                                                 <v-list-item-title>
-                                                    {{ skillStore.registrySkills.find(s => s.name === step)?.displayName?.zh || step }}
+                                                    {{ skillStore.registrySkills.find(s => s.name ===
+                                                    step)?.displayName?.zh || step }}
                                                 </v-list-item-title>
                                                 <template v-slot:append>
                                                     <v-btn size="x-small" variant="text" icon="mdi-close" color="error"
@@ -1591,13 +1787,17 @@
 
                                         <v-divider class="my-3"></v-divider>
 
-                                        <p class="text-caption text-grey mb-2">{{ $t('$vuetify.dataIterator.skill.addStepHint') }}</p>
+                                        <p class="text-caption text-grey mb-2">{{
+                                            $t('$vuetify.dataIterator.skill.addStepHint') }}</p>
                                         <div class="d-flex flex-wrap ga-2">
-                                            <v-chip v-for="installed in skillStore.installedSkills.filter(s => s.enabled && !skillStore.workflowSteps.includes(s.name))"
+                                            <v-chip
+                                                v-for="installed in skillStore.installedSkills.filter(s => s.enabled && !skillStore.workflowSteps.includes(s.name))"
                                                 :key="installed.name" size="small" variant="tonal"
                                                 @click="skillStore.workflowSteps.push(installed.name)">
-                                                <v-icon start size="small">{{ skillStore.registrySkills.find(s => s.name === installed.name)?.icon || 'mdi-puzzle' }}</v-icon>
-                                                {{ skillStore.registrySkills.find(s => s.name === installed.name)?.displayName?.zh || installed.name }}
+                                                <v-icon start size="small">{{ skillStore.registrySkills.find(s => s.name
+                                                    === installed.name)?.icon || 'mdi-puzzle' }}</v-icon>
+                                                {{ skillStore.registrySkills.find(s => s.name ===
+                                                installed.name)?.displayName?.zh || installed.name }}
                                                 <v-icon end size="small">mdi-plus</v-icon>
                                             </v-chip>
                                         </div>
@@ -1607,7 +1807,8 @@
                                         <div v-if="skillStore.workflowSteps.length > 1" class="d-flex ga-2">
                                             <v-btn size="small" variant="flat" color="primary"
                                                 @click="skillStore.activateWorkflow()">
-                                                <v-icon start>mdi-play</v-icon>{{ $t('$vuetify.dataIterator.skill.runWorkflow') }}
+                                                <v-icon start>mdi-play</v-icon>{{
+                                                $t('$vuetify.dataIterator.skill.runWorkflow') }}
                                             </v-btn>
                                         </div>
                                     </div>
@@ -1616,9 +1817,12 @@
                         </v-window>
                     </v-card-text>
                     <v-card-actions>
-                        <v-btn variant="text" prepend-icon="mdi-import" @click="settingStore.skillImportDialog = true">{{ $t('$vuetify.dataIterator.skill.import') }}</v-btn>
+                        <v-btn variant="text" prepend-icon="mdi-import"
+                            @click="settingStore.skillImportDialog = true">{{ $t('$vuetify.dataIterator.skill.import')
+                            }}</v-btn>
                         <v-spacer></v-spacer>
-                        <v-btn variant="outlined" @click="settingStore.skillDialog = false">{{ $t('$vuetify.dataIterator.skill.close') }}</v-btn>
+                        <v-btn variant="outlined" @click="settingStore.skillDialog = false">{{
+                            $t('$vuetify.dataIterator.skill.close') }}</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -1628,34 +1832,37 @@
                 <v-card prepend-icon="mdi-cog" :title="$t('$vuetify.dataIterator.skill.config')">
                     <v-divider></v-divider>
                     <v-card-text v-if="skillStore.skillConfigTarget">
-                        <p class="text-subtitle-2 mb-3">{{ skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name)?.displayName?.zh || skillStore.skillConfigTarget.name }}</p>
-                        <div v-if="skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name)?.configSchema">
-                            <div v-for="(schema, key) in skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name).configSchema.properties" :key="key" class="mb-3">
-                                <v-select v-if="schema.enum"
-                                    v-model="skillStore.skillConfigTarget.config[key]"
-                                    :items="schema.enum"
-                                    :label="schema.description || key"
-                                    density="compact" variant="outlined"></v-select>
+                        <p class="text-subtitle-2 mb-3">{{ skillStore.registrySkills.find(s => s.name ===
+                            skillStore.skillConfigTarget.name)?.displayName?.zh || skillStore.skillConfigTarget.name }}
+                        </p>
+                        <div
+                            v-if="skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name)?.configSchema">
+                            <div v-for="(schema, key) in skillStore.registrySkills.find(s => s.name === skillStore.skillConfigTarget.name).configSchema.properties"
+                                :key="key" class="mb-3">
+                                <v-select v-if="schema.enum" v-model="skillStore.skillConfigTarget.config[key]"
+                                    :items="schema.enum" :label="schema.description || key" density="compact"
+                                    variant="outlined"></v-select>
                                 <v-switch v-else-if="schema.type === 'boolean'"
                                     v-model="skillStore.skillConfigTarget.config[key]"
-                                    :label="schema.description || key"
-                                    color="primary" density="compact"></v-switch>
+                                    :label="schema.description || key" color="primary" density="compact"></v-switch>
                                 <v-text-field v-else-if="schema.type === 'number'"
                                     v-model.number="skillStore.skillConfigTarget.config[key]"
-                                    :label="schema.description || key"
-                                    type="number" density="compact" variant="outlined"></v-text-field>
-                                <v-text-field v-else
-                                    v-model="skillStore.skillConfigTarget.config[key]"
-                                    :label="schema.description || key"
-                                    density="compact" variant="outlined"></v-text-field>
+                                    :label="schema.description || key" type="number" density="compact"
+                                    variant="outlined"></v-text-field>
+                                <v-text-field v-else v-model="skillStore.skillConfigTarget.config[key]"
+                                    :label="schema.description || key" density="compact"
+                                    variant="outlined"></v-text-field>
                             </div>
                         </div>
                         <p v-else class="text-body-2 text-grey">{{ $t('$vuetify.dataIterator.skill.noConfig') }}</p>
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
-                        <v-btn variant="outlined" @click="skillStore.skillConfigDialog = false">{{ $t('$vuetify.dataIterator.skill.close') }}</v-btn>
-                        <v-btn variant="flat" color="primary" @click="skillStore.updateSkillConfig(skillStore.skillConfigTarget.name, skillStore.skillConfigTarget.config).then(() => { skillStore.skillConfigDialog = false; snackbarStore.showSuccessMessage($t('$vuetify.dataIterator.skill.configSaved')); })">{{ $t('$vuetify.dataIterator.skill.save') }}</v-btn>
+                        <v-btn variant="outlined" @click="skillStore.skillConfigDialog = false">{{
+                            $t('$vuetify.dataIterator.skill.close') }}</v-btn>
+                        <v-btn variant="flat" color="primary"
+                            @click="skillStore.updateSkillConfig(skillStore.skillConfigTarget.name, skillStore.skillConfigTarget.config).then(() => { skillStore.skillConfigDialog = false; snackbarStore.showSuccessMessage($t('$vuetify.dataIterator.skill.configSaved')); })">{{
+                            $t('$vuetify.dataIterator.skill.save') }}</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -1671,20 +1878,18 @@
                         </v-tabs>
                         <v-window v-model="settingStore.skillImportTab">
                             <v-window-item value="json">
-                                <p class="text-caption text-grey mb-3">{{ $t('$vuetify.dataIterator.skill.importHint') }}</p>
-                                <v-textarea v-model="settingStore.skillImportJson"
-                                    density="compact" variant="outlined"
-                                    :placeholder='$t("$vuetify.dataIterator.skill.importPlaceholder")'
-                                    rows="10" auto-grow clearable hide-details></v-textarea>
+                                <p class="text-caption text-grey mb-3">{{ $t('$vuetify.dataIterator.skill.importHint')
+                                    }}</p>
+                                <v-textarea v-model="settingStore.skillImportJson" density="compact" variant="outlined"
+                                    :placeholder='$t("$vuetify.dataIterator.skill.importPlaceholder")' rows="10"
+                                    auto-grow clearable hide-details></v-textarea>
                             </v-window-item>
                             <v-window-item value="file">
-                                <p class="text-caption text-grey mb-3">{{ $t('$vuetify.dataIterator.skill.importPackHint') }}</p>
-                                <v-file-input v-model="settingStore.skillPackFile"
-                                    accept=".skill,.zip"
+                                <p class="text-caption text-grey mb-3">{{
+                                    $t('$vuetify.dataIterator.skill.importPackHint') }}</p>
+                                <v-file-input v-model="settingStore.skillPackFile" accept=".skill,.zip"
                                     :label="$t('$vuetify.dataIterator.skill.selectSkillPack')"
-                                    prepend-icon="mdi-package-variant"
-                                    variant="outlined"
-                                    density="compact"
+                                    prepend-icon="mdi-package-variant" variant="outlined" density="compact"
                                     show-size></v-file-input>
                             </v-window-item>
                         </v-window>
@@ -1695,11 +1900,17 @@
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
-                        <v-btn variant="outlined" @click="settingStore.skillImportDialog = false; settingStore.skillImportJson = ''; settingStore.skillImportError = ''; settingStore.skillPackFile = null;">{{ $t('$vuetify.dataIterator.skill.close') }}</v-btn>
-                        <v-btn v-if="settingStore.skillImportTab === 'json'" variant="flat" color="primary" :disabled="!settingStore.skillImportJson"
-                            @click="skillStore.importSkill(settingStore.skillImportJson).then(result => { if(result.success) { settingStore.skillImportDialog = false; settingStore.skillImportJson = ''; settingStore.skillImportError = ''; skillStore.loadRegistrySkills(); snackbarStore.showSuccessMessage(result.message); } else { settingStore.skillImportError = result.message; } })">{{ $t('$vuetify.dataIterator.skill.import') }}</v-btn>
-                        <v-btn v-if="settingStore.skillImportTab === 'file'" variant="flat" color="primary" :disabled="!settingStore.skillPackFile"
-                            @click="skillStore.importSkillPack(settingStore.skillPackFile).then(result => { if(result.success) { settingStore.skillImportDialog = false; settingStore.skillPackFile = null; settingStore.skillImportError = ''; skillStore.loadRegistrySkills(); snackbarStore.showSuccessMessage(result.message); } else { settingStore.skillImportError = result.message; } })">{{ $t('$vuetify.dataIterator.skill.importPack') }}</v-btn>
+                        <v-btn variant="outlined"
+                            @click="settingStore.skillImportDialog = false; settingStore.skillImportJson = ''; settingStore.skillImportError = ''; settingStore.skillPackFile = null;">{{
+                            $t('$vuetify.dataIterator.skill.close') }}</v-btn>
+                        <v-btn v-if="settingStore.skillImportTab === 'json'" variant="flat" color="primary"
+                            :disabled="!settingStore.skillImportJson"
+                            @click="skillStore.importSkill(settingStore.skillImportJson).then(result => { if(result.success) { settingStore.skillImportDialog = false; settingStore.skillImportJson = ''; settingStore.skillImportError = ''; skillStore.loadRegistrySkills(); snackbarStore.showSuccessMessage(result.message); } else { settingStore.skillImportError = result.message; } })">{{
+                            $t('$vuetify.dataIterator.skill.import') }}</v-btn>
+                        <v-btn v-if="settingStore.skillImportTab === 'file'" variant="flat" color="primary"
+                            :disabled="!settingStore.skillPackFile"
+                            @click="skillStore.importSkillPack(settingStore.skillPackFile).then(result => { if(result.success) { settingStore.skillImportDialog = false; settingStore.skillPackFile = null; settingStore.skillImportError = ''; skillStore.loadRegistrySkills(); snackbarStore.showSuccessMessage(result.message); } else { settingStore.skillImportError = result.message; } })">{{
+                            $t('$vuetify.dataIterator.skill.importPack') }}</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -1737,9 +1948,10 @@
                                             :src="item.image_url.url"></tuui-img-dialog>
                                         <tuui-img-dialog v-else-if="item.type=='image'"
                                             :src="`data:${item.source.media_type};base64,${item.source.data}`"></tuui-img-dialog>
-                                        <v-textarea v-else-if="item.type=='text'" class="conversation-area" variant="plain" density='compact'
-                                            auto-grow :counter="showmodify" :hide-details="!showmodify" rows="1"
-                                            :readonly="!showmodify" v-model="item.text"></v-textarea>
+                                        <v-textarea v-else-if="item.type=='text'" class="conversation-area"
+                                            variant="plain" density='compact' auto-grow :counter="showmodify"
+                                            :hide-details="!showmodify" rows="1" :readonly="!showmodify"
+                                            v-model="item.text"></v-textarea>
                                     </div>
                                 </v-card-text>
                                 <v-card-text v-else class="md-preview pt-1">
@@ -1757,7 +1969,8 @@
                     <div class="message">
                         <v-avatar :size=size class="mt-3 mr-3 mr-lg-6" color="teal" icon="mdi-lightning-bolt-circle">
                         </v-avatar>
-                        <tuui-chat-card :index="group.index" :messages="messages" :show-content="true" :show-regenerate="true" :generating="generating" @regenerate="$emit('regenerate', $event)">
+                        <tuui-chat-card :index="group.index" :messages="messages" :show-content="true"
+                            :show-regenerate="true" :generating="generating" @regenerate="$emit('regenerate', $event)">
                             <template v-slot:default="{ showcontent }">
                                 <v-card-text v-if="group.message.reasoning_content" class="md-preview pt-1">
                                     <v-textarea class="conversation-area text-disabled font-italic" variant="plain"
@@ -1891,9 +2104,8 @@
 
     <template id="chat-mcp-chat-attachment-item-template">
         <v-card class="attachment-item" variant="outlined" width="80" height="80">
-            <v-img v-if="attachment.category === 'image' && attachment.thumbnail"
-                :src="attachment.thumbnail" cover width="80" height="60"
-                @click="$emit('preview', attachment)" class="cursor-pointer" />
+            <v-img v-if="attachment.category === 'image' && attachment.thumbnail" :src="attachment.thumbnail" cover
+                width="80" height="60" @click="$emit('preview', attachment)" class="cursor-pointer" />
             <div v-else-if="attachment.category === 'image' && !attachment.thumbnail"
                 class="d-flex align-center justify-center bg-grey-lighten-3" style="width:80px;height:60px;">
                 <v-icon size="24" color="grey">mdi-image-broken-variant</v-icon>
@@ -1908,8 +2120,10 @@
                 <v-btn size="x-small" variant="plain" icon="mdi-close" density="compact"
                     @click.stop="$emit('remove', attachment.id)" />
             </div>
-            <v-progress-linear v-if="attachment.status === 'processing'" indeterminate color="primary" absolute bottom />
-            <v-icon v-if="attachment.status === 'error'" size="16" color="error" style="position:absolute;top:2px;right:2px;">
+            <v-progress-linear v-if="attachment.status === 'processing'" indeterminate color="primary" absolute
+                bottom />
+            <v-icon v-if="attachment.status === 'error'" size="16" color="error"
+                style="position:absolute;top:2px;right:2px;">
                 mdi-alert-circle
             </v-icon>
         </v-card>
@@ -1919,14 +2133,12 @@
         <v-container v-if="attachments.length > 0" class="attachment-bar pa-0" fluid>
             <v-row dense class="ma-0">
                 <v-col v-for="attachment in attachments" :key="attachment.id" cols="auto">
-                    <chat-mcp-chat-attachment-item :attachment="attachment"
-                        @remove="$emit('remove', $event)"
+                    <chat-mcp-chat-attachment-item :attachment="attachment" @remove="$emit('remove', $event)"
                         @preview="$emit('preview', $event)" />
                 </v-col>
             </v-row>
             <v-row dense class="ma-0 mt-1" justify="end">
-                <v-btn size="x-small" variant="text" color="grey"
-                    @click="$emit('clear')">
+                <v-btn size="x-small" variant="text" color="grey" @click="$emit('clear')">
                     <v-icon start size="16">mdi-close-circle-outline</v-icon>
                     {{ $t('$vuetify.dataIterator.g.clearAll') }}
                 </v-btn>
@@ -1936,38 +2148,29 @@
 
     <template id="chat-mcp-chat-thumbnail-item-template">
         <v-hover v-slot="{ isHovering, props: hoverProps }">
-            <div v-bind="hoverProps"
-                 class="thumbnail-item position-relative rounded"
-                 :class="{ 'on-hover': isHovering }">
-                <v-img v-if="attachment.category === 'image' && attachment.thumbnail"
-                       :src="attachment.thumbnail"
-                       width="32" height="32"
-                       cover class="rounded" />
+            <div v-bind="hoverProps" class="thumbnail-item position-relative rounded"
+                :class="{ 'on-hover': isHovering }">
+                <v-img v-if="attachment.category === 'image' && attachment.thumbnail" :src="attachment.thumbnail"
+                    width="32" height="32" cover class="rounded" />
                 <div v-else-if="attachment.category === 'image' && !attachment.thumbnail"
-                     class="d-flex align-center justify-center rounded bg-grey-lighten-3"
-                     style="width:32px;height:32px;">
+                    class="d-flex align-center justify-center rounded bg-grey-lighten-3"
+                    style="width:32px;height:32px;">
                     <v-icon size="16" color="grey">mdi-image-broken-variant</v-icon>
                 </div>
-                <div v-else
-                     class="d-flex align-center justify-center rounded bg-grey-lighten-3"
-                     style="width:32px;height:32px;">
+                <div v-else class="d-flex align-center justify-center rounded bg-grey-lighten-3"
+                    style="width:32px;height:32px;">
                     <v-icon size="18" :color="getDocIconColor(attachment.type)">
                         {{ getDocIcon(attachment.type) }}
                     </v-icon>
                 </div>
-                <v-progress-circular v-if="attachment.status === 'processing'"
-                                     size="32" width="2" color="primary" indeterminate
-                                     style="position:absolute;top:0;left:0;" />
-                <v-icon v-if="attachment.status === 'error'"
-                        size="12" color="error"
-                        style="position:absolute;top:-2px;right:-2px;">
+                <v-progress-circular v-if="attachment.status === 'processing'" size="32" width="2" color="primary"
+                    indeterminate style="position:absolute;top:0;left:0;" />
+                <v-icon v-if="attachment.status === 'error'" size="12" color="error"
+                    style="position:absolute;top:-2px;right:-2px;">
                     mdi-alert-circle
                 </v-icon>
-                <v-btn v-show="isHovering"
-                       size="x-small" variant="flat" density="compact"
-                       icon="mdi-close" color="grey-darken-3"
-                       class="thumbnail-remove-btn"
-                       @click.stop="$emit('remove', attachment.id)" />
+                <v-btn v-show="isHovering" size="x-small" variant="flat" density="compact" icon="mdi-close"
+                    color="grey-darken-3" class="thumbnail-remove-btn" @click.stop="$emit('remove', attachment.id)" />
                 <v-tooltip activator="parent" location="top">
                     {{ attachment.name }} ({{ formatSize(attachment.size) }})
                     <template v-if="attachment.status === 'error'">
@@ -1979,20 +2182,14 @@
     </template>
 
     <template id="chat-mcp-chat-thumbnail-strip-template">
-        <div v-if="attachments.length > 0"
-             ref="stripRef"
-             class="thumbnail-strip d-flex align-center"
-             @wheel.prevent="onWheel">
-            <div ref="scrollContainerRef"
-                 class="d-flex align-center ga-1 thumbnail-scroll-container">
-                <chat-mcp-chat-thumbnail-item
-                    v-for="attachment in attachments"
-                    :key="attachment.id"
-                    :attachment="attachment"
-                    @remove="$emit('remove', $event)" />
+        <div v-if="attachments.length > 0" ref="stripRef" class="thumbnail-strip d-flex align-center"
+            @wheel.prevent="onWheel">
+            <div ref="scrollContainerRef" class="d-flex align-center ga-1 thumbnail-scroll-container">
+                <chat-mcp-chat-thumbnail-item v-for="attachment in attachments" :key="attachment.id"
+                    :attachment="attachment" @remove="$emit('remove', $event)" />
             </div>
             <div v-if="overflowCount > 0"
-                 class="thumbnail-overflow-badge text-caption font-weight-bold text-white bg-grey-darken-2 rounded-circle d-flex align-center justify-center">
+                class="thumbnail-overflow-badge text-caption font-weight-bold text-white bg-grey-darken-2 rounded-circle d-flex align-center justify-center">
                 +{{ overflowCount }}
             </div>
         </div>
@@ -2442,7 +2639,7 @@
             },
 
             actions: {
-                updateServers: async function() {
+                updateServers: async function () {
                     try {
                         this.mcpServers = await window.getServers();
                         console.log('Updated MCP servers:', Object.keys(this.mcpServers));
@@ -2454,7 +2651,7 @@
                 listServerResources: async function () {
                     // 确保获取最新的服务器列表
                     await this.updateServers();
-                    
+
                     const mcpServers = this.getServers
                     const mcpKeys = Object.keys(mcpServers)
                     const mcpResources = []
@@ -2493,7 +2690,7 @@
                 listTools: async function () {
                     // 确保获取最新的服务器列表
                     await this.updateServers();
-                    
+
                     const mcpServers = this.getServers
                     console.log(`List MCP Servers: ${Object.keys(mcpServers)}`)
                     if (!mcpServers) {
@@ -2502,23 +2699,23 @@
                     }
                     const mcpKeys = Object.keys(mcpServers)
                     console.log(`[listTools] Found ${mcpKeys.length} servers: ${mcpKeys.join(', ')}`);
-                    
+
                     const mcpTools = []
                     for (const key of mcpKeys) {
                         const server = mcpServers[key];
                         const toolsListFunction = server?.tools?.list;
-                        
+
                         console.log(`[listTools] Processing server "${key}":`, {
                             has_tools: !!server?.tools,
                             is_function: typeof toolsListFunction === 'function',
                             toolsListFunction: toolsListFunction?.toString?.()?.substring(0, 100)
                         });
-                        
+
                         if (typeof toolsListFunction === 'function') {
                             try {
                                 const tools = await toolsListFunction();
                                 console.log(`[listTools] Server "${key}" returned tools:`, tools);
-                                
+
                                 if (tools && Array.isArray(tools.tools)) {
                                     console.log(`[listTools] Server "${key}" has ${tools.tools.length} tools`);
                                     for (const tool of tools.tools) {
@@ -2541,14 +2738,14 @@
                             console.warn(`[listTools] Server "${key}" tools.list is not a function. Type: ${typeof toolsListFunction}, Value: ${toolsListFunction}`);
                         }
                     }
-                    
+
                     console.log(`[listTools] Total tools collected: ${mcpTools.length}`, mcpTools);
                     return mcpTools
                 },
                 getTool: async function (tool_name) {
                     // 确保获取最新的服务器列表
                     await this.updateServers();
-                    
+
                     const mcpServers = this.getServers;
                     console.log(`Get MCP Servers: ${Object.keys(mcpServers)}`)
                     const mcpKeys = Object.keys(mcpServers);
@@ -2574,7 +2771,7 @@
                 callTool: async function (tool_name, tool_args) {
                     // 确保获取最新的服务器列表
                     await this.updateServers();
-                    
+
                     const tool = await this.getTool(tool_name)
                     if (!tool) {
                         return this.packReturn(`Tool name '${tool_name}' not found`)
@@ -2693,10 +2890,10 @@
                     try {
                         const clients = await window.listClients();
                         console.log('getServersList called, clients from main:', clients);
-                        
+
                         // Convert clients to server list format
                         const serverList = [];
-                        
+
                         if (Array.isArray(clients)) {
                             // clients is an array of client objects from list-clients
                             for (const client of clients) {
@@ -2722,7 +2919,7 @@
                                 });
                             }
                         }
-                        
+
                         console.log('Returning server list:', serverList);
                         return serverList;
                     } catch (error) {
@@ -2753,13 +2950,13 @@
                                 console.log(`Local server test failed: ${err.message}`);
                             }
                         }
-                        
+
                         // 如果本地服务测试不通过，尝试测试HTTP服务
                         const url = serverConfig.url;
                         console.log(serverConfig)
                         if (url) {
                             try {
-                                const response = await fetch(url, { 
+                                const response = await fetch(url, {
                                     method: 'HEAD',
                                     timeout: 5000
                                 });
@@ -2773,7 +2970,7 @@
                                 console.log(`HTTP server test failed: ${err.message}`);
                             }
                         }
-                        
+
                         // 两种测试都失败
                         return { available: false, message: 'Server is not available (both local and HTTP tests failed)' };
                     } catch (error) {
@@ -2956,7 +3153,7 @@
 
                 toolboxShow: false,
                 fontStatus: false,
-                
+
                 // MCP Server configuration
                 addMcpDialog: false,
                 mcpTab: 'add-server', // 'add-server' or 'registry-manager'
@@ -2967,22 +3164,22 @@
                 mcpServerCommand: '', // For local MCP servers
                 mcpServerArgs: '', // For local MCP servers
                 mcpServerConfig: '',
-                
+
                 // Quick mode - JSON parsing
                 mcpJsonConfig: '',
                 mcpJsonError: '',
                 extractedMcpServers: [], // Array of {name, command, args}
                 selectedMcpServers: [], // Array of indices of selected servers
-                
+
                 // MCP Server list management
                 mcpServersList: [], // List of configured servers
                 mcpServerStatus: {}, // {serverName: 'available'|'unavailable'|'testing'|'unknown'}
                 mcpTestingServers: [], // Array of servers currently being tested
-                
+
                 // MCP Server config viewer
                 mcpConfigViewerDialog: false,
                 mcpConfigViewerServer: null, // The server being viewed
-                
+
                 // Skill management
                 skillDialog: false,
                 skillTab: 'registry', // 'registry' or 'installed' or 'workflow'
@@ -2992,7 +3189,7 @@
                 skillImportTab: 'json',
                 skillPackFile: null,
                 skillDragOver: false,
-                
+
                 // Registry Manager state
                 registryRunning: false,
                 registryUrl: '',
@@ -3060,10 +3257,10 @@
 
                     try {
                         const jsonData = JSON.parse(this.mcpJsonConfig);
-                        
+
                         // Support both direct mcpServers object and wrapped format
                         let servers = jsonData.mcpServers || jsonData;
-                        
+
                         if (!servers || typeof servers !== 'object') {
                             this.mcpJsonError = 'No valid MCP servers found in the JSON';
                             return;
@@ -3110,21 +3307,21 @@
                 addExtractedMcpServers() {
                     const successCount = this.selectedMcpServers.length;
                     const serversToInitialize = [];
-                    
+
                     for (const idx of this.selectedMcpServers) {
                         const server = this.extractedMcpServers[idx];
                         if (server) {
                             // Populate fields with extracted server data
                             this.mcpServerName = server.name;
                             this.mcpServerType = server.type; // 'http' or 'local'
-                            
+
                             if (server.type === 'http') {
                                 // Remote HTTP/SSE server
                                 this.mcpServerUrl = server.url;
                                 this.mcpServerPort = '';
                                 this.mcpServerCommand = '';
                                 this.mcpServerArgs = '';
-                                
+
                                 // Store any additional config
                                 const { url, ...additionalConfig } = server.config;
                                 if (Object.keys(additionalConfig).length > 0) {
@@ -3138,7 +3335,7 @@
                                 this.mcpServerPort = '';
                                 this.mcpServerCommand = server.command;
                                 this.mcpServerArgs = server.args.join('\n');
-                                
+
                                 // Store any additional config
                                 const { command, args, ...additionalConfig } = server.config;
                                 if (Object.keys(additionalConfig).length > 0) {
@@ -3150,7 +3347,7 @@
 
                             // Add the server using the MCP store
                             useMcpStore().addMcpServer(this);
-                            
+
                             // Collect server info for initialization - only send serializable data
                             // Deep clone to ensure no circular references
                             const serializableConfig = JSON.parse(JSON.stringify(server.config));
@@ -3171,13 +3368,13 @@
                     this.mcpJsonError = '';
                     this.extractedMcpServers = [];
                     this.selectedMcpServers = [];
-                    
+
                     // Reset form fields
                     this.resetMcpFields();
-                    
+
                     // Close dialog
                     this.addMcpDialog = false;
-                    
+
                     // Initialize servers dynamically and refresh list
                     this.initializeServersAndRefresh(serversToInitialize);
                 },
@@ -3186,11 +3383,11 @@
                     try {
                         console.log('Initializing servers dynamically:', serversToInitialize);
                         const snackbarStore = useSnackbarStore();
-                        
+
                         // Track how many servers were actually initialized
                         let successCount = 0;
                         let skipCount = 0;
-                        
+
                         // Initialize each server in the main process
                         for (const serverInfo of serversToInitialize) {
                             try {
@@ -3211,7 +3408,7 @@
                                 console.error(`Error initializing server ${serverInfo.name}:`, error);
                             }
                         }
-                        
+
                         // If there were servers to initialize (either new or already existing)
                         if (successCount > 0 || skipCount > 0) {
                             // Show a brief success message and then reload
@@ -3222,7 +3419,7 @@
                             }
                             message += ' Reloading to activate...';
                             snackbarStore.showSuccessMessage(message);
-                            
+
                             // Add a small delay to let the snackbar display, then reload
                             setTimeout(() => {
                                 window.location.reload();
@@ -3240,7 +3437,7 @@
                     useMcpStore().getServersList().then(serversList => {
                         // Update the list reactively
                         this.mcpServersList = [...serversList];
-                        
+
                         // Initialize status for new servers
                         for (const server of this.mcpServersList) {
                             if (!this.mcpServerStatus.hasOwnProperty(server.name)) {
@@ -3248,9 +3445,9 @@
                                 this.mcpServerStatus[server.name] = 'unknown';
                             }
                         }
-                        
+
                         console.log('MCP Servers List Updated:', this.mcpServersList);
-                        
+
                         // Also update mcpStore's servers
                         const mcpStore = useMcpStore();
                         mcpStore.updateServers();
@@ -3273,7 +3470,7 @@
                     useMcpStore().testServer(serverName).then(result => {
                         this.mcpServerStatus[serverName] = result.available ? 'available' : 'unavailable';
                         this.mcpTestingServers = this.mcpTestingServers.filter(s => s !== serverName);
-                        
+
                         if (result.message) {
                             console.log(`Server ${serverName}: ${result.message}`);
                         }
@@ -3287,12 +3484,12 @@
                     if (confirm(`Are you sure you want to delete the MCP server "${serverName}"?`)) {
                         // Delete from window.mcpServers
                         useMcpStore().deleteServer(serverName);
-                        
+
                         // Delete from sessionStorage dynamic servers
                         const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
                         delete dynamicServers[serverName];
                         sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
-                        
+
                         // Delete from config file via IPC
                         window.deleteMcpServer(serverName).then(result => {
                             if (result.success) {
@@ -3303,18 +3500,18 @@
                         }).catch(error => {
                             console.error(`Error deleting server ${serverName}:`, error);
                         });
-                        
+
                         // Refresh UI
                         this.refreshMcpServersList();
                         delete this.mcpServerStatus[serverName];
                     }
                 },
-                
+
                 // Registry Manager methods
                 async startRegistry() {
                     try {
                         this.addRegistryLog('正在启动内部npm仓库...');
-                        
+
                         const result = await window.registryAPI.start();
 
                         if (result.success) {
@@ -3331,13 +3528,13 @@
                         this.showRegistryNotification('启动仓库时出错', false);
                     }
                 },
-                
+
                 async stopRegistry() {
                     try {
                         this.addRegistryLog('正在停止内部npm仓库...');
 
                         const result = await window.registryAPI.stop();
-                        
+
                         if (result.success) {
                             this.addRegistryLog('内部npm仓库已停止');
                             this.showRegistryNotification('内部npm仓库已停止', true);
@@ -3345,14 +3542,14 @@
                             this.addRegistryLog(`停止内部npm仓库失败: ${result.message}`);
                             this.showRegistryNotification('停止内部npm仓库失败', false);
                         }
-                        
+
                         await this.updateRegistryStatus();
                     } catch (error) {
                         this.addRegistryLog(`停止仓库时出错: ${error.message}`);
                         this.showRegistryNotification('停止仓库时出错', false);
                     }
                 },
-                
+
                 async updateRegistryStatus() {
                     try {
                         const status = await window.registryAPI.status();
@@ -3366,7 +3563,7 @@
                         this.showRegistryNotification('获取仓库状态失败', false);
                     }
                 },
-                
+
                 async processRegistryDependencies() {
                     if (!this.registryZipFile) {
                         this.showRegistryNotification('请选择一个zip文件', false);
@@ -3376,14 +3573,14 @@
                     try {
                         this.addRegistryLog(`正在处理依赖包 ${this.registryZipFile.name}`);
                         this.registryProcessing = true;
-                        
+
                         // 显示进度条
                         this.updateRegistryProgress(5, '准备处理依赖包...');
 
                         // 使用FileReader读取文件内容并保存到临时文件
                         const arrayBuffer = await this.registryZipFile.arrayBuffer();
                         const uint8Array = new Uint8Array(arrayBuffer);
-                        
+
                         // 调用主进程API保存文件并获取路径
                         this.updateRegistryProgress(10, '正在上传文件...');
                         const result = await window.registryAPI.processDependencies({
@@ -3408,18 +3605,18 @@
                         this.registryProcessing = false;
                     }
                 },
-                
+
                 // Registry Manager helper methods
                 addRegistryLog(message) {
                     const timestamp = new Date().toLocaleTimeString();
                     this.registryLog += `[${timestamp}] ${message}\n`;
                 },
-                
+
                 updateRegistryProgress(value, text) {
                     this.registryProgress = value;
                     this.registryProgressText = text;
                 },
-                
+
                 showRegistryNotification(message, isSuccess = true) {
                     this.registryNotification.message = message;
                     this.registryNotification.type = isSuccess ? 'success' : 'error';
@@ -5477,7 +5674,7 @@
                         const blob = new Blob([jsonStr], { type: 'application/json' })
                         const url = URL.createObjectURL(blob)
                         const now = new Date()
-                        const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`
+                        const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
                         const a = document.createElement('a')
                         a.href = url
                         a.download = `chat-mcp-config-${ts}.json`
@@ -5798,6 +5995,7 @@
                             attachedCount: '{count} attachment(s) added',
                             addTooltip: 'Add attachment'
                         },
+                    },
                 },
             },
             zhHans: {
@@ -5899,8 +6097,9 @@
                             attachedCount: '已添加 {count} 个附件',
                             addTooltip: '添加附件'
                         },
+                    },
                 },
-            },
+            }
         }
 
         const i18n = createI18n({
