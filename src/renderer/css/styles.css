@@ -1,0 +1,408 @@
+/* ==========================================================================
+ * 全局滚动条样式 - 隐藏默认滚动条
+ * ========================================================================== */
+::-webkit-scrollbar {
+    display: none;
+}
+
+/* ==========================================================================
+ * 加载动画 - 页面初始化时的旋转加载圈
+ * ========================================================================== */
+.loading {
+    all: initial;
+    position: fixed;
+    top: calc(50% - 35px);
+    left: calc(50% - 35px);
+    display: flex;
+    width: 70px;
+    height: 70px;
+    border: 4px solid #1867C0;
+    border-top-color: rgba(0, 0, 0, 0.2);
+    border-right-color: rgba(0, 0, 0, 0.2);
+    border-bottom-color: rgba(0, 0, 0, 0.2);
+    border-radius: 100%;
+    overflow: hidden;
+    animation: circle infinite 1s linear;
+}
+
+@keyframes circle {
+    0% { transform: rotate(0); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+ * Vue 指令 - 初始化前隐藏元素
+ * ========================================================================== */
+[v-cloak] {
+    display: none;
+}
+
+/* ==========================================================================
+ * 聊天机器人主布局
+ * ========================================================================== */
+.chat-bot {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.chat-bot-alt {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.fill-area {
+    height: 20px;
+}
+
+/* ==========================================================================
+ * 对话框卡片样式
+ * ========================================================================== */
+.dialog-card {
+    width: 960px;
+    max-width: 100vw;
+    max-height: calc(70vh + 3rem);
+}
+
+/* ==========================================================================
+ * Lottie 动画容器
+ * ========================================================================== */
+#lottie,
+#lottie-alt {
+    display: none;
+    height: calc(99vh - 50px);
+    max-height: calc(100% - 100px);
+}
+
+/* ==========================================================================
+ * 左侧图标间距
+ * ========================================================================== */
+.left-icon {
+    margin-bottom: 0.8rem;
+}
+
+/* ==========================================================================
+ * 输入框样式
+ * ========================================================================== */
+.input-box textarea {
+    margin-bottom: 1px;
+}
+
+.input-box textarea::-webkit-scrollbar {
+    display: none;
+}
+
+/* ==========================================================================
+ * 聊天图片缩略图
+ * ========================================================================== */
+.chat-images {
+    width: 25px;
+    max-height: 40px;
+    transition: all 0.2s;
+}
+
+.chat-images:hover {
+    transition: all 0.2s;
+    opacity: 0.5;
+    filter: grayscale(100%);
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+ * 主布局 - 左右面板
+ * ========================================================================== */
+.main-layout {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.main-row {
+    height: 100%;
+}
+
+.left-panel {
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid #e5e7eb;
+}
+
+.right-panel {
+    height: 100vh;
+    overflow-y: auto;
+    background-color: #fafafa;
+}
+
+/* ==========================================================================
+ * 功能面板 - 垂直弹性布局
+ * ========================================================================== */
+.function-panel {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    flex-shrink: 0;
+    background-color: white;
+    min-height: 40px;
+}
+
+.input-section {
+    flex-shrink: 0;
+    background-color: white;
+}
+
+.nav-section,
+.bottom-toolbar {
+    flex-shrink: 0;
+    background-color: white;
+    flex-wrap: wrap;
+}
+
+.attachment-row {
+    max-height: 120px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    background-color: white;
+}
+
+.history-section {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+}
+
+.history-list-scrollable {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+/* ==========================================================================
+ * 面板切换动画
+ * ========================================================================== */
+.panel-slide-enter-active,
+.panel-slide-leave-active {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.panel-slide-enter-from {
+    opacity: 0;
+    transform: translateX(30px);
+}
+
+.panel-slide-leave-to {
+    opacity: 0;
+    transform: translateX(-30px);
+}
+
+/* ==========================================================================
+ * 阴影效果
+ * ========================================================================== */
+.shadow {
+    box-shadow: 1px 1px 7px #1867C0;
+}
+
+.hidden {
+    overflow: hidden;
+}
+
+/* ==========================================================================
+ * 聊天消息区域
+ * ========================================================================== */
+.chat-message {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.message {
+    margin: 0 auto;
+    display: flex;
+}
+
+.conversation-area {
+    margin: 6px 4px 4px 4px;
+}
+
+/* ==========================================================================
+ * 淡入淡出过渡动画
+ * ========================================================================== */
+.fade-enter-active,
+.fade-leave-active {
+    transition: all 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+    transform: translateX(35px);
+}
+
+/* ==========================================================================
+ * 历史记录图片
+ * ========================================================================== */
+.history-images:hover {
+    cursor: zoom-in;
+}
+
+/* ==========================================================================
+ * Markdown 预览
+ * ========================================================================== */
+.md-preview {
+    width: 100vw;
+    max-width: 100%;
+}
+
+.md-editor-preview p {
+    word-break: break-word;
+}
+
+/* ==========================================================================
+ * 旋转动画
+ * ========================================================================== */
+.rotation {
+    font-size: 1.5rem;
+    animation: rotation 2s linear infinite;
+}
+
+@keyframes rotation {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+ * 拖拽相关样式
+ * ========================================================================== */
+.ghost {
+    opacity: 0.5;
+    background: #E3F2FD;
+}
+
+.list-draggable {
+    height: calc(100% - 38px);
+}
+
+.bgc {
+    background-color: lightblue;
+}
+
+/* ==========================================================================
+ * 自定义滚动条样式（覆盖全局隐藏）
+ * ========================================================================== */
+::-webkit-scrollbar {
+    display: block;
+    block-size: 5px;
+    inline-size: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: lightgrey;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: grey;
+}
+
+/* ==========================================================================
+ * 附件栏样式
+ * ========================================================================== */
+.attachment-bar {
+    max-height: 200px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.attachment-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+
+.attachment-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ==========================================================================
+ * 拖拽悬停效果
+ * ========================================================================== */
+.drag-over {
+    border: 2px dashed rgb(var(--v-theme-primary));
+    background-color: rgba(var(--v-theme-primary), 0.05);
+    border-radius: 8px;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* ==========================================================================
+ * 缩略图条样式
+ * ========================================================================== */
+.thumbnail-strip {
+    max-width: 60%;
+    height: 32px;
+    margin-left: 8px;
+    overflow: hidden;
+    flex-shrink: 1;
+}
+
+.thumbnail-scroll-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.thumbnail-scroll-container::-webkit-scrollbar {
+    display: none;
+}
+
+.thumbnail-item {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    cursor: default;
+}
+
+.thumbnail-item.on-hover {
+    opacity: 0.9;
+}
+
+.thumbnail-remove-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 16px;
+    min-height: 16px;
+    width: 16px;
+    height: 16px;
+    z-index: 1;
+}
+
+.thumbnail-overflow-badge {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    margin-left: 4px;
+    font-size: 11px;
+}
+
+/* ==========================================================================
+ * 面板拖拽悬停效果
+ * ========================================================================== */
+.drag-over-panel {
+    background-color: rgba(var(--v-theme-primary), 0.06);
+    box-shadow: inset 0 0 0 2px rgba(var(--v-theme-primary), 0.55);
+    border-radius: 6px;
+}
+
+
