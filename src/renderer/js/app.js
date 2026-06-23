@@ -424,7 +424,12 @@ const MultimodalAdapter = {
  * @param {Array} rawconversation - 原始对话数组
  */
 const createCompletion = async (rawconversation) => {
-    // 移除 assistant 消息中的 reasoning_content 字段
+    const messageStore = useMessageStore();
+    const chatbotStore = useChatbotStore();
+    const snackbarStore = useSnackbarStore();
+    const agentStore = useAgentStore();
+    const mcpStore = useMcpStore();
+
     const conversation = rawconversation.reduce((newConversation, item) => {
         if (item.role === "assistant") {
             const { reasoning_content, ...rest } = item;
@@ -518,6 +523,7 @@ const createCompletion = async (rawconversation) => {
  * @param {string} currentEvent - 当前 SSE 事件类型
  */
 const read = async (reader, target, buffer, stream, currentEvent) => {
+    const messageStore = useMessageStore();
     const decoder = new TextDecoder();
     const { done, value } = await reader.read();
 
@@ -584,6 +590,7 @@ const read = async (reader, target, buffer, stream, currentEvent) => {
  * @param {string} sseEvent - SSE 事件类型
  */
 const parseJson = (content, target, sseEvent) => {
+    const chatbotStore = useChatbotStore();
     try {
         const parsed = JSON.parse(content)
         if (chatbotStore.provider === 'anthropic-compatible' && sseEvent) {
@@ -1252,6 +1259,7 @@ const app = createApp({
             confirmExport,
             cancelExport,
             getProviderDisplayName,
+            maskApiKey,
             handleSkillDrop,
             isDragging,
             onDragEnter,
