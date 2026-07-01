@@ -44,6 +44,65 @@ const ATTACHMENT_ICON_COLOR_MAP = {
 };
 
 // ==========================================================================
+// ChatDocumentCard - 文档折叠卡片组件
+// ==========================================================================
+
+/**
+ * 文档折叠卡片组件
+ * 在用户消息中显示附件文档的折叠卡片，默认仅显示文件名和大小
+ * 点击可展开/收起完整文档内容
+ * @props {Object} document - 文档对象 { name, mimeType, size, textContent }
+ */
+const ChatDocumentCard = {
+    template: '#chat-mcp-chat-document-card-template',
+    props: {
+        document: { type: Object, required: true }
+    },
+    data() {
+        return {
+            expanded: false
+        };
+    },
+    methods: {
+        /**
+         * 获取文档类型对应的图标
+         * @param {string} mimeType - MIME 类型
+         * @returns {string} MDI 图标名称
+         */
+        getDocIcon(mimeType) {
+            return ATTACHMENT_ICON_MAP[mimeType] || 'mdi-file-document';
+        },
+        /**
+         * 获取文档类型对应的图标颜色
+         * @param {string} mimeType - MIME 类型
+         * @returns {string} 颜色名称
+         */
+        getDocIconColor(mimeType) {
+            return ATTACHMENT_ICON_COLOR_MAP[mimeType] || 'grey';
+        },
+        /**
+         * 格式化文件大小
+         * @param {number} bytes - 字节数
+         * @returns {string} 格式化后的大小字符串
+         */
+        formatSize(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        },
+        /**
+         * 获取文档扩展名
+         * @returns {string} 扩展名（含点）
+         */
+        getExtension() {
+            const idx = this.document.name.lastIndexOf('.');
+            return idx > 0 ? this.document.name.substring(idx + 1).toUpperCase() : '';
+        }
+    }
+};
+
+// ==========================================================================
 // TuuiImgDialog - 图片对话框组件
 // ==========================================================================
 
@@ -349,6 +408,7 @@ const TuuiChatBox = {
     components: {
         TuuiImgDialog,
         TuuiChatCard,
+        'chat-mcp-chat-document-card': ChatDocumentCard,
     },
     props: {
         messages: { type: Array, required: true },

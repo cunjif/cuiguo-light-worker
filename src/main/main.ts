@@ -12,6 +12,7 @@ import notifier from 'node-notifier';
 
 import { npmRegistry } from '../lib/repo/internal_repo.js';
 import * as skillEngine from './skills/engine.js';
+import { convertDocumentToMarkdown } from './document-converter.js';
 
 import path from 'path';
 import os from 'os';
@@ -664,13 +665,32 @@ app.whenReady().then(async () => {
     }
   });
 
+  // 文档转 Markdown：供渲染进程在 PDF/DOCX/PPTX/XLSX 附件场景下使用
+  ipcMain.handle('document:convert-markdown', async (event, payload: { fileName: string; data: number[] | Uint8Array; mimeType?: string }) => {
+    try {
+      if (!payload || !payload.data) {
+        return { success: false, markdown: null, title: null, error: 'No file data provided.', durationMs: 0, engine: 'markitdown-ts' };
+      }
+      return await convertDocumentToMarkdown(payload);
+    } catch (error: any) {
+      console.error('document:convert-markdown failed:', error);
+      return {
+        success: false,
+        markdown: null,
+        title: null,
+        error: `IPC handler error: ${error?.message || error}`,
+        durationMs: 0,
+        engine: 'markitdown-ts'
+      };
+    }
+  });
+
 
 
   // Skills management IPC handlers
   ipcMain.handle('skills:list-registry', () => {
     return skillEngine.listRegistrySkills();
   });
-
   ipcMain.handle('skills:install', async (event, name: string, currentInstalled: any[]) => {
     return skillEngine.installSkill(name, currentInstalled);
   });

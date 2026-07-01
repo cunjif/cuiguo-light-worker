@@ -348,4 +348,10 @@ contextBridge.exposeInMainWorld('skillsAPI', {
   readFileForExport: (filePath: string) => ipcRenderer.invoke('skills:read-file-for-export', filePath),
 });
 
+// 文档转 Markdown：供附件上传场景使用，主进程通过 markitdown-ts 实现
+contextBridge.exposeInMainWorld('documentAPI', {
+  convertToMarkdown: (payload: { fileName: string; data: number[] | Uint8Array; mimeType?: string }) =>
+    ipcRenderer.invoke('document:convert-markdown', payload)
+});
+
 exposeAPIs();

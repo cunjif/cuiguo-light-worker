@@ -1503,6 +1503,8 @@
                                             :src="item.image_url.url"></tuui-img-dialog>
                                         <tuui-img-dialog v-else-if="item.type=='image'"
                                             :src="`data:${item.source.media_type};base64,${item.source.data}`"></tuui-img-dialog>
+                                        <chat-mcp-chat-document-card v-else-if="item.type=='document'"
+                                            :document="item.document"></chat-mcp-chat-document-card>
                                         <v-textarea v-else-if="item.type=='text'" class="conversation-area"
                                             variant="plain" density='compact' auto-grow :counter="showmodify"
                                             :hide-details="!showmodify" rows="1" :readonly="!showmodify"
@@ -1741,6 +1743,38 @@
         </v-hover>
     </template>
 
+    <!-- 文档折叠卡片模板（用于用户消息中显示附件文档） -->
+    <template id="chat-mcp-chat-document-card-template">
+        <v-card variant="outlined" class="document-card mb-1" rounded="lg" @click="expanded = !expanded">
+            <div class="d-flex align-center pa-2 cursor-pointer">
+                <v-icon size="20" :color="getDocIconColor(document.mimeType)" class="mr-2">
+                    {{ getDocIcon(document.mimeType) }}
+                </v-icon>
+                <div class="flex-grow-1">
+                    <div class="text-subtitle-2 font-weight-medium">{{ document.name }}</div>
+                    <div class="text-caption text-grey">{{ getExtension() }} · {{ formatSize(document.size) }}</div>
+                </div>
+                <v-icon size="20" color="grey" :class="{ 'rotate-180': expanded }">
+                    mdi-chevron-down
+                </v-icon>
+            </div>
+            <v-expand-transition>
+                <v-card-text v-if="expanded" class="pa-2 pt-0">
+                    <v-textarea
+                        variant="plain"
+                        density="compact"
+                        auto-grow
+                        rows="3"
+                        readonly
+                        hide-details
+                        class="document-content-preview"
+                        :model-value="document.textContent"
+                    ></v-textarea>
+                </v-card-text>
+            </v-expand-transition>
+        </v-card>
+    </template>
+
     <!-- 缩略图条模板 -->
     <template id="chat-mcp-chat-thumbnail-strip-template">
         <div v-if="attachments.length > 0" ref="stripRef" class="thumbnail-strip d-flex align-center"
@@ -1795,9 +1829,11 @@
     <script src="../lib/js/pinia-persist.umd.min.js"></script>
     <!-- Markdown 编辑器 -->
     <script src="../lib/js/md-editor-v3-lib-umd.min.js"></script>
-    <!-- Lottie 动画 & Docx 解析 -->
+    <!-- Lottie 动画 & 文档解析（mammoth/docx、jszip/zip、pdfjs/pdf） -->
     <script src="../lib/js/lottie.min.js"></script>
     <script src="../lib/js/mammoth.browser.js"></script>
+    <script src="../lib/js/jszip.min.js"></script>
+    <script src="../lib/js/pdf.min.js"></script>
     <!-- Vue Draggable 拖拽排序 -->
     <script src="../lib/js/Sortable.min.js"></script>
     <script src="../lib/js/vuedraggable.umd.min.js"></script>

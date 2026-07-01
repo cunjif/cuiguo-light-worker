@@ -232,24 +232,351 @@ const ImageProcessor = {
 // 文档处理器 (DocProcessor)
 // ==========================================================================
 
+/** 文档文本最大提取长度（字符），超出后截断以避免超出 LLM 上下文窗口 */
+const DOC_TEXT_MAX_LENGTH = 200000;
+/** 文档文本截断后缀（提示模型文本被截断） */
+const DOC_TEXT_TRUNCATED_SUFFIX = '\n\n[... content truncated due to length limit ...]';
+
+/**
+ * 从 ZIP 容器中解析 XML 文本节点
+ * 兼容 PPTX（a:t）、XLSX（t / is / phonetPr 等多种节点）的文本提取
+ * @param {Document} xmlDoc - 已解析的 XML Document
+ * @param {string[]} tagNames - 需要提取文本的标签名集合
+ * @returns {string} 拼接后的文本，使用换行分隔
+ */
+const extractXmlTextNodes = (xmlDoc, tagNames) => {
+    const collected = [];
+    const tagSet = new Set(tagNames);
+    const walker = xmlDoc.createTreeWalker(xmlDoc, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+        const parentTag = node.parentNode ? node.parentNode.nodeName : '';
+        if (tagSet.has(parentTag)) {
+            const value = (node.nodeValue || '').trim();
+            if (value) collected.push(value);
+        }
+    }
+    return collected.join('\n');
+};
+
 /**
  * 文档处理器
  * 负责提取文档文本内容
  */
 const DocProcessor = {
     /**
-     * 提取文档文本
-     * 支持 .docx（通过 mammoth）、.txt、.md、.csv
-     * @param {File} file - 文档文件
+     * PDF CMap 资源是否可用（运行时探测）
+     */
+    _pdfCmapAvailable: false,
+    /**
+     * PDF 标准字体资源是否可用（运行时探测）
+     */
+    _pdfStandardFontAvailable: false,
+    /**
+     * 截断过长文本
+     * @param {string} text - 原始文本
+     * @returns {string}
+     */
+    _truncate(text) {
+        if (!text || text.length <= DOC_TEXT_MAX_LENGTH) return text;
+        return text.slice(0, DOC_TEXT_MAX_LENGTH) + DOC_TEXT_TRUNCATED_SUFFIX;
+    },
+
+    /**
+     * 提取 PDF 文本
+     * 使用 PDF.js 逐页提取 textContent
+     * @param {File} file - PDF 文件
      * @returns {Promise<{text: string, error: string}>}
+     */
+    async _extractPdf(file) {
+        if (typeof pdfjsLib === 'undefined') {
+            return {
+                text: `[Document: ${file.name}]`,
+                error: 'PDF.js library is not loaded.'
+            };
+        }
+        try {
+            // PDF.js worker 指向本地资源（与主库同目录）
+            if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = '../lib/js/pdf.worker.min.js';
+            }
+            const arrayBuffer = await file.arrayBuffer();
+            // 启用 CMap 与标准字体支持：覆盖使用自定义字符映射或非内嵌字体的 PDF。
+            // 仅当本地目录存在 CMap 时才启用，避免大量 404 请求。
+            const options = {
+                data: arrayBuffer,
+                useSystemFonts: true,
+                disableFontFace: false,
+                verbosity: 0
+            };
+            if (DocProcessor._pdfCmapAvailable) {
+                options.cMapUrl = '../lib/js/pdf-cmaps/';
+                options.cMapPacked = true;
+            }
+            if (DocProcessor._pdfStandardFontAvailable) {
+                options.standardFontDataUrl = '../lib/js/pdf-standard-fonts/';
+            }
+            const loadingTask = pdfjsLib.getDocument(options);
+            const pdf = await loadingTask.promise;
+            const pageTexts = [];
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const content = await page.getTextContent({
+                    // 合并相邻文本项以保留可读性
+                    disableCombineTextItems: false,
+                    includeMarkedContent: false
+                });
+                // 使用 item.str 重组文本，按 hasEOL 决定是否换行
+                let lastY = null;
+                let line = [];
+                const lines = [];
+                for (const item of content.items) {
+                    const y = Array.isArray(item.transform) ? item.transform[5] : null;
+                    if (lastY !== null && y !== null && Math.abs(lastY - y) > 2) {
+                        lines.push(line.join(' '));
+                        line = [];
+                    }
+                    if (typeof item.str === 'string' && item.str.length > 0) {
+                        line.push(item.str);
+                    }
+                    lastY = y;
+                    if (item.hasEOL) {
+                        lines.push(line.join(' '));
+                        line = [];
+                    }
+                }
+                if (line.length > 0) lines.push(line.join(' '));
+                pageTexts.push(lines.join('\n'));
+            }
+            await pdf.destroy();
+            const text = this._truncate(pageTexts.join('\n\n'));
+            if (!text.trim()) {
+                return {
+                    text: `[Document: ${file.name}]`,
+                    error: 'PDF text extraction returned empty content. The PDF may be scanned/image-only or use a non-standard text encoding; the file name will be sent as context.'
+                };
+            }
+            return { text, error: '' };
+        } catch (e) {
+            return {
+                text: `[Document: ${file.name}]`,
+                error: `Failed to parse PDF: ${e.message || 'unknown error'}`
+            };
+        }
+    },
+
+    /**
+     * 提取 PPTX 文本
+     * PPTX 是 ZIP 容器，包含 ppt/slides/slideN.xml
+     * @param {File} file - PPTX 文件
+     * @returns {Promise<{text: string, error: string}>}
+     */
+    async _extractPptx(file) {
+        if (typeof JSZip === 'undefined') {
+            return {
+                text: `[Document: ${file.name}]`,
+                error: 'JSZip library is not loaded.'
+            };
+        }
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const zip = await JSZip.loadAsync(arrayBuffer);
+            const slideFiles = Object.keys(zip.files)
+                .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+                .sort((a, b) => {
+                    const na = parseInt(a.match(/slide(\d+)\.xml$/)[1], 10);
+                    const nb = parseInt(b.match(/slide(\d+)\.xml$/)[1], 10);
+                    return na - nb;
+                });
+            const slideTexts = [];
+            for (const name of slideFiles) {
+                const xml = await zip.files[name].async('string');
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xml, 'application/xml');
+                const text = extractXmlTextNodes(xmlDoc, ['a:t']);
+                const slideNum = name.match(/slide(\d+)\.xml$/)[1];
+                slideTexts.push(`--- Slide ${slideNum} ---\n${text}`);
+            }
+            const text = this._truncate(slideTexts.join('\n\n'));
+            if (!text.trim()) {
+                return {
+                    text: `[Document: ${file.name}]`,
+                    error: 'PPTX text extraction returned empty content.'
+                };
+            }
+            return { text, error: '' };
+        } catch (e) {
+            return {
+                text: `[Document: ${file.name}]`,
+                error: `Failed to parse PPTX: ${e.message || 'unknown error'}`
+            };
+        }
+    },
+
+    /**
+     * 提取 XLSX 文本
+     * XLSX 是 ZIP 容器，包含 xl/sharedStrings.xml 与 xl/worksheets/sheetN.xml
+     * @param {File} file - XLSX 文件
+     * @returns {Promise<{text: string, error: string}>}
+     */
+    async _extractXlsx(file) {
+        if (typeof JSZip === 'undefined') {
+            return {
+                text: `[Document: ${file.name}]`,
+                error: 'JSZip library is not loaded.'
+            };
+        }
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const zip = await JSZip.loadAsync(arrayBuffer);
+
+            // 1. 解析 sharedStrings.xml
+            let sharedStrings = [];
+            if (zip.files['xl/sharedStrings.xml']) {
+                const xml = await zip.files['xl/sharedStrings.xml'].async('string');
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xml, 'application/xml');
+                const siNodes = xmlDoc.getElementsByTagName('si');
+                for (const si of siNodes) {
+                    sharedStrings.push(extractXmlTextNodes(si, ['t', 'r']));
+                }
+            }
+
+            // 2. 解析每个 sheet
+            const sheetFiles = Object.keys(zip.files)
+                .filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
+                .sort((a, b) => {
+                    const na = parseInt(a.match(/sheet(\d+)\.xml$/)[1], 10);
+                    const nb = parseInt(b.match(/sheet(\d+)\.xml$/)[1], 10);
+                    return na - nb;
+                });
+            const sheetTexts = [];
+            for (const name of sheetFiles) {
+                const xml = await zip.files[name].async('string');
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xml, 'application/xml');
+                const rowNodes = Array.from(xmlDoc.getElementsByTagName('row'));
+                const rows = rowNodes.map(row => {
+                    const cells = Array.from(row.getElementsByTagName('c'));
+                    return cells.map(c => {
+                        const t = c.getAttribute('t');
+                        const vNode = c.getElementsByTagName('v')[0];
+                        const isNode = c.getElementsByTagName('is')[0];
+                        let value = '';
+                        if (t === 'inlineStr' && isNode) {
+                            value = extractXmlTextNodes(isNode, ['t']);
+                        } else if (vNode) {
+                            const raw = vNode.textContent || '';
+                            if (t === 's') {
+                                const idx = parseInt(raw, 10);
+                                value = sharedStrings[idx] || '';
+                            } else {
+                                value = raw;
+                            }
+                        }
+                        return value;
+                    }).filter(v => v !== '').join(' | ');
+                }).filter(line => line !== '');
+                const sheetNum = name.match(/sheet(\d+)\.xml$/)[1];
+                sheetTexts.push(`--- Sheet ${sheetNum} ---\n${rows.join('\n')}`);
+            }
+            const text = this._truncate(sheetTexts.join('\n\n'));
+            if (!text.trim()) {
+                return {
+                    text: `[Document: ${file.name}]`,
+                    error: 'XLSX text extraction returned empty content.'
+                };
+            }
+            return { text, error: '' };
+        } catch (e) {
+            return {
+                text: `[Document: ${file.name}]`,
+                error: `Failed to parse XLSX: ${e.message || 'unknown error'}`
+            };
+        }
+    },
+
+    /**
+     * 提取文档文本
+     * 主路径：通过主进程 markitdown-ts 转为 Markdown，保留文档结构
+     * 降级路径：浏览器内 PDF.js / JSZip / mammoth / FileReader
+     * @param {File} file - 文档文件
+     * @returns {Promise<{text: string, error: string, engine?: string}>}
      */
     async extractText(file) {
         const ext = file.name.split('.').pop().toLowerCase();
+        // 文本类格式直接走 FileReader（无需走 IPC）
+        if (['txt', 'md', 'csv'].includes(ext)) {
+            return this._extractPlainText(file);
+        }
+        // 先尝试主进程 markitdown-ts（输出 Markdown，结构更完整）
+        const md = await this._tryMainProcessConvert(file, ext);
+        if (md) {
+            return md;
+        }
+        // 降级到浏览器内解析
+        return this._extractWithBrowserFallback(file, ext);
+    },
+
+    /**
+     * 通过主进程 markitdown-ts 转换文档为 Markdown。
+     * @returns {Promise<{text: string, error: string} | null>} 成功则返回结果，失败/不可用返回 null
+     */
+    async _tryMainProcessConvert(file, ext) {
+        const api = window.documentAPI;
+        if (!api || typeof api.convertToMarkdown !== 'function') {
+            return null;
+        }
+        // 浏览器内能直接处理的扩展名列表，markitdown-ts 对这些格式的输出更结构化
+        const supported = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'html', 'htm', 'md', 'csv'];
+        if (!supported.includes(ext)) {
+            return null;
+        }
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            // IPC 走结构化克隆，将 ArrayBuffer 转为 Uint8Array 再交给主进程
+            const data = new Uint8Array(arrayBuffer);
+            const result = await api.convertToMarkdown({
+                fileName: file.name,
+                data,
+                mimeType: file.type || ''
+            });
+            if (!result) return null;
+            if (result.success && result.markdown && result.markdown.trim()) {
+                const truncated = this._truncate(result.markdown);
+                const docType = this.getDocTypeName(ext);
+                const text = `[${docType} Document: ${file.name}]\n\n${truncated}`;
+                return { text, error: '', engine: result.engine || 'markitdown-ts' };
+            }
+            // 失败：返回 null 让调用方走浏览器降级
+            if (result.error) {
+                console.warn(`[DocProcessor] markitdown-ts failed (${ext}): ${result.error}`);
+            }
+            return null;
+        } catch (e) {
+            console.warn(`[DocProcessor] markitdown-ts IPC error (${ext}):`, e);
+            return null;
+        }
+    },
+
+    /**
+     * 浏览器内降级解析。保留旧的 PDF/PPTX/XLSX/DOCX 实现。
+     */
+    async _extractWithBrowserFallback(file, ext) {
+        if (ext === 'pdf') return this._extractPdf(file);
+        if (ext === 'pptx') return this._extractPptx(file);
+        if (ext === 'xlsx') return this._extractXlsx(file);
         if (ext === 'docx') {
             try {
+                if (typeof mammoth === 'undefined') {
+                    return {
+                        text: `[Document: ${file.name}]`,
+                        error: 'mammoth library is not loaded.'
+                    };
+                }
                 const arrayBuffer = await file.arrayBuffer();
                 const result = await mammoth.extractRawText({ arrayBuffer });
-                return { text: result.value, error: '' };
+                return { text: this._truncate(result.value), error: '', engine: 'browser-mammoth' };
             } catch (e) {
                 return {
                     text: `[Document: ${file.name}]`,
@@ -257,13 +584,20 @@ const DocProcessor = {
                 };
             }
         }
-        if (['txt', 'md', 'csv'].includes(ext)) {
+        if (['doc', 'ppt', 'xls'].includes(ext)) {
+            // 旧版二进制 Office 格式：浏览器内无解析器，仅发送文件名
+            return {
+                text: `[Document: ${file.name}]`,
+                error: `Legacy .${ext} format is not supported by the in-browser parser. Save as .${ext}x and re-upload.`
+            };
+        }
+        if (['html', 'htm'].includes(ext)) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
-                reader.onload = (e) => resolve({ text: e.target.result, error: '' });
+                reader.onload = (e) => resolve({ text: this._truncate(String(e.target.result)), error: '', engine: 'browser-filereader' });
                 reader.onerror = () => resolve({
                     text: `[Document: ${file.name}]`,
-                    error: `Failed to read text: ${reader.error?.message || 'read error'}`
+                    error: `Failed to read HTML: ${reader.error?.message || 'read error'}`
                 });
                 reader.readAsText(file);
             });
@@ -272,6 +606,21 @@ const DocProcessor = {
             text: `[Document: ${file.name}]`,
             error: `Format .${ext} is not supported for content extraction; the file name will be sent as context.`
         };
+    },
+
+    /**
+     * 纯文本读取（TXT/MD/CSV），不经过主进程。
+     */
+    _extractPlainText(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve({ text: this._truncate(e.target.result), error: '', engine: 'browser-filereader' });
+            reader.onerror = () => resolve({
+                text: `[Document: ${file.name}]`,
+                error: `Failed to read text: ${reader.error?.message || 'read error'}`
+            });
+            reader.readAsText(file);
+        });
     },
 
     /**
@@ -290,6 +639,25 @@ const DocProcessor = {
         return map[extension] || 'Document';
     }
 };
+
+/**
+ * 探测 PDF.js 所需的本地 CMap / 标准字体资源是否可用。
+ * 通过 head 请求确认目录是否部署到 ../lib/js/ 下，避免运行时产生大量 404。
+ */
+(function detectPdfResources() {
+    if (typeof fetch !== 'function') return;
+    const probe = (url, flagKey) => {
+        fetch(url, { method: 'HEAD' })
+            .then(res => {
+                DocProcessor[flagKey] = !!res.ok;
+            })
+            .catch(() => {
+                DocProcessor[flagKey] = false;
+            });
+    };
+    probe('../lib/js/pdf-cmaps/Adobe-GB1-UCS2.bcmap', '_pdfCmapAvailable');
+    probe('../lib/js/pdf-standard-fonts/FoxitFixed.pfb', '_pdfStandardFontAvailable');
+})();
 
 // ==========================================================================
 // 多模态适配器 (MultimodalAdapter)
@@ -333,20 +701,22 @@ const MultimodalAdapter = {
         imageAttachments.forEach(a => {
             content.push({ type: 'image_url', image_url: { url: a.base64Data } });
         });
-        let textParts = [];
         docAttachments.forEach(a => {
-            const ext = a.name.split('.').pop().toLowerCase();
-            const docType = DocProcessor.getDocTypeName(ext);
-            if (a.textContent && !a.textContent.startsWith('[Document:')) {
-                textParts.push(`[${docType} Document: ${a.name}]\n\n${a.textContent}`);
-            } else {
-                textParts.push(a.textContent || `[${docType} Document: ${a.name}]`);
-            }
+            content.push({
+                type: 'document',
+                document: {
+                    name: a.name,
+                    mimeType: a.type || '',
+                    size: a.size || 0,
+                    textContent: a.textContent || `[Document: ${a.name}]`
+                }
+            });
         });
+        const textParts = [];
         if (text) textParts.push(text);
         if (textParts.length > 0) {
             content.push({ type: 'text', text: textParts.join('\n\n') });
-        } else if (imageAttachments.length > 0) {
+        } else if (imageAttachments.length > 0 && docAttachments.length === 0) {
             content.push({ type: 'text', text: imageAttachments.map(a => `[Image: ${a.name}]`).join(', ') });
         }
         return content;
@@ -371,16 +741,18 @@ const MultimodalAdapter = {
                 });
             }
         });
-        let textParts = [];
         docAttachments.forEach(a => {
-            const ext = a.name.split('.').pop().toLowerCase();
-            const docType = DocProcessor.getDocTypeName(ext);
-            if (a.textContent && !a.textContent.startsWith('[Document:')) {
-                textParts.push(`[${docType} Document: ${a.name}]\n\n${a.textContent}`);
-            } else {
-                textParts.push(a.textContent || `[${docType} Document: ${a.name}]`);
-            }
+            content.push({
+                type: 'document',
+                document: {
+                    name: a.name,
+                    mimeType: a.type || '',
+                    size: a.size || 0,
+                    textContent: a.textContent || `[Document: ${a.name}]`
+                }
+            });
         });
+        const textParts = [];
         if (text) textParts.push(text);
         if (textParts.length > 0) {
             content.push({ type: 'text', text: textParts.join('\n\n') });
@@ -411,6 +783,27 @@ const MultimodalAdapter = {
         });
         if (text) parts.push(text);
         return parts.join('\n\n');
+    },
+
+    /**
+     * 将消息 content 数组展平为 LLM 请求格式（将 document 类型转为文本）
+     * @param {Array|string} content - 消息内容
+     * @returns {Array|string}
+     */
+    flattenContentForLLM(content) {
+        if (!Array.isArray(content)) return content;
+        return content.map(item => {
+            if (item.type === 'document' && item.document) {
+                const doc = item.document;
+                const ext = doc.name.split('.').pop().toLowerCase();
+                const docType = DocProcessor.getDocTypeName(ext);
+                return {
+                    type: 'text',
+                    text: `[${docType} Document: ${doc.name}]\n\n${doc.textContent}`
+                };
+            }
+            return item;
+        });
     }
 };
 
@@ -435,7 +828,12 @@ const createCompletion = async (rawconversation) => {
             const { reasoning_content, ...rest } = item;
             newConversation.push(rest);
         } else {
-            newConversation.push(item);
+            // Flatten document items to text for LLM context
+            const flattened = { ...item };
+            if (Array.isArray(item.content)) {
+                flattened.content = MultimodalAdapter.flattenContentForLLM(item.content);
+            }
+            newConversation.push(flattened);
         }
         return newConversation;
     }, []);
@@ -655,7 +1053,8 @@ const app = createApp({
         'chat-mcp-chat-attachment-bar': ChatAttachmentBar,
         'chat-mcp-chat-attachment-item': ChatAttachmentItem,
         'chat-mcp-chat-thumbnail-strip': ChatThumbnailStrip,
-        'chat-mcp-chat-thumbnail-item': ChatThumbnailItem
+        'chat-mcp-chat-thumbnail-item': ChatThumbnailItem,
+        'chat-mcp-chat-document-card': ChatDocumentCard,
     },
     setup() {
         // ======================================================================
