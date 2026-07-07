@@ -13,6 +13,7 @@ import notifier from 'node-notifier';
 import { npmRegistry } from '../lib/repo/internal_repo.js';
 import * as skillEngine from './skills/engine.js';
 import { convertDocumentToMarkdown } from './document-converter.js';
+import { initializeMcpServers, getMcpServersDir, BUILTIN_SERVERS } from './mcp-manager.js';
 
 import path from 'path';
 import os from 'os';
@@ -406,6 +407,20 @@ app.whenReady().then(async () => {
       title: '插件管理已启动',
       message: '私有 npm 仓库运行在 http://localhost:4873'
     });
+    
+    // 初始化内置 MCP servers（首次启动时）
+    console.log('正在初始化内置 MCP servers...');
+    const mcpInitSuccess = await initializeMcpServers(configPath);
+    if (mcpInitSuccess) {
+      console.log('✓ 内置 MCP servers 初始化成功');
+      notifier.notify({
+        appID: 'CUIGUO',
+        title: 'MCP Servers 已就绪',
+        message: '内置 MCP servers 已开箱即用'
+      });
+    } else {
+      console.warn('⚠ 内置 MCP servers 初始化失败，将使用 config.json 中的配置');
+    }
   } else {
     console.error('✗ 内部npm仓库启动失败');
     notifier.notify({
@@ -765,6 +780,32 @@ app.whenReady().then(async () => {
     } catch (error: any) {
       return [];
     }
+  });
+
+  // MCP Server management IPC handlers
+  ipcMain.handle('mcp:list-installed', async () => {
+    const { listInstalledMcpServers } = await import('./mcp-manager.js');
+    return listInstalledMcpServers();
+  });
+
+  ipcMain.handle('mcp:install', async (event, packageName: string) => {
+    const { installMcpServer } = await import('./mcp-manager.js');
+    const success = await installMcpServer(packageName);
+    return { success, message: success ? `Installed ${packageName}` : `Failed to install ${packageName}` };
+  });
+
+  ipcMain.handle('mcp:uninstall', async (event, packageName: string) => {
+    const { uninstallMcpServer } = await import('./mcp-manager.js');
+    const success = await uninstallMcpServer(packageName);
+    return { success, message: success ? `Uninstalled ${packageName}` : `Failed to uninstall ${packageName}` };
+  });
+
+  ipcMain.handle('mcp:get-servers-dir', () => {
+    return getMcpServersDir();
+  });
+
+  ipcMain.handle('mcp:get-builtin-servers', () => {
+    return BUILTIN_SERVERS;
   });
 
   // Features are already initialized above, no need to re-register handlers

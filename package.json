@@ -11,7 +11,12 @@
   "scripts": {
     "start": "npm run build && electron ./dist/main/main.js",
     "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
-    "build-app": "npm run build && electron-builder"
+    "build-app": "npm run build && electron-builder",
+    "build:linux": "bash build-linux.sh deb",
+    "build:linux:all": "bash build-linux.sh all",
+    "build:linux:appimage": "bash build-linux.sh AppImage",
+    "pack:mcp": "node scripts/pack-mcp-servers.js",
+    "build:with-mcp": "npm run pack:mcp && npm run build-app"
   },
   "build": {
     "appId": "com.cuiguo.lightworkstation",
@@ -25,6 +30,11 @@
       {
         "from": "./src/main/config.json",
         "to": "./"
+      },
+      {
+        "from": "./src/mcp-builtin",
+        "to": "./mcp-builtin",
+        "filter": ["**/*"]
       }
     ],
     "win": {
