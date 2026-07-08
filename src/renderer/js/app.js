@@ -848,6 +848,27 @@ const createCompletion = async (rawconversation) => {
 
         const messages = agentStore.promptMessage(conversation);
 
+        let auxiliaryContext = '';
+        try {
+            const auxiliaryResults = await dispatchAuxiliaryModels(messageStore.attachments, 'chat');
+            for (const result of auxiliaryResults) {
+                if (result.success && result.content) {
+                    auxiliaryContext += `\n[${result.role} 辅助模型(${result.instanceName})结果]: ${result.content}\n`;
+                } else if (result.error) {
+                    snackbarStore.showWarningMessage(result.error);
+                }
+            }
+        } catch (e) {
+            console.warn('Auxiliary model dispatch failed:', e);
+        }
+
+        if (auxiliaryContext && messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            if (typeof lastMsg.content === 'string') {
+                lastMsg.content += auxiliaryContext;
+            }
+        }
+
         if (chatbotStore.mcp) {
             const tools = await mcpStore.listTools();
             chatbotStore._mcpTools = tools;
@@ -1129,6 +1150,7 @@ const app = createApp({
 
         const chatbotStore = useChatbotStore();
         runMigrationV2();
+        runMigrationV3();
         ensureProviderInstances(chatbotStore);
         const messageStore = useMessageStore();
         const historyStore = useHistoryStore();
@@ -1387,7 +1409,14 @@ const app = createApp({
             reader.onload = (e) => {
                 try {
                     const json = JSON.parse(e.target.result)
-                    if (json.chatbotStore) chatbotStore.updateStoreFromJSON(json.chatbotStore)
+                    if (json.chatbotStore) {
+                        if (Array.isArray(json.chatbotStore.providers)) {
+                            for (const p of json.chatbotStore.providers) {
+                                if (!p.modelRole) p.modelRole = 'unassigned';
+                            }
+                        }
+                        chatbotStore.updateStoreFromJSON(json.chatbotStore)
+                    }
                     if (json.defaultChoiceStore) defaultChoiceStore.updateStoreFromJSON(json.defaultChoiceStore)
                     snackbarStore.showSuccessMessage('$vuetify.dataIterator.snackbar.importSuccess')
                 } catch {
@@ -1459,6 +1488,8 @@ const app = createApp({
         // ======================================================================
         const providerTypes = ref(PROVIDER_TYPES);
 
+        const roleSelectItems = computed(() => buildRoleSelectItems());
+
         const providerCapabilities = computed(() => {
             return getCapabilities(chatbotStore.provider || 'openai-compatible');
         });
@@ -1527,6 +1558,14 @@ const app = createApp({
         };
 
         const doDeleteProvider = () => {
+            const target = chatbotStore.providers.find(p => p.id === deleteTargetId.value);
+            if (target && target.modelRole === 'primary') {
+                const otherPrimary = chatbotStore.providers.find(p => p.modelRole === 'primary' && p.id !== deleteTargetId.value);
+                if (!otherPrimary) {
+                    snackbarStore.showErrorMessage('请先指定其他主模型');
+                    return;
+                }
+            }
             chatbotStore.removeProvider(deleteTargetId.value);
             showDeleteDialog.value = false;
             deleteTargetId.value = null;
@@ -1703,6 +1742,11 @@ const app = createApp({
             cancelProviderForm,
             confirmDeleteProvider,
             doDeleteProvider,
+            roleSelectItems,
+            getRoleDisplayName,
+            getRoleColor,
+            getRoleIcon,
+            getRoleDescription,
         };
     }
 });

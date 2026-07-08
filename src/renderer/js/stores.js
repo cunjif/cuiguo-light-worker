@@ -2452,6 +2452,23 @@ const useChatbotStore = defineStore("chatbotStore", {
         activeProvider(state) {
             return state.providers.find(p => p.id === state.activeProviderId);
         },
+
+        /**
+         * 获取指定角色的第一个 Provider 实例
+         * @param {string} role - 模型角色标识
+         * @returns {Object|null}
+         */
+        getProviderByRole: (state) => (role) => {
+            return state.providers.find(p => p.modelRole === role) || null;
+        },
+
+        /**
+         * 获取当前主模型实例
+         * @returns {Object|null}
+         */
+        getPrimaryProvider(state) {
+            return state.providers.find(p => p.modelRole === 'primary') || null;
+        },
     },
 
     actions: {
@@ -2484,6 +2501,9 @@ const useChatbotStore = defineStore("chatbotStore", {
             if (this.providers.length >= 20) {
                 throw new Error('已达到最大实例数量限制（20）');
             }
+            if (instance.modelRole === 'primary') {
+                this.ensurePrimaryUnique(instance.id);
+            }
             this.providers.push(instance);
             this.switchProvider(instance.id);
             return instance.id;
@@ -2498,9 +2518,26 @@ const useChatbotStore = defineStore("chatbotStore", {
             const idx = this.providers.findIndex(p => p.id === id);
             if (idx === -1) return;
             this.providers[idx] = { ...this.providers[idx], ...updated };
+            if (updated.modelRole === 'primary') {
+                this.ensurePrimaryUnique(id);
+            }
             if (id === this.activeProviderId) {
                 this._applyInstanceToStore(this.providers[idx]);
             }
+        },
+
+        /**
+         * 校验并处理主模型唯一性
+         * 当设置新主模型时，自动将原主模型变更为 unassigned
+         * @param {string} newPrimaryId - 新主模型的实例 ID
+         * @returns {string|null} 被替换的原主模型名称，或 null
+         */
+        ensurePrimaryUnique(newPrimaryId) {
+            const current = this.providers.find(p => p.modelRole === 'primary' && p.id !== newPrimaryId);
+            if (!current) return null;
+            const replacedName = current.name;
+            current.modelRole = 'unassigned';
+            return replacedName;
         },
 
         /**

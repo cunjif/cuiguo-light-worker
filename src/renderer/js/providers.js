@@ -576,6 +576,7 @@ function createDefaultInstance(providerType) {
         seed: null,
         frequency_penalty: null,
         mask_sensitive_info: false,
+        modelRole: 'unassigned',
     };
 }
 
@@ -589,6 +590,7 @@ function validateInstance(instance) {
     if (typeof instance.id !== 'string' || !instance.id) return false;
     if (typeof instance.name !== 'string') return false;
     if (typeof instance.provider !== 'string' || !instance.provider) return false;
+    if (instance.modelRole !== undefined && !isValidModelRole(instance.modelRole)) return false;
     return true;
 }
 
@@ -671,6 +673,35 @@ function runMigrationV2() {
         localStorage.setItem(storeKey, JSON.stringify(parsed));
     } catch (e) {
         console.warn('Migration V2 failed:', e);
+    }
+}
+
+/**
+ * 执行 V3 数据迁移 - 为缺少 modelRole 字段的 Provider 实例补充默认值
+ * 规则：若该实例为当前活跃实例则设为 primary，否则设为 unassigned
+ */
+function runMigrationV3() {
+    try {
+        const storeKey = 'chatbotStore';
+        const raw = localStorage.getItem(storeKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return;
+        if (!Array.isArray(parsed.providers)) return;
+
+        let changed = false;
+        for (const instance of parsed.providers) {
+            if (!instance.modelRole) {
+                instance.modelRole = (instance.id === parsed.activeProviderId) ? 'primary' : 'unassigned';
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            localStorage.setItem(storeKey, JSON.stringify(parsed));
+        }
+    } catch (e) {
+        console.warn('Migration V3 failed:', e);
     }
 }
 
