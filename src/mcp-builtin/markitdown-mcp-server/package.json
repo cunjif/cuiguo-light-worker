@@ -1,0 +1,19 @@
+{
+  "name": "markitdown-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for converting documents to Markdown using markitdown-ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "markitdown-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.2",
+    "@lprhodes/markitdown-ts": "^1.0.0",
+    "zod": "^3.24.3"
+  }
+}

@@ -52,6 +52,12 @@ const BUILTIN_SERVERS: BuiltinMcpServer[] = [
     args: [],
     enabled: true,
   },
+  {
+    name: 'markitdown',
+    package: 'markitdown-mcp-server',
+    args: [],
+    enabled: true,
+  },
 ];
 
 // Get the user data directory for MCP servers

@@ -15,7 +15,7 @@ import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
-// MCP servers to bundle
+// MCP servers to bundle (from npm registry)
 const MCP_SERVERS = [
   'playwright-mcp@0.0.10',
   '@modelcontextprotocol/server-filesystem@latest',
@@ -23,8 +23,91 @@ const MCP_SERVERS = [
   'bazi-mcp@latest',
 ];
 
+// Local MCP servers to bundle (from local source directories)
+const LOCAL_MCP_SERVERS = [
+  { name: 'markitdown-mcp-server', dir: 'src/mcp-builtin/markitdown-mcp-server' },
+];
+
+// Additional dependencies to pack from the main project's node_modules
+// (for packages not available on the public npm registry)
+const EXTRA_PACKAGES_TO_PACK = [
+  '@lprhodes/markitdown-ts',
+];
+
 // Output directory
 const OUTPUT_DIR = path.join(process.cwd(), 'src', 'mcp-builtin', 'packages');
+
+async function packLocalServers() {
+  const projectNodeModules = path.join(process.cwd(), 'node_modules');
+
+  for (const local of LOCAL_MCP_SERVERS) {
+    const localDir = path.join(process.cwd(), local.dir);
+    if (!fs.existsSync(localDir)) {
+      console.warn(`Local package directory not found: ${local.dir}, skipping`);
+      continue;
+    }
+
+    const localNodeModules = path.join(localDir, 'node_modules');
+    let createdSymlink = false;
+
+    if (!fs.existsSync(localNodeModules) && fs.existsSync(projectNodeModules)) {
+      try {
+        fs.symlinkSync(projectNodeModules, localNodeModules, 'junction');
+        createdSymlink = true;
+        console.log(`Linked node_modules for ${local.name}`);
+      } catch (error) {
+        console.warn(`Failed to link node_modules for ${local.name}:`, error.message);
+        continue;
+      }
+    }
+
+    try {
+      console.log(`Building local package: ${local.name}...`);
+      await execAsync('npx tsc', { cwd: localDir });
+      console.log(`✓ Built ${local.name}`);
+    } catch (error) {
+      console.error(`Failed to build ${local.name}:`, error.message);
+      if (createdSymlink) {
+        try { fs.unlinkSync(localNodeModules); } catch {}
+      }
+      continue;
+    }
+
+    try {
+      console.log(`Packing local package: ${local.name}...`);
+      const { stdout } = await execAsync(`npm pack "${localDir}" --ignore-scripts`, { cwd: OUTPUT_DIR });
+      const packedFile = stdout.trim();
+      console.log(`✓ Packed: ${packedFile}`);
+    } catch (error) {
+      console.error(`Failed to pack ${local.name}:`, error.message);
+    }
+
+    if (createdSymlink) {
+      try { fs.unlinkSync(localNodeModules); } catch {}
+    }
+  }
+}
+
+async function packExtraDependencies() {
+  const projectNodeModules = path.join(process.cwd(), 'node_modules');
+
+  for (const pkg of EXTRA_PACKAGES_TO_PACK) {
+    const pkgDir = path.join(projectNodeModules, pkg);
+    if (!fs.existsSync(pkgDir)) {
+      console.warn(`Extra dependency not found in node_modules: ${pkg}, skipping`);
+      continue;
+    }
+
+    try {
+      console.log(`Packing extra dependency: ${pkg}...`);
+      const { stdout } = await execAsync(`npm pack "${pkgDir}"`, { cwd: OUTPUT_DIR });
+      const packedFile = stdout.trim();
+      console.log(`✓ Packed: ${packedFile}`);
+    } catch (error) {
+      console.error(`Failed to pack ${pkg}:`, error.message);
+    }
+  }
+}
 
 async function main() {
   console.log('Packing MCP servers...');
@@ -35,7 +118,13 @@ async function main() {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
   
-  // Create a temporary directory for packing
+  // Pack local MCP servers first
+  await packLocalServers();
+
+  // Pack extra dependencies from main project's node_modules
+  await packExtraDependencies();
+
+  // Create a temporary directory for packing npm packages
   const tempDir = path.join(process.cwd(), 'temp-mcp-pack');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -50,7 +139,10 @@ async function main() {
   };
   
   for (const server of MCP_SERVERS) {
-    packageJson.dependencies[server.split('@')[0]] = server.includes('@') ? server.split('@').slice(1).join('@') : 'latest';
+    const atIndex = server.indexOf('@', server.startsWith('@') ? 1 : 0);
+    const name = atIndex > 0 ? server.substring(0, atIndex) : server;
+    const version = atIndex > 0 ? server.substring(atIndex + 1) : 'latest';
+    packageJson.dependencies[name] = version;
   }
   
   fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
@@ -70,7 +162,8 @@ async function main() {
   const nodeModulesDir = path.join(tempDir, 'node_modules');
   
   for (const server of MCP_SERVERS) {
-    const packageName = server.split('@')[0];
+    const atIndex = server.indexOf('@', server.startsWith('@') ? 1 : 0);
+    const packageName = atIndex > 0 ? server.substring(0, atIndex) : server;
     const packageDir = path.join(nodeModulesDir, packageName);
     
     if (!fs.existsSync(packageDir)) {
