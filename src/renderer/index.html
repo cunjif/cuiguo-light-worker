@@ -67,7 +67,7 @@
                                     :class="{ 'drag-over-panel': isDragging }">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
                                         <v-btn icon size="small" variant="text"
-                                            :disabled="messageStore.isProcessingFiles"
+                                            :disabled="messageStore.attachments.some(a => a.status === 'processing')"
                                             @click="triggerFilePicker('left')"
                                             data-component-id="chat-mcp.chat.file-upload">
                                             <v-icon>mdi-paperclip</v-icon>
@@ -119,16 +119,16 @@
                                         <template v-slot:append-inner>
                                             <div class="d-flex flex-column ga-1 mr-1 mb-4">
                                                 <v-btn
-                                                    v-if="messageStore.userMessage && !messageStore.isProcessingFiles"
+                                                    v-if="messageStore.userMessage && !messageStore.attachments.some(a => a.status === 'processing')"
                                                     size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
                                                 <v-btn
-                                                    v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating"
+                                                    v-else-if="messageStore.attachments.length > 0 && !messageStore.attachments.some(a => a.status === 'processing') && !messageStore.generating"
                                                     size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small"
+                                                <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
                                                     color="grey" variant="elevated" disabled icon="mdi-arrow-up"
                                                     v-tooltip:start="'Files processing...'"></v-btn>
                                                 <v-btn v-else-if="messageStore.generating" size="small" color="primary"
@@ -282,7 +282,7 @@
                                     :class="{ 'drag-over-panel': isDragging }">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
                                         <v-btn icon size="small" variant="text"
-                                            :disabled="messageStore.isProcessingFiles"
+                                            :disabled="messageStore.attachments.some(a => a.status === 'processing')"
                                             @click="triggerFilePicker('right')"
                                             data-component-id="chat-mcp.chat.file-upload">
                                             <v-icon>mdi-paperclip</v-icon>
@@ -334,16 +334,16 @@
                                         <template v-slot:append-inner>
                                             <div class="d-flex flex-column ga-1 mr-1 mb-4">
                                                 <v-btn
-                                                    v-if="messageStore.userMessage && !messageStore.isProcessingFiles"
+                                                    v-if="messageStore.userMessage && !messageStore.attachments.some(a => a.status === 'processing')"
                                                     size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
                                                 <v-btn
-                                                    v-else-if="messageStore.attachments.length > 0 && !messageStore.isProcessingFiles && !messageStore.generating"
+                                                    v-else-if="messageStore.attachments.length > 0 && !messageStore.attachments.some(a => a.status === 'processing') && !messageStore.generating"
                                                     size="small" color="primary" variant="elevated"
                                                     @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                     data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.isProcessingFiles" size="small"
+                                                <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
                                                     color="grey" variant="elevated" disabled icon="mdi-arrow-up"
                                                     v-tooltip:start="'Files processing...'"></v-btn>
                                                 <v-btn v-else-if="messageStore.generating" size="small" color="primary"

@@ -259,6 +259,69 @@ const extractXmlTextNodes = (xmlDoc, tagNames) => {
     return collected.join('\n');
 };
 
+const IpcConcurrencyLimiter = {
+    MAX_CONCURRENT: 3,
+    runningCount: 0,
+    waitQueue: [],
+
+    execute(asyncFn) {
+        return new Promise((resolve, reject) => {
+            if (this.runningCount < this.MAX_CONCURRENT) {
+                this.runningCount++;
+                console.log(`[IpcConcurrencyLimiter] task started, running=${this.runningCount}`);
+                asyncFn()
+                    .then(resolve)
+                    .catch(reject)
+                    .finally(() => {
+                        this.runningCount--;
+                        console.log(`[IpcConcurrencyLimiter] task completed, running=${this.runningCount}`);
+                        this._dequeue();
+                    });
+            } else {
+                console.log(`[IpcConcurrencyLimiter] task queued, queue=${this.waitQueue.length + 1}`);
+                this.waitQueue.push({ fn: asyncFn, resolve, reject });
+            }
+        });
+    },
+
+    _dequeue() {
+        if (this.waitQueue.length === 0 || this.runningCount >= this.MAX_CONCURRENT) return;
+        const { fn, resolve, reject } = this.waitQueue.shift();
+        this.runningCount++;
+        console.log(`[IpcConcurrencyLimiter] queued task started, running=${this.runningCount}`);
+        fn()
+            .then(resolve)
+            .catch(reject)
+            .finally(() => {
+                this.runningCount--;
+                console.log(`[IpcConcurrencyLimiter] task completed, running=${this.runningCount}`);
+                this._dequeue();
+            });
+    },
+};
+
+const IpcTimeoutWrapper = {
+    DEFAULT_TIMEOUT_MS: 30000,
+
+    wrap(ipcPromise, timeoutMs, signal) {
+        const timeout = timeoutMs || this.DEFAULT_TIMEOUT_MS;
+
+        const timeoutPromise = new Promise((_, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error(`IPC call timed out after ${timeout}ms`));
+            }, timeout);
+            if (signal) {
+                signal.addEventListener('abort', () => {
+                    clearTimeout(timer);
+                    reject(new Error('IPC call aborted'));
+                }, { once: true });
+            }
+        });
+
+        return Promise.race([ipcPromise, timeoutPromise]);
+    },
+};
+
 /**
  * 文档处理器
  * 负责提取文档文本内容
@@ -503,18 +566,17 @@ const DocProcessor = {
      * @param {File} file - 文档文件
      * @returns {Promise<{text: string, error: string, engine?: string}>}
      */
-    async extractText(file) {
+    async extractText(file, signal) {
         const ext = file.name.split('.').pop().toLowerCase();
-        // 文本类格式直接走 FileReader（无需走 IPC）
         if (['txt', 'md', 'csv'].includes(ext)) {
             return this._extractPlainText(file);
         }
-        // 先尝试主进程 markitdown-ts（输出 Markdown，结构更完整）
-        const md = await this._tryMainProcessConvert(file, ext);
+        if (signal?.aborted) return { text: '', error: 'Cancelled' };
+        const md = await this._tryMainProcessConvert(file, ext, signal);
         if (md) {
             return md;
         }
-        // 降级到浏览器内解析
+        if (signal?.aborted) return { text: '', error: 'Cancelled' };
         return this._extractWithBrowserFallback(file, ext);
     },
 
@@ -522,25 +584,28 @@ const DocProcessor = {
      * 通过主进程 markitdown-ts 转换文档为 Markdown。
      * @returns {Promise<{text: string, error: string} | null>} 成功则返回结果，失败/不可用返回 null
      */
-    async _tryMainProcessConvert(file, ext) {
+    async _tryMainProcessConvert(file, ext, signal) {
         const api = window.documentAPI;
         if (!api || typeof api.convertToMarkdown !== 'function') {
             return null;
         }
-        // 浏览器内能直接处理的扩展名列表，markitdown-ts 对这些格式的输出更结构化
         const supported = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'html', 'htm', 'md', 'csv'];
         if (!supported.includes(ext)) {
             return null;
         }
         try {
             const arrayBuffer = await file.arrayBuffer();
-            // IPC 走结构化克隆，将 ArrayBuffer 转为 Uint8Array 再交给主进程
+            if (signal?.aborted) return null;
             const data = new Uint8Array(arrayBuffer);
-            const result = await api.convertToMarkdown({
-                fileName: file.name,
-                data,
-                mimeType: file.type || ''
-            });
+            const result = await IpcTimeoutWrapper.wrap(
+                api.convertToMarkdown({
+                    fileName: file.name,
+                    data,
+                    mimeType: file.type || ''
+                }),
+                undefined,
+                signal
+            );
             if (!result) return null;
             if (result.success && result.markdown && result.markdown.trim()) {
                 const truncated = this._truncate(result.markdown);
@@ -548,12 +613,15 @@ const DocProcessor = {
                 const text = `[${docType} Document: ${file.name}]\n\n${truncated}`;
                 return { text, error: '', engine: result.engine || 'markitdown-ts' };
             }
-            // 失败：返回 null 让调用方走浏览器降级
             if (result.error) {
                 console.warn(`[DocProcessor] markitdown-ts failed (${ext}): ${result.error}`);
             }
             return null;
         } catch (e) {
+            if (signal?.aborted) {
+                console.log(`[DocProcessor] IPC call cancelled for ${file.name}`);
+                return null;
+            }
             console.warn(`[DocProcessor] markitdown-ts IPC error (${ext}):`, e);
             return null;
         }
@@ -1174,7 +1242,7 @@ const app = createApp({
          * @param {string} side - 'left' 或 'right'
          */
         function triggerFilePicker(side) {
-            if (messageStore.isProcessingFiles) return;
+            if (messageStore.attachments.some(a => a.status === 'processing')) return;
             const refName = side === 'right' ? filePickerRefRight : filePickerRefLeft;
             if (refName.value) refName.value.click();
         }

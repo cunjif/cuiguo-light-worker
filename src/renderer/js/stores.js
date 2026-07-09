@@ -1731,7 +1731,9 @@ const useMessageStore = defineStore("messageStore", {
         /** @type {boolean} 是否正在处理文件 */
         isProcessingFiles: false,
         /** @type {number} 正在处理的文件数量 */
-        processingCount: 0
+        processingCount: 0,
+        /** @type {Map<string, AbortController>} 异步任务控制器映射 */
+        activeTaskControllers: new Map()
     }),
 
     getters: {
@@ -1739,7 +1741,7 @@ const useMessageStore = defineStore("messageStore", {
          * 所有附件是否已处理完毕
          */
         allAttachmentsReady() {
-            return this.attachments.length > 0 && this.attachments.every(a => a.status === 'ready');
+            return this.attachments.length > 0 && this.attachments.every(a => a.status === 'ready' || a.status === 'error');
         },
 
         /**
@@ -1856,6 +1858,25 @@ const useMessageStore = defineStore("messageStore", {
          * @param {File} file - 文件对象
          * @param {string} category - 文件分类
          */
+        registerTask(attachmentId) {
+            const controller = new AbortController();
+            this.activeTaskControllers.set(attachmentId, controller);
+            return controller;
+        },
+
+        cancelTask(attachmentId) {
+            const controller = this.activeTaskControllers.get(attachmentId);
+            if (!controller) return false;
+            controller.abort();
+            this.activeTaskControllers.delete(attachmentId);
+            console.log(`[AsyncTask] cancelled task for attachment ${attachmentId}`);
+            return true;
+        },
+
+        cleanupTask(attachmentId) {
+            this.activeTaskControllers.delete(attachmentId);
+        },
+
         _enqueueAttachment(file, category) {
             const id = crypto.randomUUID();
             const attachment = {
@@ -1874,6 +1895,10 @@ const useMessageStore = defineStore("messageStore", {
             this.attachments.push(attachment);
             this.processingCount += 1;
             this.isProcessingFiles = true;
+
+            const controller = this.registerTask(id);
+            const signal = controller.signal;
+
             (async () => {
                 try {
                     if (category === 'image') {
@@ -1881,28 +1906,38 @@ const useMessageStore = defineStore("messageStore", {
                             ImageProcessor.compress(file),
                             ImageProcessor.generateThumbnail(file)
                         ]);
+                        if (signal.aborted) return;
                         this._updateAttachment(id, a => {
                             a.base64Data = compressed;
                             a.thumbnail = thumb;
                         });
                     } else {
-                        const result = await DocProcessor.extractText(file);
+                        console.log(`[AsyncTask] started doc processing for ${file.name} (id=${id})`);
+                        const result = await IpcConcurrencyLimiter.execute(() => DocProcessor.extractText(file, signal));
+                        if (signal.aborted) return;
                         this._updateAttachment(id, a => {
                             a.textContent = result.text;
                             if (result.error) a.errorMessage = result.error;
                         });
                     }
+                    if (signal.aborted) return;
                     this._updateAttachment(id, a => {
                         a.status = 'ready';
                     });
+                    console.log(`[AsyncTask] attachment ${id} ready`);
                 } catch (e) {
+                    if (signal.aborted) return;
                     this._updateAttachment(id, a => {
                         a.status = 'error';
                         a.errorMessage = e.message || 'Processing failed';
                     });
+                    console.log(`[AsyncTask] attachment ${id} error: ${e.message}`);
                 } finally {
-                    this.processingCount = Math.max(0, this.processingCount - 1);
-                    this.isProcessingFiles = this.processingCount > 0;
+                    if (!signal.aborted) {
+                        this.processingCount = Math.max(0, this.processingCount - 1);
+                        this.isProcessingFiles = this.processingCount > 0;
+                    }
+                    this.cleanupTask(id);
                 }
             })();
         },
@@ -1943,6 +1978,7 @@ const useMessageStore = defineStore("messageStore", {
         removeAttachment(id) {
             const target = this.attachments.find(a => a.id === id);
             if (target && target.status === 'processing') {
+                this.cancelTask(id);
                 this.processingCount = Math.max(0, this.processingCount - 1);
                 this.isProcessingFiles = this.processingCount > 0;
             }
@@ -1953,6 +1989,10 @@ const useMessageStore = defineStore("messageStore", {
          * 清除所有附件
          */
         clearAttachments() {
+            for (const [id, controller] of this.activeTaskControllers) {
+                controller.abort();
+            }
+            this.activeTaskControllers.clear();
             this.attachments = [];
             this.isProcessingFiles = false;
             this.processingCount = 0;
@@ -1975,7 +2015,8 @@ const useMessageStore = defineStore("messageStore", {
          * @returns {Array|string} 消息内容
          */
         buildMultimodalContent(text) {
-            return MultimodalAdapter.buildContent(this.attachments, text, useChatbotStore().provider);
+            const readyAttachments = this.attachments.filter(a => a.status === 'ready');
+            return MultimodalAdapter.buildContent(readyAttachments, text, useChatbotStore().provider);
         },
 
         /**
@@ -2040,7 +2081,7 @@ const useMessageStore = defineStore("messageStore", {
 
             if (!hasText && !hasAttachments && !hasLegacyFile) return;
 
-            if (this.isProcessingFiles) {
+            if (this.attachments.some(a => a.status === 'processing')) {
                 useSnackbarStore().showWarningMessage('$vuetify.dataIterator.snackbar.filesProcessing');
                 return;
             }
