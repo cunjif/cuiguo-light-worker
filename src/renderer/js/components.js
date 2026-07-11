@@ -469,3 +469,70 @@ const TuuiChatBox = {
         }
     }
 };
+
+// ==========================================================================
+// McpServerTools - MCP 服务器工具列表组件
+// ==========================================================================
+
+const McpServerTools = {
+    name: 'McpServerTools',
+    props: {
+        serverName: { type: String, required: true },
+        mcpStore: { type: Object, required: true }
+    },
+    data() {
+        return {
+            tools: [],
+            loading: false,
+            loaded: false
+        };
+    },
+    watch: {
+        serverName: {
+            handler() {
+                this.tools = [];
+                this.loaded = false;
+            }
+        }
+    },
+    mounted() {
+        this.loadTools();
+    },
+    methods: {
+        async loadTools() {
+            if (this.loaded || this.loading) return;
+            this.loading = true;
+            try {
+                const servers = this.mcpStore.getServers;
+                if (servers && servers[this.serverName] && typeof servers[this.serverName].tools?.list === 'function') {
+                    const result = await servers[this.serverName].tools.list();
+                    if (result && Array.isArray(result.tools)) {
+                        this.tools = result.tools;
+                    }
+                }
+            } catch (e) {
+                console.error(`Error loading tools for ${this.serverName}:`, e);
+            } finally {
+                this.loading = false;
+                this.loaded = true;
+            }
+        }
+    },
+    template: `
+        <div>
+            <v-progress-circular v-if="loading" indeterminate size="16" color="primary" class="mb-2"></v-progress-circular>
+            <div v-else-if="tools.length === 0" class="text-caption text-grey">No tools available</div>
+            <div v-else class="mb-2" style="max-height: 200px; overflow-y: auto;">
+                <div v-for="tool in tools" :key="tool.name"
+                    class="d-flex align-start pa-1 mb-1 rounded bg-surface-variant"
+                    style="font-size: 12px;">
+                    <v-icon size="x-small" class="mr-1 mt-half" icon="mdi-wrench-outline"></v-icon>
+                    <div style="min-width: 0;">
+                        <span class="font-weight-medium">{{ tool.name }}</span>
+                        <span v-if="tool.description" class="text-grey ml-1">{{ tool.description }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `
+};

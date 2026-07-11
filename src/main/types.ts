@@ -41,5 +41,6 @@ export interface ServerConfig {
 export interface ClientObj {
   name: string;
   client: Client | HttpClient;
-  capabilities: Record<string, any>;
+  capabilities: Record<string, any> | undefined;
+  serverConfig?: Record<string, any>;
 }

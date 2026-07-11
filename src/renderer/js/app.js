@@ -1144,6 +1144,7 @@ const app = createApp({
         'chat-mcp-chat-thumbnail-strip': ChatThumbnailStrip,
         'chat-mcp-chat-thumbnail-item': ChatThumbnailItem,
         'chat-mcp-chat-document-card': ChatDocumentCard,
+        'mcp-server-tools': McpServerTools,
     },
     setup() {
         // ======================================================================
@@ -1675,6 +1676,11 @@ const app = createApp({
             initLottie();
             agentStore.initAgent();
             settingStore.refreshMcpServersList();
+            if (window.onMcpClientsUpdated) {
+                window.onMcpClientsUpdated.register(() => {
+                    settingStore.refreshMcpServersList();
+                });
+            }
             resizeAvatar()
             window.onresize = () => resizeAvatar()
             resizeInputBox()
@@ -1684,6 +1690,9 @@ const app = createApp({
         onUnmounted(() => {
             destroyLottie();
             window.removeEventListener('keydown', onGlobalKeydown);
+            if (window.onMcpClientsUpdated) {
+                window.onMcpClientsUpdated.unregister();
+            }
         });
 
         watch(

@@ -321,15 +321,21 @@ const useMcpStore = defineStore("mcpStore", {
                 const serverList = [];
                 if (Array.isArray(clients)) {
                     for (const client of clients) {
+                        // Prefer the full config from the main process if available
+                        const config = client.config || {
+                            type: client.type || 'local',
+                            url: client.url || undefined,
+                            command: client.command || undefined,
+                            args: client.args || undefined,
+                            message: client.message || undefined
+                        };
+                        // Ensure type is always set for display purposes
+                        if (!config.type) {
+                            config.type = client.type || (config.url ? 'http' : 'local');
+                        }
                         serverList.push({
                             name: client.name,
-                            config: {
-                                type: client.type || 'local',
-                                url: client.url || undefined,
-                                command: client.command || undefined,
-                                args: client.args || undefined,
-                                message: client.message || undefined
-                            },
+                            config: config,
                             status: 'unknown'
                         });
                     }
@@ -631,27 +637,59 @@ const useSettingStore = defineStore("settingStore", {
         /** @type {boolean} 字体状态 */
         fontStatus: false,
 
-        // MCP Server 配置
-        /** @type {boolean} 添加 MCP 对话框 */
-        addMcpDialog: false,
-        /** @type {string} MCP 标签页 */
-        mcpTab: 'add-server',
-        /** @type {string} MCP 服务器名称 */
-        mcpServerName: '',
-        /** @type {string} MCP 服务器类型 */
-        mcpServerType: 'local',
-        /** @type {string} MCP 服务器 URL */
-        mcpServerUrl: '',
-        /** @type {string} MCP 服务器端口 */
-        mcpServerPort: '',
-        /** @type {string} MCP 服务器命令 */
-        mcpServerCommand: '',
-        /** @type {string} MCP 服务器参数 */
-        mcpServerArgs: '',
-        /** @type {string} MCP 服务器配置 JSON */
-        mcpServerConfig: '',
+        // MCP Server 管理（统一面板）
+        /** @type {boolean} MCP 管理面板 */
+        mcpManageDialog: false,
+        /** @type {string} MCP 管理标签页 */
+        mcpManageTab: 'servers',
+        /** @type {string} MCP 搜索关键词 */
+        mcpSearchQuery: '',
+        /** @type {string} MCP 状态筛选 */
+        mcpStatusFilter: 'all',
+        /** @type {string|null} 当前展开的服务器名 */
+        mcpExpandedServer: null,
 
-        // JSON 解析模式
+        // MCP 服务器列表管理
+        /** @type {Array} 已配置的服务器列表 */
+        mcpServersList: [],
+        /** @type {Object} 服务器状态映射 */
+        mcpServerStatus: {},
+        /** @type {Array} 正在测试的服务器 */
+        mcpTestingServers: [],
+        /** @type {Object} 服务器禁用状态映射 */
+        mcpServerDisabled: {},
+
+        // MCP 服务器配置查看器
+        /** @type {boolean} 配置查看器对话框 */
+        mcpConfigViewerDialog: false,
+        /** @type {Object|null} 正在查看的服务器 */
+        mcpConfigViewerServer: null,
+
+        // MCP 删除确认
+        /** @type {boolean} 删除确认对话框 */
+        mcpDeleteConfirmDialog: false,
+        /** @type {string} 待删除的服务器名 */
+        mcpDeleteTarget: '',
+
+        // MCP 添加服务器 - 表单模式
+        /** @type {string} 添加模式标签页 */
+        mcpAddTab: 'form',
+        /** @type {string} 表单 - 服务器名称 */
+        mcpFormName: '',
+        /** @type {string} 表单 - 传输类型 */
+        mcpFormTransport: 'stdio',
+        /** @type {string} 表单 - 命令 */
+        mcpFormCommand: '',
+        /** @type {Array} 表单 - 参数列表 */
+        mcpFormArgs: [''],
+        /** @type {Array} 表单 - 环境变量 [{key, value}] */
+        mcpFormEnv: [],
+        /** @type {string} 表单 - URL */
+        mcpFormUrl: '',
+        /** @type {Array} 表单 - 请求头 [{key, value}] */
+        mcpFormHeaders: [],
+
+        // MCP 添加服务器 - JSON 导入模式
         /** @type {string} MCP JSON 配置 */
         mcpJsonConfig: '',
         /** @type {string} MCP JSON 错误 */
@@ -661,19 +699,13 @@ const useSettingStore = defineStore("settingStore", {
         /** @type {Array} 选中的 MCP 服务器索引 */
         selectedMcpServers: [],
 
-        // MCP 服务器列表管理
-        /** @type {Array} 已配置的服务器列表 */
-        mcpServersList: [],
-        /** @type {Object} 服务器状态映射 */
-        mcpServerStatus: {},
-        /** @type {Array} 正在测试的服务器 */
-        mcpTestingServers: [],
-
-        // MCP 服务器配置查看器
-        /** @type {boolean} 配置查看器对话框 */
-        mcpConfigViewerDialog: false,
-        /** @type {Object|null} 正在查看的服务器 */
-        mcpConfigViewerServer: null,
+        // MCP 编辑服务器
+        /** @type {boolean} 编辑对话框 */
+        mcpEditDialog: false,
+        /** @type {string} 编辑 - 服务器名称 */
+        mcpEditName: '',
+        /** @type {Object} 编辑 - 原始配置 */
+        mcpEditOriginalConfig: null,
 
         // 技能管理
         /** @type {boolean} 技能对话框 */
@@ -741,6 +773,29 @@ const useSettingStore = defineStore("settingStore", {
             return state.activePanel === 'chat'
                 ? state.functionPanelCols
                 : state.chatPanelCols;
+        },
+        filteredMcpServers(state) {
+            let list = state.mcpServersList;
+            if (state.mcpSearchQuery) {
+                const q = state.mcpSearchQuery.toLowerCase();
+                list = list.filter(s => s.name.toLowerCase().includes(q));
+            }
+            if (state.mcpStatusFilter !== 'all') {
+                list = list.filter(s => {
+                    if (state.mcpStatusFilter === 'disabled') return state.mcpServerDisabled[s.name];
+                    if (state.mcpStatusFilter === 'available') return !state.mcpServerDisabled[s.name] && state.mcpServerStatus[s.name] === 'available';
+                    if (state.mcpStatusFilter === 'unavailable') return !state.mcpServerDisabled[s.name] && (state.mcpServerStatus[s.name] === 'unavailable' || state.mcpServerStatus[s.name] === 'unknown');
+                    return true;
+                });
+            }
+            return list;
+        },
+        mcpStats(state) {
+            const total = state.mcpServersList.length;
+            const available = state.mcpServersList.filter(s => !state.mcpServerDisabled[s.name] && state.mcpServerStatus[s.name] === 'available').length;
+            const unavailable = state.mcpServersList.filter(s => !state.mcpServerDisabled[s.name] && state.mcpServerStatus[s.name] !== 'available' && state.mcpServerStatus[s.name] !== 'testing').length;
+            const disabled = state.mcpServersList.filter(s => state.mcpServerDisabled[s.name]).length;
+            return { total, available, unavailable, disabled };
         }
     },
 
@@ -777,13 +832,123 @@ const useSettingStore = defineStore("settingStore", {
          * 重置 MCP 字段
          */
         resetMcpFields() {
-            this.mcpServerName = '';
-            this.mcpServerType = 'local';
-            this.mcpServerUrl = '';
-            this.mcpServerPort = '';
-            this.mcpServerCommand = '';
-            this.mcpServerArgs = '';
-            this.mcpServerConfig = '';
+            this.mcpFormName = '';
+            this.mcpFormTransport = 'stdio';
+            this.mcpFormCommand = '';
+            this.mcpFormArgs = [''];
+            this.mcpFormEnv = [];
+            this.mcpFormUrl = '';
+            this.mcpFormHeaders = [];
+        },
+
+        resetMcpJsonFields() {
+            this.mcpJsonConfig = '';
+            this.mcpJsonError = '';
+            this.extractedMcpServers = [];
+            this.selectedMcpServers = [];
+        },
+
+        openMcpManage() {
+            this.mcpManageDialog = true;
+            this.mcpManageTab = 'servers';
+            this.mcpExpandedServer = null;
+            this.refreshMcpServersList();
+        },
+
+        toggleMcpServerExpand(serverName) {
+            this.mcpExpandedServer = this.mcpExpandedServer === serverName ? null : serverName;
+        },
+
+        getMcpServerToolCount(serverName) {
+            const mcpStore = useMcpStore();
+            const servers = mcpStore.getServers;
+            if (servers && servers[serverName] && typeof servers[serverName].tools?.list === 'function') {
+                return -1;
+            }
+            return 0;
+        },
+
+        async loadServerTools(serverName) {
+            const mcpStore = useMcpStore();
+            const servers = mcpStore.getServers;
+            if (servers && servers[serverName] && typeof servers[serverName].tools?.list === 'function') {
+                try {
+                    const result = await servers[serverName].tools.list();
+                    return result && Array.isArray(result.tools) ? result.tools : [];
+                } catch (e) {
+                    console.error(`Error loading tools for ${serverName}:`, e);
+                    return [];
+                }
+            }
+            return [];
+        },
+
+
+        async addMcpServerFromForm() {
+            if (!this.mcpFormName.trim()) {
+                useSnackbarStore().showWarningMessage(this.$t ? this.$t('$vuetify.dataIterator.mcp.serverNameRequired') : 'Server name is required');
+                return false;
+            }
+            const exists = this.mcpServersList.some(s => s.name === this.mcpFormName);
+            if (exists) {
+                useSnackbarStore().showWarningMessage(this.$t ? this.$t('$vuetify.dataIterator.mcp.serverExists') : 'Server name already exists');
+                return false;
+            }
+
+            let serverConfig = {};
+            if (this.mcpFormTransport === 'stdio') {
+                if (!this.mcpFormCommand.trim()) {
+                    useSnackbarStore().showWarningMessage(this.$t ? this.$t('$vuetify.dataIterator.mcp.commandRequired') : 'Command is required');
+                    return false;
+                }
+                serverConfig = {
+                    type: 'local',
+                    command: this.mcpFormCommand,
+                    args: this.mcpFormArgs.filter(a => a.trim()).length > 0 ? this.mcpFormArgs.filter(a => a.trim()) : undefined,
+                    env: this.mcpFormEnv.length > 0 ? Object.fromEntries(this.mcpFormEnv.filter(e => e.key.trim()).map(e => [e.key, e.value])) : undefined,
+                };
+            } else {
+                if (!this.mcpFormUrl.trim()) {
+                    useSnackbarStore().showWarningMessage(this.$t ? this.$t('$vuetify.dataIterator.mcp.urlRequired') : 'URL is required');
+                    return false;
+                }
+                serverConfig = {
+                    type: 'http',
+                    url: this.mcpFormUrl,
+                    transport: 'sse',
+                    headers: this.mcpFormHeaders.length > 0 ? Object.fromEntries(this.mcpFormHeaders.filter(h => h.key.trim()).map(h => [h.key, h.value])) : undefined,
+                };
+            }
+
+            const serializableConfig = JSON.parse(JSON.stringify(serverConfig));
+            const serversToInitialize = [{ name: this.mcpFormName, config: serializableConfig }];
+
+            const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
+            dynamicServers[this.mcpFormName] = serverConfig;
+            sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+
+            this.resetMcpFields();
+            this.mcpManageTab = 'servers';
+            await this.initializeServersAndRefresh(serversToInitialize);
+            return true;
+        },
+
+        async toggleMcpServerEnabled(serverName) {
+            const newDisabled = !this.mcpServerDisabled[serverName];
+            this.mcpServerDisabled[serverName] = newDisabled;
+
+            const disabledServers = JSON.parse(sessionStorage.getItem('mcpServerDisabled') || '{}');
+            disabledServers[serverName] = newDisabled;
+            sessionStorage.setItem('mcpServerDisabled', JSON.stringify(disabledServers));
+
+            const snackbarStore = useSnackbarStore();
+            const statusText = newDisabled ? 'disabled' : 'enabled';
+            snackbarStore.showSuccessMessage(`Server ${serverName} ${statusText}`);
+        },
+
+        loadDisabledState() {
+            const disabledServers = JSON.parse(sessionStorage.getItem('mcpServerDisabled') || '{}');
+            this.mcpServerDisabled = disabledServers;
         },
 
         /**
@@ -795,7 +960,7 @@ const useSettingStore = defineStore("settingStore", {
             this.selectedMcpServers = [];
 
             if (!this.mcpJsonConfig.trim()) {
-                this.mcpJsonError = 'Please paste the JSON configuration';
+
                 return;
             }
 
@@ -851,37 +1016,13 @@ const useSettingStore = defineStore("settingStore", {
             for (const idx of this.selectedMcpServers) {
                 const server = this.extractedMcpServers[idx];
                 if (server) {
-                    this.mcpServerName = server.name;
-                    this.mcpServerType = server.type;
-
-                    if (server.type === 'http') {
-                        this.mcpServerUrl = server.url;
-                        this.mcpServerPort = '';
-                        this.mcpServerCommand = '';
-                        this.mcpServerArgs = '';
-                        const { url, ...additionalConfig } = server.config;
-                        if (Object.keys(additionalConfig).length > 0) {
-                            this.mcpServerConfig = JSON.stringify(additionalConfig, null, 2);
-                        } else {
-                            this.mcpServerConfig = '';
-                        }
-                    } else {
-                        this.mcpServerUrl = '';
-                        this.mcpServerPort = '';
-                        this.mcpServerCommand = server.command;
-                        this.mcpServerArgs = server.args.join('\n');
-                        const { command, args, ...additionalConfig } = server.config;
-                        if (Object.keys(additionalConfig).length > 0) {
-                            this.mcpServerConfig = JSON.stringify(additionalConfig, null, 2);
-                        } else {
-                            this.mcpServerConfig = '';
-                        }
-                    }
-
-                    useMcpStore().addMcpServer(this);
-
                     const serializableConfig = JSON.parse(JSON.stringify(server.config));
                     serializableConfig.type = server.type;
+
+                    const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
+                    dynamicServers[server.name] = serializableConfig;
+                    sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+
                     serversToInitialize.push({
                         name: server.name,
                         config: serializableConfig
@@ -895,8 +1036,7 @@ const useSettingStore = defineStore("settingStore", {
             this.mcpJsonError = '';
             this.extractedMcpServers = [];
             this.selectedMcpServers = [];
-            this.resetMcpFields();
-            this.addMcpDialog = false;
+            this.mcpManageTab = 'servers';
             this.initializeServersAndRefresh(serversToInitialize);
         },
 
@@ -932,22 +1072,24 @@ const useSettingStore = defineStore("settingStore", {
                 }
 
                 if (successCount > 0 || skipCount > 0) {
-                    console.log(`Initialization complete: ${successCount} new, ${skipCount} already existed. Reloading page to activate...`);
+                    console.log(`Initialization complete: ${successCount} new, ${skipCount} already existed.`);
                     let message = `Successfully registered ${successCount} MCP server(s)!`;
                     if (skipCount > 0) {
                         message = `${successCount} new and ${skipCount} existing MCP server(s) ready.`;
                     }
-                    message += ' Reloading to activate...';
                     snackbarStore.showSuccessMessage(message);
 
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
+                    await window.updateMcpServersAPI(false);
+                    this.refreshMcpServersList();
+                    const mcpStore = useMcpStore();
+                    await mcpStore.updateServers();
+                    await mcpStore.loadTools();
                 } else {
                     snackbarStore.showWarningMessage('No servers to initialize');
                 }
             } catch (error) {
                 console.error('Error during server initialization:', error);
+                const snackbarStore = useSnackbarStore();
                 snackbarStore.showErrorMessage(`Error initializing servers: ${error.message}`);
             }
         },
@@ -956,12 +1098,23 @@ const useSettingStore = defineStore("settingStore", {
          * 刷新 MCP 服务器列表
          */
         refreshMcpServersList() {
+            this.loadDisabledState();
             useMcpStore().getServersList().then(serversList => {
+                const prevServerNames = new Set(this.mcpServersList.map(s => s.name));
                 this.mcpServersList = [...serversList];
 
                 for (const server of this.mcpServersList) {
                     if (!this.mcpServerStatus.hasOwnProperty(server.name)) {
                         this.mcpServerStatus[server.name] = 'unknown';
+                    }
+                    if (!prevServerNames.has(server.name)) {
+                        this.mcpServerStatus[server.name] = 'available';
+                        if (this.mcpServerDisabled[server.name] === undefined) {
+                            this.mcpServerDisabled[server.name] = false;
+                            const disabledServers = JSON.parse(sessionStorage.getItem('mcpServerDisabled') || '{}');
+                            disabledServers[server.name] = false;
+                            sessionStorage.setItem('mcpServerDisabled', JSON.stringify(disabledServers));
+                        }
                     }
                 }
 
@@ -1014,26 +1167,70 @@ const useSettingStore = defineStore("settingStore", {
          * @param {string} serverName - 服务器名称
          */
         deleteMcpServer(serverName) {
-            if (confirm(`Are you sure you want to delete the MCP server "${serverName}"?`)) {
-                useMcpStore().deleteServer(serverName);
+            this.mcpDeleteTarget = serverName;
+            this.mcpDeleteConfirmDialog = true;
+        },
 
-                const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
-                delete dynamicServers[serverName];
-                sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+        confirmDeleteMcpServer() {
+            const serverName = this.mcpDeleteTarget;
+            this.mcpDeleteConfirmDialog = false;
+            if (!serverName) return;
 
-                window.deleteMcpServer(serverName).then(result => {
-                    if (result.success) {
-                        console.log(`Server ${serverName} deleted successfully:`, result.message);
-                    } else {
-                        console.error(`Failed to delete server ${serverName}:`, result.message);
-                    }
-                }).catch(error => {
-                    console.error(`Error deleting server ${serverName}:`, error);
-                });
+            useMcpStore().deleteServer(serverName);
 
-                this.refreshMcpServersList();
-                delete this.mcpServerStatus[serverName];
+            const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
+            delete dynamicServers[serverName];
+            sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+
+            window.deleteMcpServer(serverName).then(result => {
+                if (result.success) {
+                    console.log(`Server ${serverName} deleted successfully:`, result.message);
+                    const snackbarStore = useSnackbarStore();
+                    snackbarStore.showSuccessMessage(`Server "${serverName}" deleted`);
+                } else {
+                    console.error(`Failed to delete server ${serverName}:`, result.message);
+                }
+            }).catch(error => {
+                console.error(`Error deleting server ${serverName}:`, error);
+            });
+
+            this.refreshMcpServersList();
+            delete this.mcpServerStatus[serverName];
+            this.mcpDeleteTarget = '';
+        },
+
+        openMcpEdit(server) {
+            this.mcpEditName = server.name;
+            this.mcpEditOriginalConfig = JSON.stringify(server.config, null, 2);
+            this.mcpEditDialog = true;
+        },
+
+        async saveMcpEdit() {
+            const serverName = this.mcpEditName;
+            if (!serverName) return;
+
+            let parsedConfig;
+            try {
+                parsedConfig = JSON.parse(this.mcpEditOriginalConfig);
+            } catch (e) {
+                useSnackbarStore().showErrorMessage('Invalid JSON configuration');
+                return;
             }
+
+            await window.deleteMcpServer(serverName);
+
+            const dynamicServers = JSON.parse(sessionStorage.getItem('dynamicMcpServers') || '{}');
+            delete dynamicServers[serverName];
+
+            const serializableConfig = JSON.parse(JSON.stringify(parsedConfig));
+            serializableConfig.type = serializableConfig.url ? 'http' : 'local';
+
+            dynamicServers[serverName] = serializableConfig;
+            sessionStorage.setItem('dynamicMcpServers', JSON.stringify(dynamicServers));
+
+            const serversToInitialize = [{ name: serverName, config: serializableConfig }];
+            this.mcpEditDialog = false;
+            await this.initializeServersAndRefresh(serversToInitialize);
         },
 
         // ======================================================================

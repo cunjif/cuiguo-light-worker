@@ -144,7 +144,7 @@ async function publishBuiltinToRegistry(registryUrl: string = 'http://localhost:
 async function installMcpServers(
   registryUrl: string = 'http://localhost:4873',
   servers: BuiltinMcpServer[] = BUILTIN_SERVERS
-): Promise<boolean> {
+): Promise<BuiltinMcpServer[]> {
   const mcpDir = getMcpServersDir();
   
   if (!fs.existsSync(mcpDir)) {
@@ -166,6 +166,9 @@ async function installMcpServers(
   
   console.log(`Installing ${enabledServers.length} MCP servers...`);
   
+  let anyFailed = false;
+  const installedServers: BuiltinMcpServer[] = [];
+
   for (const server of enabledServers) {
     try {
       console.log(`Installing ${server.package}...`);
@@ -174,13 +177,18 @@ async function installMcpServers(
         { cwd: mcpDir }
       );
       console.log(`✓ ${server.package} installed`);
+      installedServers.push(server);
     } catch (error) {
       console.error(`Failed to install ${server.package}: ${error.message}`);
-      return false;
+      anyFailed = true;
     }
   }
   
-  return true;
+  if (installedServers.length === 0) {
+    return [];
+  }
+  
+  return installedServers;
 }
 
 // Generate config.json with local paths
@@ -250,14 +258,14 @@ export async function initializeMcpServers(
     await publishBuiltinToRegistry(registryUrl);
     
     // Step 2: Install MCP servers to user data directory
-    const installSuccess = await installMcpServers(registryUrl);
-    if (!installSuccess) {
-      console.error('Failed to install MCP servers');
+    const installedServers = await installMcpServers(registryUrl);
+    if (installedServers.length === 0) {
+      console.error('Failed to install any MCP servers');
       return false;
     }
     
-    // Step 3: Generate and save config
-    const config = generateConfig();
+    // Step 3: Generate and save config (only for successfully installed servers)
+    const config = generateConfig(installedServers);
     saveConfig(configPath, config);
     
     // Step 4: Mark as initialized

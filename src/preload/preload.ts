@@ -309,12 +309,23 @@ async function getServers(): Promise<any> {
   }
 }
 
+let onClientsUpdatedCallback: (() => void) | null = null;
+
 contextBridge.exposeInMainWorld('initializeMcpServer', initializeMcpServer);
 contextBridge.exposeInMainWorld('deleteMcpServer', deleteMcpServer);
 contextBridge.exposeInMainWorld('updateMcpServersAPI', updateMcpServersAPI);
 contextBridge.exposeInMainWorld('listClients', listClients);
 contextBridge.exposeInMainWorld('getServers', getServers);
-ipcRenderer.on('clients-updated', async () => { await updateMcpServersAPI(); });
+contextBridge.exposeInMainWorld('onMcpClientsUpdated', {
+  register: (callback: () => void) => { onClientsUpdatedCallback = callback; },
+  unregister: () => { onClientsUpdatedCallback = null; }
+});
+ipcRenderer.on('clients-updated', async () => {
+  await updateMcpServersAPI();
+  if (onClientsUpdatedCallback) {
+    onClientsUpdatedCallback();
+  }
+});
 
 // 暴露内部npm仓库管理器需要的API
 contextBridge.exposeInMainWorld('registryAPI', {

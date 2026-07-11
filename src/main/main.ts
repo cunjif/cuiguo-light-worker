@@ -48,6 +48,7 @@ interface ClientObj {
   name: string;
   client: Client | HttpClient;
   capabilities: Record<string, any> | undefined;
+  serverConfig?: Record<string, any>;
 }
 
 function readConfig(configPath: string): McpServersConfig | null {
@@ -101,7 +102,7 @@ async function initClient(): Promise<ClientObj[]> {
             .then(client => {
               console.log(`${name} initialized.`);
               const capabilities = client.getServerCapabilities();
-              return { name, client, capabilities } as ClientObj;
+              return { name, client, capabilities, serverConfig } as ClientObj;
             })
             .catch(err => {
               console.error(`Client ${name} failed to initialize:`, err?.message);
@@ -304,27 +305,57 @@ function registerIpcHandlers(
 }
 
 async function bootstrapClientsFromConfig() {
-  let clients: ClientObj[] = [];
-  try {
-    clients = await initClient();
-  } catch (error) {
-    console.error('Failed to initialize clients:', error?.message);
-    clients = [];
+  const config = readConfig(configPath);
+  if (!config || !config.mcpServers || Object.keys(config.mcpServers).length === 0) {
+    console.log('No MCP servers configured, skipping bootstrap');
+    return;
   }
 
-  features = clients.map(clientObj => {
-    const feature = registerIpcHandlers(clientObj.name, clientObj.client, clientObj.capabilities);
-    if (clientObj.client instanceof HttpClient) {
-      feature.type = 'http';
-      feature.url = (clientObj.client as HttpClient).getUrl();
-    } else {
-      feature.type = 'local';
-    }
-    return feature;
-  });
+  const entries = Object.entries(config.mcpServers);
+  console.log(`Bootstrapping ${entries.length} MCP servers...`);
 
-  console.log('Features initialized:', features.length, features);
-  BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
+  for (const [name, serverConfig] of entries) {
+    console.log(`Initializing client for ${name}...`);
+    try {
+      const timeoutPromise = new Promise<Client | HttpClient>((resolve, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Initialization of client for ${name} timed out after 30 seconds`));
+        }, 30000);
+      });
+
+      const client = await Promise.race([
+        initializeClient(name, serverConfig),
+        timeoutPromise,
+      ]);
+
+      const capabilities = client.getServerCapabilities();
+      const feature = registerIpcHandlers(name, client, capabilities);
+
+      if (client instanceof HttpClient) {
+        feature.type = 'http';
+        feature.url = (client as HttpClient).getUrl();
+      } else {
+        feature.type = 'local';
+        feature.command = serverConfig.command;
+        feature.args = serverConfig.args;
+      }
+      feature.config = serverConfig;
+
+      const existingIndex = features.findIndex(f => f.name === name);
+      if (existingIndex !== -1) {
+        features[existingIndex] = feature;
+      } else {
+        features.push(feature);
+      }
+
+      console.log(`Server ${name} initialized and registered. Notifying renderer...`);
+      BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
+    } catch (error) {
+      console.error(`Failed to initialize server ${name}:`, error?.message);
+    }
+  }
+
+  console.log('All MCP servers bootstrap attempts completed. Features:', features.length);
 }
 
 // 初始化特定的服务器
@@ -379,7 +410,12 @@ async function bootstrapSpecificClients(serverNames: string[]) {
           feature.url = (client as HttpClient).getUrl();
         } else {
           feature.type = 'local';
+          feature.command = serverConfig.command;
+          feature.args = serverConfig.args;
         }
+
+        // Set the full config for display in the management UI
+        feature.config = serverConfig;
 
         features.push(feature);
         console.log(`Server ${serverName} registered with IPC handlers`);
