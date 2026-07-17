@@ -349,8 +349,14 @@ const useMcpStore = defineStore("mcpStore", {
                     }
                 }
 
-                console.log('Returning server list:', serverList);
-                return serverList;
+                const dedupMap = new Map();
+                for (const item of serverList) {
+                    dedupMap.set(item.name, item);
+                }
+                const dedupedList = [...dedupMap.values()];
+
+                console.log('Returning server list:', dedupedList);
+                return dedupedList;
             } catch (error) {
                 console.error('Error fetching server list:', error);
                 return [];
@@ -1010,12 +1016,17 @@ const useSettingStore = defineStore("settingStore", {
          * 添加提取的 MCP 服务器
          */
         addExtractedMcpServers() {
-            const successCount = this.selectedMcpServers.length;
+            let frontendSkipCount = 0;
             const serversToInitialize = [];
 
             for (const idx of this.selectedMcpServers) {
                 const server = this.extractedMcpServers[idx];
                 if (server) {
+                    if (this.mcpServersList.some(s => s.name === server.name)) {
+                        frontendSkipCount++;
+                        continue;
+                    }
+
                     const serializableConfig = JSON.parse(JSON.stringify(server.config));
                     serializableConfig.type = server.type;
 
@@ -1030,21 +1041,21 @@ const useSettingStore = defineStore("settingStore", {
                 }
             }
 
-            console.log(`Added ${successCount} MCP server(s)`);
+            console.log(`Added ${serversToInitialize.length} MCP server(s), ${frontendSkipCount} skipped (duplicate)`);
 
             this.mcpJsonConfig = '';
             this.mcpJsonError = '';
             this.extractedMcpServers = [];
             this.selectedMcpServers = [];
             this.mcpManageTab = 'servers';
-            this.initializeServersAndRefresh(serversToInitialize);
+            this.initializeServersAndRefresh(serversToInitialize, frontendSkipCount);
         },
 
         /**
          * 初始化服务器并刷新列表
          * @param {Array} serversToInitialize - 待初始化的服务器列表
          */
-        async initializeServersAndRefresh(serversToInitialize) {
+        async initializeServersAndRefresh(serversToInitialize, frontendSkipCount = 0) {
             try {
                 console.log('Initializing servers dynamically:', serversToInitialize);
                 const snackbarStore = useSnackbarStore();
@@ -1071,11 +1082,12 @@ const useSettingStore = defineStore("settingStore", {
                     }
                 }
 
-                if (successCount > 0 || skipCount > 0) {
-                    console.log(`Initialization complete: ${successCount} new, ${skipCount} already existed.`);
+                const totalSkipCount = skipCount + frontendSkipCount;
+                if (successCount > 0 || totalSkipCount > 0) {
+                    console.log(`Initialization complete: ${successCount} new, ${totalSkipCount} skipped (already existed).`);
                     let message = `Successfully registered ${successCount} MCP server(s)!`;
-                    if (skipCount > 0) {
-                        message = `${successCount} new and ${skipCount} existing MCP server(s) ready.`;
+                    if (totalSkipCount > 0) {
+                        message = `${successCount} new, ${totalSkipCount} already existed and skipped.`;
                     }
                     snackbarStore.showSuccessMessage(message);
 
@@ -1101,6 +1113,7 @@ const useSettingStore = defineStore("settingStore", {
             this.loadDisabledState();
             useMcpStore().getServersList().then(serversList => {
                 const prevServerNames = new Set(this.mcpServersList.map(s => s.name));
+                // Deduplication is guaranteed by getServersList() using Map
                 this.mcpServersList = [...serversList];
 
                 for (const server of this.mcpServersList) {

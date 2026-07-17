@@ -781,11 +781,14 @@ const MultimodalAdapter = {
             });
         });
         const textParts = [];
+        if (imageAttachments.length > 0) {
+            textParts.push(`[用户已提供${imageAttachments.length}张图片，请直接分析上方提供的图片内容，不要调用截图工具]`);
+        }
         if (text) textParts.push(text);
         if (textParts.length > 0) {
             content.push({ type: 'text', text: textParts.join('\n\n') });
-        } else if (imageAttachments.length > 0 && docAttachments.length === 0) {
-            content.push({ type: 'text', text: imageAttachments.map(a => `[Image: ${a.name}]`).join(', ') });
+        } else if (imageAttachments.length === 0 && docAttachments.length === 0) {
+            content.push({ type: 'text', text: '' });
         }
         return content;
     },
@@ -821,6 +824,9 @@ const MultimodalAdapter = {
             });
         });
         const textParts = [];
+        if (imageAttachments.length > 0) {
+            textParts.push(`[用户已提供${imageAttachments.length}张图片，请直接分析上方提供的图片内容，不要调用截图工具]`);
+        }
         if (text) textParts.push(text);
         if (textParts.length > 0) {
             content.push({ type: 'text', text: textParts.join('\n\n') });
@@ -937,9 +943,19 @@ const createCompletion = async (rawconversation) => {
             }
         }
 
+        const hasImageInMessages = messages.some(msg =>
+            Array.isArray(msg.content) && msg.content.some(item => item.type === 'image_url')
+        );
+
         if (chatbotStore.mcp) {
-            const tools = await mcpStore.listTools();
+            let tools = await mcpStore.listTools();
+            if (hasImageInMessages && Array.isArray(tools)) {
+                tools = tools.filter(t =>
+                    !['browser_screenshot', 'computer_screenshot', 'take_screenshot'].includes(t.function?.name)
+                );
+            }
             chatbotStore._mcpTools = tools;
+            chatbotStore._hasImageInMessages = hasImageInMessages;
         }
 
         const { headers: authHeaders, body: requestBody, url } = adaptRequest(chatbotStore, messages);
@@ -947,7 +963,11 @@ const createCompletion = async (rawconversation) => {
         const body = { ...requestBody };
         if (chatbotStore.mcp && chatbotStore._mcpTools) {
             body.tools = chatbotStore._mcpTools;
+            if (chatbotStore._hasImageInMessages && body.tools.length > 0) {
+                body.tool_choice = 'auto';
+            }
             delete chatbotStore._mcpTools;
+            delete chatbotStore._hasImageInMessages;
         }
 
         const headers = { ...authHeaders };

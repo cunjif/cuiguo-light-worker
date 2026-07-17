@@ -929,16 +929,16 @@
                  ================================================================ -->
             <v-dialog v-model="settingStore.mcpManageDialog" max-width="960" class="dialog-card" persistent
                 data-component-id="chat-mcp.dialog.mcp-manage">
-                <v-card>
-                    <v-card-title class="pa-4 d-flex align-center">
+                <v-card style="max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
+                    <v-card-title class="pa-4 d-flex align-center flex-shrink-0">
                         <v-icon start size="small" class="mr-2">mdi-lan-connect</v-icon>
                         <span class="flex-fill">{{ $t('$vuetify.dataIterator.mcp.title') }}</span>
                         <v-btn variant="text" rounded icon="mdi-close" size="small" color="primary"
                             @click="settingStore.mcpManageDialog = false">
                         </v-btn>
                     </v-card-title>
-                    <v-divider></v-divider>
-                    <v-card-text class="pa-0">
+                    <v-divider class="flex-shrink-0"></v-divider>
+                    <v-card-text class="pa-0" style="overflow-y: auto; flex: 1 1 auto; min-height: 0;">
                         <v-tabs v-model="settingStore.mcpManageTab" class="px-4">
                             <v-tab value="servers">{{ $t('$vuetify.dataIterator.mcp.servers') }}</v-tab>
                             <v-tab value="add">{{ $t('$vuetify.dataIterator.mcp.addServer') }}</v-tab>
@@ -1383,12 +1383,16 @@
             <!-- ================================================================
                  Skill Management 对话框
                  ================================================================ -->
-            <v-dialog v-model="settingStore.skillDialog" max-width="900" class="dialog-card"
+            <v-dialog v-model="settingStore.skillDialog" max-width="900" class="dialog-card" persistent
                 data-component-id="chat-mcp.dialog.skill-manage">
-                <v-card prepend-icon="mdi-auto-fix" :title="$t('$vuetify.dataIterator.skill.title')"
+                <v-card style="max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;"
                     @dragover.prevent="settingStore.skillDragOver = true"
                     @dragleave.prevent="settingStore.skillDragOver = false"
                     @drop.prevent="settingStore.skillDragOver = false; handleSkillDrop($event)">
+                    <v-card-title class="pa-4 d-flex align-center flex-shrink-0">
+                        <v-icon start size="small" class="mr-2">mdi-auto-fix</v-icon>
+                        <span>{{ $t('$vuetify.dataIterator.skill.title') }}</span>
+                    </v-card-title>
                     <v-overlay v-model="settingStore.skillDragOver" contained class="align-center justify-center"
                         opacity="0.8">
                         <div class="text-center">
@@ -1396,8 +1400,8 @@
                             <p class="text-h6 mt-2">{{ $t('$vuetify.dataIterator.skill.dropToInstall') }}</p>
                         </div>
                     </v-overlay>
-                    <v-divider></v-divider>
-                    <v-card-text>
+                    <v-divider class="flex-shrink-0"></v-divider>
+                    <v-card-text class="pa-0" style="overflow-y: auto; flex: 1 1 auto; min-height: 0;">
                         <v-tabs v-model="settingStore.skillTab" class="mb-4">
                             <v-tab value="registry">{{ $t('$vuetify.dataIterator.skill.registry') }}</v-tab>
                             <v-tab value="installed">{{ $t('$vuetify.dataIterator.skill.installed') }}</v-tab>
@@ -1588,7 +1592,7 @@
                             </v-window-item>
                         </v-window>
                     </v-card-text>
-                    <v-card-actions>
+                    <v-card-actions class="flex-shrink-0">
                         <v-btn variant="text" prepend-icon="mdi-import"
                             @click="settingStore.skillImportDialog = true">{{ $t('$vuetify.dataIterator.skill.import')
                             }}</v-btn>
