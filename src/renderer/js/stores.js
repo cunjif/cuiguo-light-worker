@@ -2688,7 +2688,9 @@ const useChatbotStore = defineStore("chatbotStore", {
         /** @type {number|null} 频率惩罚 */
         frequency_penalty: null,
         /** @type {boolean} 是否屏蔽敏感信息 */
-        mask_sensitive_info: false
+        mask_sensitive_info: false,
+        /** @type {string} 用户身份标识，非空时作为请求头 "userId" 的值发送 */
+        userId: ''
     }),
 
     persist: {

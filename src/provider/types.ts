@@ -67,6 +67,7 @@ export interface ModelConfig {
   seed?: number;
   frequency_penalty?: number;
   mask_sensitive_info?: boolean;
+  userId?: string;
 }
 
 export type RequestTransformer = (skeleton: RequestSkeleton, config: ModelConfig) => object;

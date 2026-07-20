@@ -683,6 +683,10 @@
                                                     :items="['Authorization', 'x-api-key', 'Token']"
                                                     v-model="providerFormData.authHeaderName"
                                                     variant="outlined"></v-combobox>
+                                                <v-text-field class="px-2" density='compact' label="User ID"
+                                                    v-model="providerFormData.userId"
+                                                    variant="outlined" clearable hide-details
+                                                    prepend-inner-icon="mdi-account-outline"></v-text-field>
                                                 <v-text-field v-if="providerFormCapabilities.seedSupported" class="px-2"
                                                     density='compact' label="Seed"
                                                     v-model.number="providerFormData.seed" type='number'

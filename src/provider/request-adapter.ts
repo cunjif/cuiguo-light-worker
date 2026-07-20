@@ -48,6 +48,10 @@ export function buildAuthHeaders(config: ModelConfig): Record<string, string> {
     headers['anthropic-version'] = '2023-06-01';
   }
 
+  if (config.userId && config.userId.trim() !== '') {
+    headers['userId'] = config.userId;
+  }
+
   return headers;
 }
 

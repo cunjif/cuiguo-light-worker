@@ -70,6 +70,7 @@ async function executeAuxiliaryRequest(instance, messages) {
         const authHeader = instance.authHeaderName || 'Authorization';
         const authPrefix = instance.authPrefix || 'Bearer';
         headers[authHeader] = `${authPrefix} ${instance.apiKey}`;
+        if (instance.userId && instance.userId.trim() !== '') headers['userId'] = instance.userId;
 
         const url = (instance.url || '') + (instance.path || '');
         const response = await fetch(url, {

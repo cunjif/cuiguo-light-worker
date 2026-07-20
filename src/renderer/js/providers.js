@@ -424,6 +424,7 @@ function buildAuthHeaders(config) {
     const authPrefix = config.authPrefix !== undefined ? config.authPrefix : provider.connectionPreset.authPrefix;
     if (config.apiKey) headers[authHeaderName] = `${authPrefix}${config.apiKey}`;
     if (config.provider === 'anthropic-compatible') headers['anthropic-version'] = '2023-06-01';
+    if (config.userId && config.userId.trim() !== '') headers['userId'] = config.userId;
     return headers;
 }
 
@@ -577,6 +578,7 @@ function createDefaultInstance(providerType) {
         frequency_penalty: null,
         mask_sensitive_info: false,
         modelRole: 'unassigned',
+        userId: '',
     };
 }
 
@@ -602,7 +604,8 @@ const INSTANCE_FIELDS = [
     'provider', 'apiKey', 'url', 'path', 'model', 'authPrefix', 'authHeaderName',
     'contentType', 'max_tokens_type', 'max_tokens_value', 'temperature', 'top_p',
     'method', 'stream', 'thinking', 'reasoning_effort', 'mcp',
-    'seed', 'frequency_penalty', 'mask_sensitive_info'
+    'seed', 'frequency_penalty', 'mask_sensitive_info',
+    'userId'
 ];
 
 /**
@@ -702,6 +705,31 @@ function runMigrationV3() {
         }
     } catch (e) {
         console.warn('Migration V3 failed:', e);
+    }
+}
+
+function runMigrationV4() {
+    try {
+        const storeKey = 'chatbotStore';
+        const raw = localStorage.getItem(storeKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return;
+        if (!Array.isArray(parsed.providers)) return;
+
+        let changed = false;
+        for (const instance of parsed.providers) {
+            if (instance.userId === undefined || instance.userId === null) {
+                instance.userId = '';
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            localStorage.setItem(storeKey, JSON.stringify(parsed));
+        }
+    } catch (e) {
+        console.warn('Migration V4 failed:', e);
     }
 }
 

@@ -1240,6 +1240,7 @@ const app = createApp({
         const chatbotStore = useChatbotStore();
         runMigrationV2();
         runMigrationV3();
+        runMigrationV4();
         ensureProviderInstances(chatbotStore);
         const messageStore = useMessageStore();
         const historyStore = useHistoryStore();
