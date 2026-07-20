@@ -1444,6 +1444,10 @@ const app = createApp({
                         if (chatElement) {
                             chatElement.style.paddingBottom = `${Math.max(entry.contentRect.height, 50)}px`
                         }
+                        const chatAltElement = document.querySelector(".chat-bot-alt");
+                        if (chatAltElement) {
+                            chatAltElement.style.paddingBottom = `${Math.max(entry.contentRect.height, 50)}px`
+                        }
                     }
                 }
             };
@@ -1465,17 +1469,86 @@ const app = createApp({
         // 滚动辅助
         // ======================================================================
 
-        const asyncScrollToBottom = async () => {
-            requestAnimationFrame(() => {
-                scrollToBottom(document.querySelector(".chat-bot"));
-            });
-        }
+        const bottomThreshold = 50;
+        const isAtBottom = ref(true);
+        const unreadCount = ref(0);
+        let rafId = null;
+        let currentScrollContainer = null;
 
-        const scrollToBottom = (element, options = { behavior: "auto" }) => {
-            window.scrollTo({
-                ...options,
-                top: element?.scrollHeight
+        const getScrollContainer = () => {
+            const selector = settingStore.activePanel === 'chat' ? '.left-panel' : '.right-panel';
+            return document.querySelector(selector);
+        };
+
+        const checkIsAtBottom = () => {
+            const container = getScrollContainer();
+            if (!container) return true;
+            const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= bottomThreshold;
+            isAtBottom.value = atBottom;
+            return atBottom;
+        };
+
+        const scrollToBottom = ({ behavior = 'auto' } = {}) => {
+            const container = getScrollContainer();
+            if (!container) return;
+            container.scrollTo({ top: container.scrollHeight, behavior });
+        };
+
+        const onScroll = () => {
+            const wasAtBottom = isAtBottom.value;
+            const nowAtBottom = checkIsAtBottom();
+            if (!wasAtBottom && nowAtBottom) {
+                scrollToBottom();
+                unreadCount.value = 0;
+            }
+        };
+
+        const bindScrollListener = (container) => {
+            if (currentScrollContainer) {
+                currentScrollContainer.removeEventListener('scroll', onScroll);
+            }
+            currentScrollContainer = container;
+            if (container) {
+                container.addEventListener('scroll', onScroll, { passive: true });
+            }
+        };
+
+        const onNewMessage = () => {
+            if (isAtBottom.value) {
+                if (rafId !== null) {
+                    cancelAnimationFrame(rafId);
+                }
+                rafId = requestAnimationFrame(() => {
+                    scrollToBottom({ behavior: 'auto' });
+                    rafId = null;
+                });
+            } else {
+                unreadCount.value++;
+            }
+        };
+
+        const onPanelSwitch = () => {
+            setTimeout(() => {
+                const newContainer = getScrollContainer();
+                bindScrollListener(newContainer);
+                isAtBottom.value = true;
+                unreadCount.value = 0;
+                scrollToBottom();
+            }, 300);
+        };
+
+        const onHistoryLoad = () => {
+            nextTick(() => {
+                isAtBottom.value = true;
+                unreadCount.value = 0;
+                scrollToBottom();
             });
+        };
+
+        const handleScrollToBottom = () => {
+            scrollToBottom({ behavior: 'smooth' });
+            isAtBottom.value = true;
+            unreadCount.value = 0;
         };
 
         // ======================================================================
@@ -1705,6 +1778,10 @@ const app = createApp({
             window.onresize = () => resizeAvatar()
             resizeInputBox()
             window.addEventListener('keydown', onGlobalKeydown);
+            nextTick(() => {
+                const container = getScrollContainer();
+                bindScrollListener(container);
+            });
         });
 
         onUnmounted(() => {
@@ -1713,11 +1790,17 @@ const app = createApp({
             if (window.onMcpClientsUpdated) {
                 window.onMcpClientsUpdated.unregister();
             }
+            if (currentScrollContainer) {
+                currentScrollContainer.removeEventListener('scroll', onScroll);
+            }
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+            }
         });
 
         watch(
             () => settingStore.activePanel,
-            () => { reinitLottie(); }
+            () => { reinitLottie(); onPanelSwitch(); }
         );
 
         onUpdated(() => {
@@ -1732,9 +1815,19 @@ const app = createApp({
         watch(computed(() => messageStore.conversation.at(-1)?.content),
             (newValue, oldValue) => {
                 if (newValue !== oldValue) {
-                    asyncScrollToBottom();
+                    onNewMessage();
                 }
             }, { deep: true });
+
+        // 监听消息数组长度变化（新消息追加）
+        watch(() => messageStore.conversation.length,
+            (newLen, oldLen) => {
+                if (newLen > 0 && oldLen === 0) {
+                    onHistoryLoad();
+                } else if (newLen > oldLen) {
+                    onNewMessage();
+                }
+            });
 
         // 监听 Agent 卡片引用文件变化
         watch(computed(() => agentStore.card?.refFile),
@@ -1844,6 +1937,10 @@ const app = createApp({
             getRoleColor,
             getRoleIcon,
             getRoleDescription,
+
+            isAtBottom,
+            unreadCount,
+            handleScrollToBottom,
         };
     }
 });

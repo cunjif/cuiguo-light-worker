@@ -59,6 +59,14 @@
                                     @regenerate="messageStore.regenerateFromIndex($event)"
                                     data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
                                 <div class="fill-area"></div>
+                                <v-btn v-show="!isAtBottom" icon variant="elevated" size="small"
+                                    class="scroll-to-bottom-btn"
+                                    @click="handleScrollToBottom">
+                                    <v-badge v-if="unreadCount > 0" :content="unreadCount" floating>
+                                        <v-icon>mdi-arrow-down</v-icon>
+                                    </v-badge>
+                                    <v-icon v-else>mdi-arrow-down</v-icon>
+                                </v-btn>
                             </v-container>
                         </template>
                         <template v-else>
@@ -458,6 +466,14 @@
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
                                     data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
+                                <v-btn v-show="!isAtBottom" icon variant="elevated" size="small"
+                                    class="scroll-to-bottom-btn"
+                                    @click="handleScrollToBottom">
+                                    <v-badge v-if="unreadCount > 0" :content="unreadCount" floating>
+                                        <v-icon>mdi-arrow-down</v-icon>
+                                    </v-badge>
+                                    <v-icon v-else>mdi-arrow-down</v-icon>
+                                </v-btn>
                             </v-container>
                         </template>
                     </v-col>
