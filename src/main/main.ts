@@ -54,7 +54,30 @@ interface ClientObj {
 function readConfig(configPath: string): McpServersConfig | null {
   try {
     const config = readFileSync(configPath, 'utf8');
-    return JSON.parse(config);
+    const parsed = JSON.parse(config);
+    if (parsed && parsed.mcpServers) {
+      const currentPlatform = os.platform();
+      const configDir = path.dirname(configPath);
+      const filtered: Record<string, any> = {};
+      for (const [name, serverConfig] of Object.entries(parsed.mcpServers)) {
+        const cfg = serverConfig as Record<string, any>;
+        if (cfg.platform && cfg.platform !== currentPlatform) {
+          console.log(`Skipping MCP server "${name}": platform "${cfg.platform}" does not match current "${currentPlatform}"`);
+          continue;
+        }
+        if (cfg.args && Array.isArray(cfg.args)) {
+          cfg.args = cfg.args.map((arg: string) => {
+            if (typeof arg === 'string' && arg.startsWith('./mcp-builtin/')) {
+              return path.resolve(configDir, arg);
+            }
+            return arg;
+          });
+        }
+        filtered[name] = cfg;
+      }
+      parsed.mcpServers = filtered;
+    }
+    return parsed;
   } catch (error) {
     console.error('Error reading config file:', error);
     return null;
@@ -73,9 +96,9 @@ function saveConfig(configPath: string, config: McpServersConfig): boolean {
 }
 
 function cleanServerConfig(config: any): any {
-  // Remove internal fields that shouldn't be persisted to config.json
   const cleaned = { ...config };
-  delete cleaned.type;  // Remove type field - it's only for internal use
+  delete cleaned.type;
+  delete cleaned.platform;
   return cleaned;
 }
 

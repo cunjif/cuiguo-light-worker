@@ -1,0 +1,13 @@
+{
+  "name": "linux-control",
+  "version": "1.0.0",
+  "description": "Linux desktop automation MCP Server using xdotool/xclip/scrot",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "linux-control": "index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.2"
+  }
+}

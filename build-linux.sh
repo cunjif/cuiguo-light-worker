@@ -22,7 +22,9 @@ docker run --rm \
   /bin/bash -c "
     set -e
     cd /project
-    echo '📥 Installing dependencies...'
+    echo '📥 Installing system dependencies for Linux automation...'
+    apt-get update -qq && apt-get install -y -qq xdotool xclip scrot imagemagick 2>/dev/null || echo '⚠ Some system deps may not be available in Docker build'
+    echo '📥 Installing npm dependencies...'
     npm install
     echo '🔨 Building TypeScript...'
     npm run build

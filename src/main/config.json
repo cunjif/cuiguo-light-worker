@@ -39,7 +39,13 @@
     },
     "MCPControl": {
       "command": "mcp-control",
-      "args": ["--sse"]
+      "args": ["--sse"],
+      "platform": "win32"
+    },
+    "LinuxControl": {
+      "command": "node",
+      "args": ["./mcp-builtin/linux-control/index.js"],
+      "platform": "linux"
     }
   }
 }

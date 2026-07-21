@@ -90,11 +90,13 @@
     "jszip": "^3.10.0",
     "mammoth": "^1.11.0",
     "markdownify": "^0.1.0",
-    "mcp-control": "^0.2.0",
     "papaparse": "^5.0.0",
     "pdfjs-dist": "^4.0.0",
     "playwright-mcp": "^0.0.10",
     "turndown": "^7.0.0",
     "verdaccio": "^2.2.6"
+  },
+  "optionalDependencies": {
+    "mcp-control": "^0.2.0"
   }
 }
