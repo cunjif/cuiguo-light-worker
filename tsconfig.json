@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-      "module": "es2022",
+      "module": "Node16",
       "target": "es2017",
       "lib": [
         "ES2022",
@@ -12,11 +12,12 @@
         "node"
       ],
       "esModuleInterop": true,
-      "moduleResolution": "bundler",
+      "moduleResolution": "node16",
       "resolveJsonModule": true,
       "allowSyntheticDefaultImports": true,
       "useUnknownInCatchVariables": false,
       "strict": true,
+      "skipLibCheck": true,
       "outDir": "./dist",
       "rootDir": "./src"
     },

@@ -155,7 +155,85 @@ const useMcpStore = defineStore("mcpStore", {
             }
 
             console.log(`[listTools] Total tools collected: ${mcpTools.length}`, mcpTools);
-            return mcpTools
+
+            const selfEvolutionTools = [
+                {
+                    type: 'function',
+                    function: {
+                        name: 'memory',
+                        description: '管理你的持久记忆。memory=环境事实/经验教训(2200字符限制)，user=用户偏好/画像(1375字符限制)。记忆在下次会话生效。超限时需先合并/删除旧条目。',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                action: { type: 'string', enum: ['add', 'replace', 'remove', 'list'], description: '操作类型' },
+                                target: { type: 'string', enum: ['memory', 'user'], description: 'memory=环境事实/经验, user=用户偏好/画像' },
+                                content: { type: 'string', description: 'add/replace 时的内容' },
+                                old_text: { type: 'string', description: 'replace/remove 时的匹配子串' }
+                            },
+                            required: ['action', 'target']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'session_search',
+                        description: '搜索历史对话。用于回忆过去讨论的内容、查找之前的解决方案。',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                query: { type: 'string', description: '搜索关键词' },
+                                limit: { type: 'integer', description: '返回结果数量，默认5', default: 5 }
+                            },
+                            required: ['query']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'skill_manage',
+                        description: '管理你的技能库。创建新技能以保存可复用的工作流程和专业知识，技能可通过关键词在后续对话中自动激活。创建技能后，你将在类似场景下自动获得该技能的提示词注入。',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                action: { type: 'string', enum: ['create', 'patch', 'delete', 'list'], description: '操作类型' },
+                                name: { type: 'string', description: '技能名称（create/patch/delete时必填，仅允许字母数字下划线连字符）' },
+                                manifest: {
+                                    type: 'object',
+                                    description: 'create 时的技能清单',
+                                    properties: {
+                                        name: { type: 'string', description: '技能名称' },
+                                        version: { type: 'string', description: '版本号，默认1.0.0' },
+                                        displayName: { type: 'object', properties: { zh: { type: 'string' }, en: { type: 'string' } } },
+                                        description: { type: 'object', properties: { zh: { type: 'string' }, en: { type: 'string' } } },
+                                        icon: { type: 'string', description: '图标，默认mdi-robot' },
+                                        category: { type: 'string', description: '分类，默认custom' },
+                                        tags: { type: 'array', items: { type: 'string' } },
+                                        triggers: { type: 'array', items: { type: 'object', properties: { type: { type: 'string' }, value: { type: 'string' }, priority: { type: 'number' } } } },
+                                        systemPrompt: { type: 'string', description: '技能的系统提示词（必填）' },
+                                        userPromptTemplate: { type: 'string' }
+                                    },
+                                    required: ['name', 'systemPrompt']
+                                },
+                                patches: {
+                                    type: 'object',
+                                    description: 'patch 时的更新字段',
+                                    properties: {
+                                        systemPrompt: { type: 'string' },
+                                        triggers: { type: 'array', items: { type: 'object' } },
+                                        tags: { type: 'array', items: { type: 'string' } },
+                                        description: { type: 'object' }
+                                    }
+                                }
+                            },
+                            required: ['action']
+                        }
+                    }
+                }
+            ];
+
+            return [...selfEvolutionTools, ...mcpTools]
         },
 
         /**
@@ -191,6 +269,11 @@ const useMcpStore = defineStore("mcpStore", {
          * @returns {Object} 工具调用结果
          */
         callTool: async function (tool_name, tool_args) {
+            const builtinResult = await this.callBuiltinTool(tool_name, tool_args);
+            if (builtinResult !== null) {
+                return builtinResult;
+            }
+
             await this.updateServers();
             const tool = await this.getTool(tool_name)
             if (!tool) {
@@ -211,6 +294,102 @@ const useMcpStore = defineStore("mcpStore", {
 
             const result = await this.getServers[tool.server].tools.call(params)
             return result
+        },
+
+        callBuiltinTool: async function (tool_name, tool_args) {
+            const selfEvolutionAPI = window.selfEvolutionAPI;
+            if (!selfEvolutionAPI) return null;
+
+            let tool_arguments;
+            try {
+                tool_arguments = JSON.parse(tool_args);
+            } catch (e) {
+                return null;
+            }
+
+            if (tool_name === 'memory') {
+                try {
+                    const result = await selfEvolutionAPI.memoryWrite({
+                        action: tool_arguments.action,
+                        target: tool_arguments.target || 'memory',
+                        content: tool_arguments.content,
+                        old_text: tool_arguments.old_text
+                    });
+                    const text = result.success
+                        ? `Memory ${result.error === 'no duplicate added' ? 'no duplicate added' : 'updated'}. Usage: ${result.usage || 'ok'}${result.error && result.error !== 'no duplicate added' ? '' : ''}`
+                        : `Error: ${result.error}`;
+
+                    if (result.success && result.error !== 'no duplicate added') {
+                        const agentStore = useAgentStore();
+                        agentStore.loadMemoryForPrompt();
+                        useSnackbarStore().showInfoMessage(`Memory updated (${tool_arguments.action}) [${result.usage || 'ok'}]`);
+                    }
+
+                    return this.packReturn(text);
+                } catch (e) {
+                    return this.packReturn(`Memory tool error: ${e.message}`);
+                }
+            }
+
+            if (tool_name === 'session_search') {
+                try {
+                    const result = await selfEvolutionAPI.sessionSearch(
+                        tool_arguments.query,
+                        tool_arguments.limit || 5
+                    );
+                    if (result.results && result.results.length > 0) {
+                        const text = result.results.map(r =>
+                            `[Session: ${r.session_id}] [${r.role}] ${r.content.substring(0, 200)}`
+                        ).join('\n---\n');
+                        return this.packReturn(text);
+                    }
+                    return this.packReturn('No matching sessions found.');
+                } catch (e) {
+                    return this.packReturn(`Session search error: ${e.message}`);
+                }
+            }
+
+            if (tool_name === 'skill_manage') {
+                try {
+                    let result;
+                    if (tool_arguments.action === 'create') {
+                        result = await selfEvolutionAPI.skillCreate(tool_arguments.manifest);
+                    } else if (tool_arguments.action === 'patch') {
+                        result = await selfEvolutionAPI.skillPatch(tool_arguments.name, tool_arguments.patches);
+                    } else if (tool_arguments.action === 'delete') {
+                        result = await selfEvolutionAPI.skillDelete(tool_arguments.name);
+                    } else if (tool_arguments.action === 'list') {
+                        result = await selfEvolutionAPI.skillListAgent();
+                    } else {
+                        return this.packReturn(`Unknown skill_manage action: ${tool_arguments.action}`);
+                    }
+
+                    if (tool_arguments.action === 'list') {
+                        const skills = result.skills || [];
+                        if (skills.length === 0) {
+                            return this.packReturn('No agent-created skills yet.');
+                        }
+                        const text = skills.map(s =>
+                            `[${s.name}] v${s.version} — ${s.description?.zh || s.description?.en || ''} | Triggers: ${s.triggers?.map(t => t.value).join(', ') || 'none'}`
+                        ).join('\n');
+                        return this.packReturn(text);
+                    }
+
+                    const text = result.success
+                        ? `Skill ${tool_arguments.action}d successfully.${result.name ? ` Name: ${result.name}` : ''}`
+                        : `Error: ${result.error}`;
+
+                    if (result.success && tool_arguments.action === 'create') {
+                        useSnackbarStore().showInfoMessage(`Skill "${result.name}" created by agent`);
+                    }
+
+                    return this.packReturn(text);
+                } catch (e) {
+                    return this.packReturn(`Skill manage error: ${e.message}`);
+                }
+            }
+
+            return null;
         },
 
         /**
@@ -556,10 +735,38 @@ const useAgentStore = defineStore("agentStore", {
                 systemParts.push(_skillStore.activeSkillPrompt);
             }
 
+            const memoryParts = this.getMemoryPromptParts();
+            if (memoryParts) {
+                systemParts.push(memoryParts);
+            }
+
             if (systemParts.length > 0) {
                 return [{ content: systemParts.join('\n\n---\n\n'), role: "system" }, ...conversation]
             } else {
                 return [...conversation]
+            }
+        },
+
+        getMemoryPromptParts() {
+            const memoryData = this._cachedMemoryPrompt;
+            if (!memoryData) return null;
+            const parts = [];
+            if (memoryData.memoryText) parts.push(memoryData.memoryText);
+            if (memoryData.userText) parts.push(memoryData.userText);
+
+            parts.push(`══════════════════════════════════════════════\nSELF-EVOLUTION (自进化指引)\n══════════════════════════════════════════════\n- 使用 memory 工具保存重要事实、经验教训和用户偏好，下次对话自动生效\n- 完成复杂任务后，考虑使用 skill_manage 工具创建可复用技能\n- 技能通过关键词触发，帮助你在类似场景下更快响应\n- memory 目标: memory=环境事实/经验, user=用户偏好/画像`);
+
+            return parts.length > 0 ? parts.join('\n\n') : null;
+        },
+
+        async loadMemoryForPrompt() {
+            try {
+                const selfEvolutionAPI = window.selfEvolutionAPI;
+                if (!selfEvolutionAPI) return;
+                const data = await selfEvolutionAPI.memoryRead();
+                this._cachedMemoryPrompt = data;
+            } catch (e) {
+                console.warn('Failed to load memory for prompt:', e);
             }
         },
 
@@ -1992,8 +2199,11 @@ const useMessageStore = defineStore("messageStore", {
                 this.generating = false;
             }
             if (this.conversation.length > 0) {
+                const savedConversation = [...this.conversation];
                 historyStore.init([...this.conversation]);
+                this.saveSessionToDb(this.conversation);
                 this.conversation = [];
+                this.triggerBackgroundReview(savedConversation);
                 snackbarStore.showSuccessMessage('$vuetify.dataIterator.snackbar.addnew');
             } else {
                 snackbarStore.showWarningMessage('$vuetify.dataIterator.snackbar.addfail');
@@ -2291,6 +2501,14 @@ const useMessageStore = defineStore("messageStore", {
 
             if (!hasText && !hasAttachments && !hasLegacyFile) return;
 
+            if (this.userMessage && this.userMessage.startsWith('/')) {
+                const handled = this.handleSlashCommand(this.userMessage.trim());
+                if (handled) {
+                    this.userMessage = '';
+                    return;
+                }
+            }
+
             if (this.attachments.some(a => a.status === 'processing')) {
                 useSnackbarStore().showWarningMessage('$vuetify.dataIterator.snackbar.filesProcessing');
                 return;
@@ -2441,6 +2659,389 @@ const useMessageStore = defineStore("messageStore", {
                     content: msg.map(item => item.text).join('\n'),
                     tool_call_id: toolCallId
                 }]
+            }
+        },
+
+        handleSlashCommand: async function (input) {
+            const selfEvolutionAPI = window.selfEvolutionAPI;
+            if (!selfEvolutionAPI) return false;
+
+            const parts = input.trim().split(/\s+/);
+            const cmd = parts[0];
+
+            if (cmd === '/memory') {
+                const sub = parts[1];
+
+                if (!sub) {
+                    try {
+                        const data = await selfEvolutionAPI.memoryRead();
+                        const textParts = [];
+                        if (data.memoryText) textParts.push(data.memoryText);
+                        if (data.userText) textParts.push(data.userText);
+                        const text = textParts.length > 0 ? textParts.join('\n\n') : 'No memory entries yet.';
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: text });
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Memory read failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'list') {
+                    try {
+                        const target = parts[2] || undefined;
+                        const entries = await selfEvolutionAPI.memoryList(target);
+                        if (entries && entries.length > 0) {
+                            const text = entries.map(e => `[${e.id}] [${e.target}] ${e.content}`).join('\n');
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: text });
+                        } else {
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: 'No memory entries found.' });
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Memory list failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'search') {
+                    const query = parts.slice(2).join(' ');
+                    if (!query) {
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: 'Usage: /memory search <query>' });
+                        return true;
+                    }
+                    try {
+                        const results = await selfEvolutionAPI.memorySearch(query, 5);
+                        if (results && results.length > 0) {
+                            const text = results.map(r => `[${r.id}] [${r.target}] ${r.content}`).join('\n---\n');
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: text });
+                        } else {
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: `No results for "${query}".` });
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Memory search failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'add') {
+                    const content = parts.slice(2).join(' ');
+                    if (!content) {
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: 'Usage: /memory add <content>' });
+                        return true;
+                    }
+                    try {
+                        const result = await selfEvolutionAPI.memoryWrite({
+                            action: 'add', target: 'memory', content
+                        });
+                        const text = result.success
+                            ? `Added to memory. Usage: ${result.usage || 'ok'}`
+                            : `Error: ${result.error}`;
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: text });
+                        if (result.success) {
+                            useAgentStore().loadMemoryForPrompt();
+                            useSnackbarStore().showInfoMessage('Memory entry added');
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Memory add failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'remove') {
+                    const oldText = parts.slice(2).join(' ');
+                    if (!oldText) {
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: 'Usage: /memory remove <text to match>' });
+                        return true;
+                    }
+                    try {
+                        const result = await selfEvolutionAPI.memoryWrite({
+                            action: 'remove', target: 'memory', old_text: oldText
+                        });
+                        const text = result.success
+                            ? 'Memory entry removed.'
+                            : `Error: ${result.error}`;
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: text });
+                        if (result.success) {
+                            useAgentStore().loadMemoryForPrompt();
+                            useSnackbarStore().showInfoMessage('Memory entry removed');
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Memory remove failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'pending') {
+                    try {
+                        const pending = await selfEvolutionAPI.pendingList('pending');
+                        if (pending && pending.length > 0) {
+                            const text = pending.map(p => {
+                                const payload = JSON.parse(p.payload);
+                                return `[${p.id}] [${p.type}] [${p.action}] ${p.type === 'memory' ? payload.content || payload.old_text || '' : payload.name || ''} (from: ${p.source}, ${p.created_at})`;
+                            }).join('\n---\n');
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: text });
+                        } else {
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: 'No pending writes.' });
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Pending list failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'approve') {
+                    const id = parseInt(parts[2]);
+                    if (!id) {
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: 'Usage: /memory approve <id>' });
+                        return true;
+                    }
+                    try {
+                        const result = await selfEvolutionAPI.pendingApprove(id);
+                        const text = result.success
+                            ? `Pending write ${id} approved and applied.`
+                            : `Error: ${result.error}`;
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: text });
+                        if (result.success) {
+                            useAgentStore().loadMemoryForPrompt();
+                            useSnackbarStore().showInfoMessage(`Pending write ${id} approved`);
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Approve failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                if (sub === 'reject') {
+                    const id = parseInt(parts[2]);
+                    if (!id) {
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: 'Usage: /memory reject <id>' });
+                        return true;
+                    }
+                    try {
+                        const result = await selfEvolutionAPI.pendingReject(id);
+                        const text = result.success
+                            ? `Pending write ${id} rejected.`
+                            : `Error: ${result.error}`;
+                        this.conversation.push({ role: 'user', content: input });
+                        this.conversation.push({ role: 'assistant', content: text });
+                        if (result.success) {
+                            useSnackbarStore().showInfoMessage(`Pending write ${id} rejected`);
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Reject failed: ${e.message}`);
+                    }
+                    return true;
+                }
+
+                this.conversation.push({ role: 'user', content: input });
+                this.conversation.push({ role: 'assistant', content: 'Unknown /memory subcommand. Available: /memory, /memory list [target], /memory search <query>, /memory add <content>, /memory remove <text>, /memory pending, /memory approve <id>, /memory reject <id>' });
+                return true;
+            }
+
+            if (cmd === '/learn') {
+                const description = parts.slice(1).join(' ');
+                if (!description) {
+                    this.conversation.push({ role: 'user', content: input });
+                    this.conversation.push({ role: 'assistant', content: 'Usage: /learn <描述> — 从当前对话提取经验并创建技能。例如: /learn Vue组件调试流程' });
+                    return true;
+                }
+                const learnPrompt = `请根据当前对话内容，创建一个名为"${description}"的技能。分析对话中的关键步骤、方法和最佳实践，生成一个可复用的技能清单。\n\n请使用 skill_manage 工具的 create 动作来创建此技能，包含：\n1. name: 基于描述的英文标识符\n2. systemPrompt: 提炼出的专业知识和操作流程\n3. triggers: 能触发此技能的关键词\n4. tags: 相关标签`;
+                this.userMessage = learnPrompt;
+                return false;
+            }
+
+            if (cmd === '/skills') {
+                const sub = parts[1];
+                if (!sub || sub === 'list') {
+                    try {
+                        const result = await selfEvolutionAPI.skillListAgent();
+                        const skills = result.skills || [];
+                        if (skills.length === 0) {
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: 'No agent-created skills yet. Use /learn <描述> to create one.' });
+                        } else {
+                            const text = skills.map(s =>
+                                `[${s.name}] v${s.version} — ${s.description?.zh || ''}\n  Triggers: ${s.triggers?.map(t => t.value).join(', ') || 'none'}\n  Prompt: ${s.systemPrompt.substring(0, 100)}...`
+                            ).join('\n---\n');
+                            this.conversation.push({ role: 'user', content: input });
+                            this.conversation.push({ role: 'assistant', content: text });
+                        }
+                    } catch (e) {
+                        useSnackbarStore().showErrorMessage(`Skills list failed: ${e.message}`);
+                    }
+                    return true;
+                }
+                this.conversation.push({ role: 'user', content: input });
+                this.conversation.push({ role: 'assistant', content: 'Unknown /skills subcommand. Available: /skills list' });
+                return true;
+            }
+
+            return false;
+        },
+
+        saveSessionToDb: async function (conversation) {
+            try {
+                const selfEvolutionAPI = window.selfEvolutionAPI;
+                if (!selfEvolutionAPI) return;
+                const chatbotStore = useChatbotStore();
+                const sessionId = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
+                const messages = conversation.map(msg => ({
+                    role: msg.role,
+                    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+                    reasoning_content: msg.reasoning_content || null,
+                    tool_calls: msg.tool_calls || null,
+                    tool_call_id: msg.tool_call_id || null
+                }));
+                await selfEvolutionAPI.sessionSave(sessionId, messages, chatbotStore.model, chatbotStore.provider);
+            } catch (e) {
+                console.warn('Failed to save session to SQLite:', e);
+            }
+        },
+
+        triggerBackgroundReview: async function (conversation) {
+            const selfEvolutionAPI = window.selfEvolutionAPI;
+            if (!selfEvolutionAPI) return;
+
+            const userMessages = conversation.filter(m => m.role === 'user' && typeof m.content === 'string');
+            const assistantMessages = conversation.filter(m => m.role === 'assistant' && typeof m.content === 'string');
+            if (userMessages.length < 2 || assistantMessages.length < 1) return;
+
+            try {
+                const chatbotStore = useChatbotStore();
+                if (!chatbotStore.apiKey) return;
+
+                const reviewPrompt = `你是一个对话审查专家。请分析以下对话，提取值得长期记住的信息。
+
+请以 JSON 格式输出，包含以下字段：
+- "memory_writes": 数组，每个元素是 {"target": "memory"或"user", "content": "要保存的内容"}
+- "skill_suggestion": 对象或null，如果发现可复用的工作流程，包含 {"name": "技能名", "systemPrompt": "技能提示词", "triggers": [{"type": "keyword", "value": "关键词1|关键词2", "priority": 5}]}
+
+规则：
+1. memory_writes 只提取真正有价值的事实、偏好、经验教训
+2. target="user" 用于用户偏好/画像信息，target="memory" 用于环境事实/经验教训
+3. 每条内容要简洁（不超过200字），避免冗余
+4. skill_suggestion 只在发现明确的可复用流程时才创建
+5. 如果没有值得记住的内容，返回空数组
+
+对话内容：
+${conversation.map(m => `[${m.role}]: ${typeof m.content === 'string' ? m.content.substring(0, 500) : ''}`).join('\n')}
+
+请输出 JSON：`;
+
+                const url = chatbotStore.url + (chatbotStore.path || '');
+                const headers = { 'Content-Type': 'application/json' };
+                if (chatbotStore.authHeaderName && chatbotStore.apiKey) {
+                    headers[chatbotStore.authHeaderName] = `${chatbotStore.authPrefix || 'Bearer'} ${chatbotStore.apiKey}`;
+                }
+
+                const body = {
+                    model: chatbotStore.model,
+                    messages: [{ role: 'system', content: reviewPrompt }],
+                    max_tokens: 1024,
+                    temperature: 0.3,
+                    stream: false,
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                });
+
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content;
+                if (!content) return;
+
+                let parsed;
+                try {
+                    const jsonMatch = content.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) return;
+                    parsed = JSON.parse(jsonMatch[0]);
+                } catch {
+                    return;
+                }
+
+                const snackbarStore = useSnackbarStore();
+                let writeCount = 0;
+                const writeApproval = localStorage.getItem('write_approval') === 'true';
+
+                if (Array.isArray(parsed.memory_writes)) {
+                    for (const write of parsed.memory_writes) {
+                        if (!write.content || !write.target) continue;
+                        try {
+                            if (writeApproval) {
+                                await selfEvolutionAPI.pendingAdd('memory', 'add', {
+                                    action: 'add',
+                                    target: write.target,
+                                    content: write.content,
+                                }, 'review');
+                                writeCount++;
+                            } else {
+                                const result = await selfEvolutionAPI.memoryWrite({
+                                    action: 'add',
+                                    target: write.target,
+                                    content: write.content,
+                                });
+                                if (result.success && result.error !== 'no duplicate added') {
+                                    writeCount++;
+                                }
+                            }
+                        } catch {}
+                    }
+                }
+
+                if (parsed.skill_suggestion && parsed.skill_suggestion.name && parsed.skill_suggestion.systemPrompt) {
+                    try {
+                        if (writeApproval) {
+                            await selfEvolutionAPI.pendingAdd('skill', 'create', {
+                                action: 'create',
+                                manifest: {
+                                    name: parsed.skill_suggestion.name,
+                                    systemPrompt: parsed.skill_suggestion.systemPrompt,
+                                    triggers: parsed.skill_suggestion.triggers || [],
+                                    tags: [parsed.skill_suggestion.name],
+                                },
+                            }, 'review');
+                            writeCount++;
+                        } else {
+                            await selfEvolutionAPI.skillCreate({
+                                name: parsed.skill_suggestion.name,
+                                systemPrompt: parsed.skill_suggestion.systemPrompt,
+                                triggers: parsed.skill_suggestion.triggers || [],
+                                tags: [parsed.skill_suggestion.name],
+                            });
+                            writeCount++;
+                        }
+                    } catch {}
+                }
+
+                if (writeCount > 0) {
+                    const agentStore = useAgentStore();
+                    agentStore.loadMemoryForPrompt();
+                    if (writeApproval) {
+                        snackbarStore.showInfoMessage(`Background review: ${writeCount} item(s) pending approval. Use /memory pending to review.`);
+                    } else {
+                        snackbarStore.showInfoMessage(`Background review: ${writeCount} item(s) learned`);
+                    }
+                }
+            } catch (e) {
+                console.warn('Background review failed:', e);
             }
         }
     }

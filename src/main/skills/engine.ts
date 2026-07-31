@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync } from 'fs';
 import { join, dirname, sep } from 'path';
 import { fileURLToPath } from 'url';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractZip } from '../../lib/repo/extract_zip.js';
@@ -26,7 +26,24 @@ function readRegistry(): SkillRegistryIndex {
 
 export function listRegistrySkills(): SkillManifest[] {
   const registry = readRegistry();
-  return registry.skills;
+  const agentSkills = loadAgentCreatedSkills();
+  return [...registry.skills, ...agentSkills];
+}
+
+function loadAgentCreatedSkills(): SkillManifest[] {
+  const dir = join(homedir(), '.chat-mcp', 'skills', 'agent-created');
+  const skills: SkillManifest[] = [];
+  try {
+    if (!existsSync(dir)) return skills;
+    const files = readdirSync(dir).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      try {
+        const manifest: SkillManifest = JSON.parse(readFileSync(join(dir, file), 'utf8'));
+        skills.push(manifest);
+      } catch {}
+    }
+  } catch {}
+  return skills;
 }
 
 export function installSkill(name: string, currentInstalled: InstalledSkill[]): {
@@ -106,8 +123,8 @@ export function updateSkillConfig(name: string, config: Record<string, any>, cur
 }
 
 export function getSkillManifest(name: string): SkillManifest | null {
-  const registry = readRegistry();
-  return registry.skills.find(s => s.name === name) || null;
+  const allSkills = listRegistrySkills();
+  return allSkills.find(s => s.name === name) || null;
 }
 
 export function matchSkill(userInput: string, currentInstalled: InstalledSkill[]): SkillManifest | null {
@@ -117,14 +134,14 @@ export function matchSkill(userInput: string, currentInstalled: InstalledSkill[]
     return null;
   }
 
-  const registry = readRegistry();
+  const allSkills = listRegistrySkills();
   const inputLower = userInput.toLowerCase();
 
   let bestMatch: SkillManifest | null = null;
   let bestPriority = 0;
 
   for (const installedSkill of enabledSkills) {
-    const manifest = registry.skills.find(s => s.name === installedSkill.name);
+    const manifest = allSkills.find(s => s.name === installedSkill.name);
     if (!manifest || !manifest.triggers) continue;
 
     for (const trigger of manifest.triggers) {

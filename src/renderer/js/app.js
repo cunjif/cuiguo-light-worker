@@ -1769,6 +1769,7 @@ const app = createApp({
         onMounted(async () => {
             initLottie();
             agentStore.initAgent();
+            agentStore.loadMemoryForPrompt();
             settingStore.refreshMcpServersList();
             if (window.onMcpClientsUpdated) {
                 window.onMcpClientsUpdated.register(() => {

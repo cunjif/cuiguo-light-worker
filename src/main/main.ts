@@ -12,6 +12,7 @@ import notifier from 'node-notifier';
 
 import { npmRegistry } from '../lib/repo/internal_repo.js';
 import * as skillEngine from './skills/engine.js';
+import * as memoryStore from './self-evolution/memory-store.js';
 import { convertDocumentToMarkdown } from './document-converter.js';
 import { initializeMcpServers, getMcpServersDir, BUILTIN_SERVERS } from './mcp-manager.js';
 
@@ -867,6 +868,69 @@ app.whenReady().then(async () => {
     return BUILTIN_SERVERS;
   });
 
+  // Self-Evolution IPC handlers
+  ipcMain.handle('memory:read', () => {
+    return memoryStore.getMemoryForPrompt();
+  });
+
+  ipcMain.handle('memory:write', (_event, params: { action: string; target: string; content?: string; old_text?: string }) => {
+    return memoryStore.handleMemoryToolCall(params);
+  });
+
+  ipcMain.handle('memory:search', (_event, query: string, limit?: number) => {
+    return memoryStore.searchMemory(query, limit);
+  });
+
+  ipcMain.handle('memory:list', (_event, target?: string) => {
+    return memoryStore.listMemory(target);
+  });
+
+  ipcMain.handle('session:save', (_event, sessionId: string, messages: any[], model?: string, provider?: string) => {
+    memoryStore.saveSession(sessionId, messages, model, provider);
+    return { success: true };
+  });
+
+  ipcMain.handle('session:search', (_event, query: string, limit?: number) => {
+    return memoryStore.handleSessionSearchToolCall({ query, limit });
+  });
+
+  ipcMain.handle('session:list', (_event, limit?: number) => {
+    return memoryStore.listSessions(limit);
+  });
+
+  ipcMain.handle('skill:create', (_event, manifest: memoryStore.AgentSkillManifest) => {
+    return memoryStore.handleSkillManageToolCall({ action: 'create', manifest });
+  });
+
+  ipcMain.handle('skill:patch', (_event, name: string, patches: Partial<memoryStore.AgentSkillManifest>) => {
+    return memoryStore.handleSkillManageToolCall({ action: 'patch', name, patches });
+  });
+
+  ipcMain.handle('skill:delete', (_event, name: string) => {
+    return memoryStore.handleSkillManageToolCall({ action: 'delete', name });
+  });
+
+  ipcMain.handle('skill:list-agent', () => {
+    return memoryStore.handleSkillManageToolCall({ action: 'list' });
+  });
+
+  ipcMain.handle('pending:add', (_event, type: string, action: string, payload: any, source?: string) => {
+    const id = memoryStore.addPendingWrite(type, action, payload, source);
+    return { success: true, id };
+  });
+
+  ipcMain.handle('pending:list', (_event, status?: string) => {
+    return memoryStore.listPendingWrites(status);
+  });
+
+  ipcMain.handle('pending:approve', (_event, id: number) => {
+    return memoryStore.approvePendingWrite(id);
+  });
+
+  ipcMain.handle('pending:reject', (_event, id: number) => {
+    return memoryStore.rejectPendingWrite(id);
+  });
+
   // Features are already initialized above, no need to re-register handlers
   console.log('Final features:', features);
 
@@ -887,4 +951,8 @@ app.on('before-quit', async () => {
   console.log('应用即将退出，正在停止内部npm仓库...');
   await npmRegistry.shutdown();
   console.log('✓ 内部npm仓库已停止');
+
+  // 关闭自进化数据库
+  memoryStore.closeDb();
+  console.log('✓ 自进化数据库已关闭');
 });

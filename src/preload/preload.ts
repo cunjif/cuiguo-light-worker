@@ -374,4 +374,25 @@ contextBridge.exposeInMainWorld('documentAPI', {
     ipcRenderer.invoke('document:convert-markdown', payload)
 });
 
+// Self-Evolution API
+contextBridge.exposeInMainWorld('selfEvolutionAPI', {
+  memoryRead: () => ipcRenderer.invoke('memory:read'),
+  memoryWrite: (params: { action: string; target: string; content?: string; old_text?: string }) =>
+    ipcRenderer.invoke('memory:write', params),
+  memorySearch: (query: string, limit?: number) => ipcRenderer.invoke('memory:search', query, limit),
+  memoryList: (target?: string) => ipcRenderer.invoke('memory:list', target),
+  sessionSave: (sessionId: string, messages: any[], model?: string, provider?: string) =>
+    ipcRenderer.invoke('session:save', sessionId, messages, model, provider),
+  sessionSearch: (query: string, limit?: number) => ipcRenderer.invoke('session:search', query, limit),
+  sessionList: (limit?: number) => ipcRenderer.invoke('session:list', limit),
+  skillCreate: (manifest: any) => ipcRenderer.invoke('skill:create', manifest),
+  skillPatch: (name: string, patches: any) => ipcRenderer.invoke('skill:patch', name, patches),
+  skillDelete: (name: string) => ipcRenderer.invoke('skill:delete', name),
+  skillListAgent: () => ipcRenderer.invoke('skill:list-agent'),
+  pendingAdd: (type: string, action: string, payload: any, source?: string) => ipcRenderer.invoke('pending:add', type, action, payload, source),
+  pendingList: (status?: string) => ipcRenderer.invoke('pending:list', status),
+  pendingApprove: (id: number) => ipcRenderer.invoke('pending:approve', id),
+  pendingReject: (id: number) => ipcRenderer.invoke('pending:reject', id),
+});
+
 exposeAPIs();
