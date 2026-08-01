@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { MarkItDown, MissingDependencyError, UnsupportedFormatError, FileTooLargeError, FileType } from '@lprhodes/markitdown-ts';
+import { MarkItDown, MissingDependencyError, UnsupportedFormatError, FileTooLargeError, FileType } from './vendor/markitdown-ts/index.js';
 import * as logger from './logger.js';
 
 let markItDownInstance: MarkItDown | null = null;

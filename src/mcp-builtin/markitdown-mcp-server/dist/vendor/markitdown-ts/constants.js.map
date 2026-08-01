@@ -1,0 +1,1 @@
+{"version":3,"file":"constants.js","sourceRoot":"","sources":["../../../src/vendor/markitdown-ts/constants.ts"],"names":[],"mappings":"AAAA,mBAAmB;AAEnB,MAAM,CAAC,MAAM,iBAAiB,GAAG,CAAC,CAAC;AACnC,MAAM,CAAC,MAAM,gBAAgB,GAAG,EAAE,CAAC;AAEnC,MAAM,CAAC,MAAM,uBAAuB,GAAG,GAAG,GAAG,IAAI,GAAG,IAAI,CAAC,CAAC,QAAQ;AAClE,MAAM,CAAC,MAAM,6BAA6B,GAAG,GAAG,GAAG,IAAI,GAAG,IAAI,CAAC,CAAC,QAAQ"}

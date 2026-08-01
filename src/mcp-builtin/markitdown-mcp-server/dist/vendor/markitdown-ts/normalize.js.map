@@ -1,0 +1,1 @@
+{"version":3,"file":"normalize.js","sourceRoot":"","sources":["../../../src/vendor/markitdown-ts/normalize.ts"],"names":[],"mappings":"AAAA,mBAAmB;AAEnB,MAAM,mBAAmB,GAAG,WAAW,CAAC;AACxC,MAAM,kBAAkB,GAAG,SAAS,CAAC;AAErC,MAAM,UAAU,eAAe,CAAC,IAAY;IAC1C,OAAO,IAAI;SACR,OAAO,CAAC,mBAAmB,EAAE,EAAE,CAAC;SAChC,OAAO,CAAC,kBAAkB,EAAE,MAAM,CAAC;SACnC,IAAI,EAAE,CAAC;AACZ,CAAC"}

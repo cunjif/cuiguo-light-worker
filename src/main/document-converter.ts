@@ -2,7 +2,7 @@
 // 包装 @lprhodes/markitdown-ts，为渲染进程提供统一的"附件转 Markdown"服务。
 // 转换失败时返回降级结果，调用方应继续走渲染进程内的浏览器解析路径。
 
-import { MarkItDown } from '@lprhodes/markitdown-ts';
+import { MarkItDown } from '../vendor/markitdown-ts/index.js';
 
 export interface ConvertRequest {
     /** 文件名（用于推断扩展名） */

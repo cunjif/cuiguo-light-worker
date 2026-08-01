@@ -1,5 +1,5 @@
-import { markitdown } from '@lprhodes/markitdown-ts';
-import { createFsReader } from '@lprhodes/markitdown-ts/node';
+import { markitdown } from '../vendor/markitdown-ts/index.js';
+import { createFsReader } from '../vendor/markitdown-ts/node.js';
 
 const result = await markitdown('C:\\Users\\james\\Desktop\\skillopt.pdf', {
     nodeServices: { readFile: createFsReader() },

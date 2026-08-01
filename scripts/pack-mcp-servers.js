@@ -30,9 +30,7 @@ const LOCAL_MCP_SERVERS = [
 
 // Additional dependencies to pack from the main project's node_modules
 // (for packages not available on the public npm registry)
-const EXTRA_PACKAGES_TO_PACK = [
-  '@lprhodes/markitdown-ts',
-];
+const EXTRA_PACKAGES_TO_PACK = [];
 
 // Output directory
 const OUTPUT_DIR = path.join(process.cwd(), 'src', 'mcp-builtin', 'packages');

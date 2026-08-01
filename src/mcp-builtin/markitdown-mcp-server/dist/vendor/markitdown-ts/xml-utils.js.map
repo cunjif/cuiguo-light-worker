@@ -1,0 +1,1 @@
+{"version":3,"file":"xml-utils.js","sourceRoot":"","sources":["../../../src/vendor/markitdown-ts/xml-utils.ts"],"names":[],"mappings":"AAAA,mBAAmB;AACnB,6EAA6E;AAC7E,+CAA+C;AAE/C,MAAM,CAAC,MAAM,gBAAgB,GAAG;IAC9B,sBAAsB,EAAE,IAAI;IAC5B,eAAe,EAAE,KAAK;IACtB,YAAY,EAAE,KAAK;IACnB,iBAAiB,EAAE,IAAI;IACvB,gBAAgB,EAAE,KAAK;IACvB,mBAAmB,EAAE,IAAI;CACjB,CAAC"}

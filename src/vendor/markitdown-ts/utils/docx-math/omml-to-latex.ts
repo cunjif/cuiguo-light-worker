@@ -1,0 +1,712 @@
+// @ts-nocheck
+// src/utils/docx-math/omml-to-latex.ts
+// Ported from Python: markitdown/converter_utils/docx/math/omml.py
+// Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
+
+import { XMLParser } from 'fast-xml-parser';
+import { SAFE_XML_OPTIONS } from '../../xml-utils.js';
+import {
+  CHARS,
+  CHR,
+  CHR_BO,
+  CHR_DEFAULT,
+  POS,
+  POS_DEFAULT,
+  SUB,
+  SUP,
+  F,
+  F_DEFAULT,
+  T,
+  FUNC,
+  D,
+  D_DEFAULT,
+  RAD,
+  RAD_DEFAULT,
+  ARR,
+  LIM_FUNC,
+  LIM_TO,
+  LIM_UPP,
+  M,
+  BRK,
+  BLANK,
+  BACKSLASH,
+  ALN,
+  FUNC_PLACE,
+} from './latex-dict.js';
+
+// ---------------------------------------------------------------------------
+// XML element abstraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal element interface that mirrors what the Python code expects from
+ * lxml/ElementTree elements.  We build these from fast-xml-parser output so
+ * the converter methods can walk the tree uniformly.
+ */
+interface XmlElement {
+  /** Local tag name without namespace prefix (e.g. "oMath", "f", "r") */
+  tag: string;
+  /** Attributes (without namespace prefix) */
+  attrs: Record<string, string>;
+  /** Ordered child elements */
+  children: XmlElement[];
+  /** Direct text content (e.g. the text inside <m:t>) */
+  text: string | undefined;
+}
+
+/**
+ * The OMML namespace prefix used in DOCX XML.
+ */
+const M_PREFIX = 'm:';
+
+/**
+ * Strip the `m:` namespace prefix from a tag name.
+ */
+function stripNs(tag: string): string {
+  if (tag.startsWith(M_PREFIX)) {
+    return tag.slice(M_PREFIX.length);
+  }
+  return tag;
+}
+
+/**
+ * Convert the fast-xml-parser JSON tree into our flat XmlElement list.
+ *
+ * fast-xml-parser returns objects like:
+ *   { "m:f": { "m:num": { "m:r": { "m:t": "1" } }, "m:den": ... } }
+ *
+ * We need ordered children, so we parse with `preserveOrder: true` which gives:
+ *   [ { "m:f": [ { "m:num": [...] }, ... ], ":@": { attrs } } ]
+ */
+function jsonToElement(node: Record<string, unknown>): XmlElement | null {
+  // With preserveOrder the node has exactly one key that is the tag name
+  // (plus an optional ":@" key for attributes).
+  const attrs: Record<string, string> = {};
+  const attrObj = node[':@'] as Record<string, unknown> | undefined;
+  if (attrObj) {
+    for (const [k, v] of Object.entries(attrObj)) {
+      // Remove @_ prefix added by attributeNamePrefix
+      const cleanKey = k.startsWith('@_') ? k.slice(2) : k;
+      attrs[cleanKey] = String(v);
+    }
+  }
+
+  // Find the tag key (not ":@")
+  let tagName: string | undefined;
+  let childrenRaw: unknown[] | string | undefined;
+  for (const key of Object.keys(node)) {
+    if (key === ':@') continue;
+    tagName = key;
+    childrenRaw = node[key] as unknown[] | string | undefined;
+    break;
+  }
+
+  if (!tagName) return null;
+
+  const localTag = stripNs(tagName);
+
+  // If childrenRaw is an array, recursively convert children
+  const children: XmlElement[] = [];
+  let text: string | undefined;
+
+  if (Array.isArray(childrenRaw)) {
+    for (const child of childrenRaw) {
+      if (typeof child === 'object' && child !== null) {
+        const childObj = child as Record<string, unknown>;
+        // Check for text node: { "#text": "..." }
+        if ('#text' in childObj) {
+          const tVal = childObj['#text'];
+          text = tVal !== undefined && tVal !== null ? String(tVal) : undefined;
+        } else {
+          const el = jsonToElement(childObj);
+          if (el) {
+            children.push(el);
+          }
+        }
+      }
+    }
+  } else if (typeof childrenRaw === 'string' || typeof childrenRaw === 'number') {
+    text = String(childrenRaw);
+  }
+
+  return { tag: localTag, attrs, children, text };
+}
+
+// ---------------------------------------------------------------------------
+// Parser configuration
+// ---------------------------------------------------------------------------
+
+const OMML_PARSER_OPTIONS = {
+  ...SAFE_XML_OPTIONS,
+  preserveOrder: true,
+  // We do NOT strip namespace prefixes â€?we handle them ourselves via stripNs
+  removeNSPrefix: false,
+};
+
+/**
+ * Parse an OMML XML string and return the root XmlElement.
+ */
+function parseOmml(xml: string): XmlElement | null {
+  const parser = new XMLParser(OMML_PARSER_OPTIONS);
+  const result = parser.parse(xml);
+
+  if (!Array.isArray(result) || result.length === 0) return null;
+
+  // result is an array of top-level nodes (preserveOrder mode)
+  // We wrap them in a virtual root
+  const children: XmlElement[] = [];
+  for (const node of result) {
+    const el = jsonToElement(node);
+    if (el) children.push(el);
+  }
+
+  if (children.length === 1) return children[0]!;
+
+  // Multiple top-level nodes â€?wrap in a virtual root
+  return { tag: '__root__', attrs: {}, children, text: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions (ported from Python)
+// ---------------------------------------------------------------------------
+
+function escapeLatex(strs: string): string {
+  let last: string | null = null;
+  const newChr: string[] = [];
+  strs = strs.replace(/\\\\/g, '\\');
+  for (const c of strs) {
+    if (CHARS.has(c) && last !== BACKSLASH) {
+      newChr.push(BACKSLASH + c);
+    } else {
+      newChr.push(c);
+    }
+    last = c;
+  }
+  return newChr.join(BLANK);
+}
+
+function getVal(
+  key: string | null | undefined,
+  defaultVal: string | undefined = undefined,
+  store: Record<string, string> | null = CHR,
+): string | undefined {
+  if (key != null) {
+    return !store ? key : (store[key] ?? key);
+  }
+  return defaultVal;
+}
+
+/**
+ * Python-style `.format()` replacement for named placeholders.
+ * E.g. formatNamed("\\frac{{{num}}}{{{den}}}", { num: "1", den: "2" })
+ *       -> "\\frac{1}{2}"
+ *
+ * The Python templates use `{{{name}}}` which means literal `{` + `{name}` + literal `}`.
+ * After Python's `.format()`, `{{` -> `{`, `{name}` -> value, `}}` -> `}`.
+ */
+function formatNamed(template: string, values: Record<string, string | undefined>): string {
+  // First: unescape doubled braces temporarily
+  let result = template;
+  // Replace named placeholders
+  for (const [key, val] of Object.entries(values)) {
+    // Replace {key} with the value
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), val ?? '');
+  }
+  // Unescape double braces: {{ -> { and }} -> }
+  result = result.replace(/\{\{/g, '{').replace(/\}\}/g, '}');
+  return result;
+}
+
+/**
+ * Python-style positional `.format()` for `{0}` placeholders.
+ */
+function formatPositional(template: string, ...args: string[]): string {
+  let result = template;
+  for (let i = 0; i < args.length; i++) {
+    result = result.replace(new RegExp(`\\{${i}\\}`, 'g'), args[i]!);
+  }
+  result = result.replace(/\{\{/g, '{').replace(/\}\}/g, '}');
+  return result;
+}
+
+/**
+ * Find the text content of a child element with a specific local tag name.
+ * Equivalent to Python: elm.findtext("./{ns}t")
+ */
+function findText(elm: XmlElement, localTag: string): string | undefined {
+  for (const child of elm.children) {
+    if (child.tag === localTag) {
+      // The text could be the direct text or nested in children
+      if (child.text !== undefined) return child.text;
+      // Also check for #text in children
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Get an attribute value from an element.
+ * In OMML, attributes like `m:val` are accessed as `{ns}val`.
+ * With fast-xml-parser, they appear as `m:val` in attrs.
+ */
+function getAttr(elm: XmlElement, localName: string): string | undefined {
+  // Try with m: prefix first, then without
+  return elm.attrs[`m:${localName}`] ?? elm.attrs[localName];
+}
+
+// ---------------------------------------------------------------------------
+// Pr (property) processor
+// ---------------------------------------------------------------------------
+
+interface PrResult {
+  text: string;
+  chr?: string | null;
+  pos?: string | null;
+  begChr?: string | null;
+  endChr?: string | null;
+  type?: string | null;
+  brk?: string;
+}
+
+const PR_VAL_TAGS = new Set(['chr', 'pos', 'begChr', 'endChr', 'type']);
+
+const PR_TAG_METHODS: Record<string, string> = {
+  brk: 'brk',
+  chr: 'common',
+  pos: 'common',
+  begChr: 'common',
+  endChr: 'common',
+  type: 'common',
+};
+
+function processPr(elm: XmlElement): PrResult {
+  const result: PrResult = { text: '' };
+  const textParts: string[] = [];
+
+  for (const child of elm.children) {
+    const stag = child.tag;
+    const methodName = PR_TAG_METHODS[stag];
+
+    if (methodName === 'brk') {
+      result.brk = BRK;
+      textParts.push(BRK);
+    } else if (methodName === 'common') {
+      if (PR_VAL_TAGS.has(stag)) {
+        const val = getAttr(child, 'val');
+        (result as Record<string, unknown>)[stag] = val ?? null;
+      }
+      // Returns null â€?doesn't add to text
+    }
+    // Other children are ignored for Pr
+  }
+
+  result.text = textParts.join(BLANK);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// oMath2Latex converter
+// ---------------------------------------------------------------------------
+
+type TagMethodResult = string | PrResult | null;
+
+const DIRECT_TAGS = new Set([
+  'box',
+  'sSub',
+  'sSup',
+  'sSubSup',
+  'num',
+  'den',
+  'deg',
+  'e',
+]);
+
+/**
+ * Process children of an element, yielding (tag, result, element) tuples.
+ */
+function* processChildrenList(
+  elm: XmlElement,
+  include?: Set<string> | null,
+): Generator<[string, string | PrResult, XmlElement]> {
+  for (const child of elm.children) {
+    const stag = child.tag;
+
+    // Only process elements that look like OMML elements
+    // (In the Python code, this checks for the OMML namespace)
+    if (include && !include.has(stag)) {
+      continue;
+    }
+
+    let t = callMethod(child, stag);
+    if (t === null) {
+      t = processUnknown(child, stag);
+      if (t === null) {
+        continue;
+      }
+    }
+    yield [stag, t, child];
+  }
+}
+
+/**
+ * Process children and return a dictionary of tag -> result.
+ */
+function processChildrenDict(
+  elm: XmlElement,
+  include?: Set<string> | null,
+): Record<string, string | PrResult> {
+  const result: Record<string, string | PrResult> = {};
+  for (const [stag, t] of processChildrenList(elm, include)) {
+    result[stag] = t;
+  }
+  return result;
+}
+
+/**
+ * Process children and return concatenated string.
+ */
+function processChildren(
+  elm: XmlElement,
+  include?: Set<string> | null,
+): string {
+  const parts: string[] = [];
+  for (const [, t] of processChildrenList(elm, include)) {
+    if (typeof t === 'string') {
+      parts.push(t);
+    } else {
+      // PrResult â€?use its text representation
+      parts.push(t.text);
+    }
+  }
+  return parts.join(BLANK);
+}
+
+/**
+ * Handle unknown tags â€?either direct processing or Pr creation.
+ */
+function processUnknown(elm: XmlElement, stag: string): TagMethodResult {
+  if (DIRECT_TAGS.has(stag)) {
+    return processChildren(elm);
+  }
+  if (stag.length >= 2 && stag.slice(-2) === 'Pr') {
+    return processPr(elm);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Tag method implementations
+// ---------------------------------------------------------------------------
+
+function doAcc(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const pr = cDict['accPr'] as PrResult;
+  const latexS = getVal(
+    pr?.chr,
+    CHR_DEFAULT['ACC_VAL'],
+    CHR,
+  )!;
+  return formatPositional(latexS, cDict['e'] as string ?? '');
+}
+
+function doBar(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const pr = cDict['barPr'] as PrResult;
+  const latexS = getVal(
+    pr?.pos,
+    POS_DEFAULT['BAR_VAL'],
+    POS,
+  )!;
+  return (pr?.text ?? '') + formatPositional(latexS, cDict['e'] as string ?? '');
+}
+
+function doD(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const pr = cDict['dPr'] as PrResult;
+  const nullChar = D_DEFAULT['null']!;
+  const sVal = getVal(pr?.begChr, D_DEFAULT['left'], T);
+  const eVal = getVal(pr?.endChr, D_DEFAULT['right'], T);
+  return (
+    (pr?.text ?? '') +
+    formatNamed(D, {
+      left: !sVal ? nullChar : escapeLatex(sVal),
+      text: cDict['e'] as string ?? '',
+      right: !eVal ? nullChar : escapeLatex(eVal),
+    })
+  );
+}
+
+function doSub(elm: XmlElement): string {
+  const text = processChildren(elm);
+  return formatPositional(SUB, text);
+}
+
+function doSup(elm: XmlElement): string {
+  const text = processChildren(elm);
+  return formatPositional(SUP, text);
+}
+
+function doF(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const pr = cDict['fPr'] as PrResult;
+  const latexS = getVal(pr?.type, F_DEFAULT, F) ?? F_DEFAULT;
+  return (
+    (pr?.text ?? '') +
+    formatNamed(latexS, {
+      num: cDict['num'] as string ?? '',
+      den: cDict['den'] as string ?? '',
+    })
+  );
+}
+
+function doFunc(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const funcName = cDict['fName'] as string ?? '';
+  return funcName.replace(FUNC_PLACE, cDict['e'] as string ?? '');
+}
+
+function doFName(elm: XmlElement): string {
+  const latexChars: string[] = [];
+  for (const [stag, t] of processChildrenList(elm)) {
+    if (stag === 'r') {
+      const tStr = t as string;
+      const funcTemplate = FUNC[tStr];
+      if (funcTemplate) {
+        latexChars.push(funcTemplate);
+      } else {
+        // Unsupported function â€?fall back to raw text
+        latexChars.push(tStr);
+      }
+    } else {
+      latexChars.push(typeof t === 'string' ? t : t.text);
+    }
+  }
+  const result = latexChars.join(BLANK);
+  return result.includes(FUNC_PLACE) ? result : result + FUNC_PLACE;
+}
+
+function doGroupChr(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const pr = cDict['groupChrPr'] as PrResult;
+  const latexS = getVal(pr?.chr)!;
+  return (pr?.text ?? '') + formatPositional(latexS, cDict['e'] as string ?? '');
+}
+
+function doRad(elm: XmlElement): string {
+  const cDict = processChildrenDict(elm);
+  const text = cDict['e'] as string ?? '';
+  const degText = cDict['deg'] as string ?? '';
+  if (degText) {
+    return formatNamed(RAD, { deg: degText, text });
+  }
+  return formatNamed(RAD_DEFAULT, { text });
+}
+
+function doEqArr(elm: XmlElement): string {
+  const includeSet = new Set(['e']);
+  const rows: string[] = [];
+  for (const [, t] of processChildrenList(elm, includeSet)) {
+    rows.push(typeof t === 'string' ? t : t.text);
+  }
+  return formatNamed(ARR, { text: rows.join(BRK) });
+}
+
+function doLimLow(elm: XmlElement): string {
+  const includeSet = new Set(['e', 'lim']);
+  const tDict = processChildrenDict(elm, includeSet);
+  const eText = tDict['e'] as string;
+  const latexS = LIM_FUNC[eText];
+  if (!latexS) {
+    // Unsupported limit function â€?fall back
+    return eText ?? '';
+  }
+  return formatNamed(latexS, { lim: tDict['lim'] as string ?? '' });
+}
+
+function doLimUpp(elm: XmlElement): string {
+  const includeSet = new Set(['e', 'lim']);
+  const tDict = processChildrenDict(elm, includeSet);
+  return formatNamed(LIM_UPP, {
+    lim: tDict['lim'] as string ?? '',
+    text: tDict['e'] as string ?? '',
+  });
+}
+
+function doLim(elm: XmlElement): string {
+  return processChildren(elm).replace(LIM_TO[0], LIM_TO[1]);
+}
+
+function doM(elm: XmlElement): string {
+  const rows: string[] = [];
+  for (const [stag, t] of processChildrenList(elm)) {
+    if (stag === 'mPr') {
+      // skip
+    } else if (stag === 'mr') {
+      rows.push(typeof t === 'string' ? t : t.text);
+    }
+  }
+  return formatNamed(M, { text: rows.join(BRK) });
+}
+
+function doMr(elm: XmlElement): string {
+  const includeSet = new Set(['e']);
+  const cols: string[] = [];
+  for (const [, t] of processChildrenList(elm, includeSet)) {
+    cols.push(typeof t === 'string' ? t : t.text);
+  }
+  return cols.join(ALN);
+}
+
+function doNary(elm: XmlElement): string {
+  const res: string[] = [];
+  let bo = '';
+  for (const [stag, t] of processChildrenList(elm)) {
+    if (stag === 'naryPr') {
+      const pr = t as PrResult;
+      bo = getVal(pr.chr, undefined, CHR_BO) ?? '';
+    } else {
+      res.push(typeof t === 'string' ? t : t.text);
+    }
+  }
+  return bo + res.join(BLANK);
+}
+
+function doR(elm: XmlElement): string {
+  // Find the <m:t> child and get its text content
+  const tText = findText(elm, 't');
+  if (!tText) return '';
+
+  const parts: string[] = [];
+  for (const c of tText) {
+    parts.push(T[c] ?? c);
+  }
+  return escapeLatex(parts.join(BLANK));
+}
+
+// ---------------------------------------------------------------------------
+// Tag dispatch table
+// ---------------------------------------------------------------------------
+
+const TAG_METHODS: Record<string, (elm: XmlElement) => string> = {
+  acc: doAcc,
+  r: doR,
+  bar: doBar,
+  sub: doSub,
+  sup: doSup,
+  f: doF,
+  func: doFunc,
+  fName: doFName,
+  groupChr: doGroupChr,
+  d: doD,
+  rad: doRad,
+  eqArr: doEqArr,
+  limLow: doLimLow,
+  limUpp: doLimUpp,
+  lim: doLim,
+  m: doM,
+  mr: doMr,
+  nary: doNary,
+};
+
+function callMethod(elm: XmlElement, stag?: string): TagMethodResult {
+  const tag = stag ?? elm.tag;
+  const method = TAG_METHODS[tag];
+  if (method) {
+    return method(elm);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a single OMML `<m:oMath>` XML string to a LaTeX string.
+ *
+ * @param ommlXml - An XML string containing an `<m:oMath>` element
+ *                  (or the oMath element itself as root).
+ * @returns The LaTeX representation of the math expression.
+ */
+export function ommlToLatex(ommlXml: string): string {
+  const root = parseOmml(ommlXml);
+  if (!root) return '';
+
+  // If the root is an oMath element, process it directly
+  if (root.tag === 'oMath') {
+    return processChildren(root);
+  }
+
+  // If the root is oMathPara, find oMath children
+  if (root.tag === 'oMathPara') {
+    const results: string[] = [];
+    for (const child of root.children) {
+      if (child.tag === 'oMath') {
+        results.push(processChildren(child));
+      }
+    }
+    return results.join(' ');
+  }
+
+  // Otherwise look for oMath elements in children
+  const results: string[] = [];
+  for (const child of root.children) {
+    if (child.tag === 'oMath') {
+      results.push(processChildren(child));
+    } else if (child.tag === 'oMathPara') {
+      for (const grandchild of child.children) {
+        if (grandchild.tag === 'oMath') {
+          results.push(processChildren(grandchild));
+        }
+      }
+    }
+  }
+
+  return results.join(' ');
+}
+
+/**
+ * Process a full DOCX XML document string, finding all `<m:oMathPara>` and
+ * `<m:oMath>` elements, converting them to LaTeX, and replacing them with
+ * `<w:p><w:r><w:t>$latex$</w:t></w:r></w:p>` (for inline oMath) or
+ * display math `$$latex$$` (for oMathPara).
+ *
+ * @param xml - The full DOCX document XML string
+ * @returns The modified XML string with math elements replaced by LaTeX
+ */
+export function processOmmlInXml(xml: string): string {
+  let result = xml;
+
+  // First handle <m:oMathPara>...</m:oMathPara> (display math)
+  // These wrap one or more <m:oMath> elements
+  result = result.replace(
+    /<m:oMathPara[\s>][\s\S]*?<\/m:oMathPara>/g,
+    (match) => {
+      try {
+        const latex = ommlToLatex(match);
+        if (!latex) return match;
+        return `<w:p><w:r><w:t>$$${latex}$$</w:t></w:r></w:p>`;
+      } catch {
+        return match;
+      }
+    },
+  );
+
+  // Then handle standalone <m:oMath>...</m:oMath> (inline math)
+  // that were NOT already inside an oMathPara (which we already replaced)
+  result = result.replace(
+    /<m:oMath[\s>][\s\S]*?<\/m:oMath>/g,
+    (match) => {
+      try {
+        const latex = ommlToLatex(match);
+        if (!latex) return match;
+        return `<w:r><w:t>$${latex}$</w:t></w:r>`;
+      } catch {
+        return match;
+      }
+    },
+  );
+
+  return result;
+}
