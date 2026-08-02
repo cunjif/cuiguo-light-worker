@@ -21,7 +21,7 @@ export class HtmlConverter {
         let cheerio;
         let TurndownService;
         try {
-            cheerio = await import('cheerio');
+            cheerio = await import('../../cheerio/dist/esm/index.js');
         }
         catch {
             throw new MissingDependencyError('cheerio', 'pnpm add cheerio');

@@ -28,10 +28,10 @@ export class HtmlConverter implements DocumentConverter {
   }
 
   async convertHtml(html: string, keepDataUris = false): Promise<ConvertResult> {
-    let cheerio: typeof import('cheerio');
+    let cheerio: typeof import('../../cheerio/dist/esm/index.js');
     let TurndownService: any;
     try {
-      cheerio = await import('cheerio');
+      cheerio = await import('../../cheerio/dist/esm/index.js');
     } catch {
       throw new MissingDependencyError('cheerio', 'pnpm add cheerio');
     }

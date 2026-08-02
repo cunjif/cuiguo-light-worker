@@ -34,7 +34,7 @@ function copyPackageContents(srcDir, destDir) {
   }
 }
 
-function vendorPackage(pkgName, targetDir, visited = new Set()) {
+function vendorPackage(pkgName, targetDir, rootDir, visited = new Set()) {
   if (visited.has(pkgName)) return;
   visited.add(pkgName);
 
@@ -62,8 +62,8 @@ function vendorPackage(pkgName, targetDir, visited = new Set()) {
   const deps = pkg.dependencies || {};
   for (const depName of Object.keys(deps)) {
     if (depName.startsWith('node:')) continue;
-    const depTargetDir = join(targetDir, 'node_modules', depName);
-    vendorPackage(depName, depTargetDir, visited);
+    const depTargetDir = join(rootDir, 'node_modules', depName);
+    vendorPackage(depName, depTargetDir, rootDir, visited);
   }
 }
 
@@ -80,5 +80,5 @@ console.log(`Vendoring ${pkgName} -> ${absTarget}`);
 
 if (existsSync(absTarget)) rmSync(absTarget, { recursive: true, force: true });
 
-vendorPackage(pkgName, absTarget);
+vendorPackage(pkgName, absTarget, absTarget);
 console.log(`Done: ${pkgName}`);
