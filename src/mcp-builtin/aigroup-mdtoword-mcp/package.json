@@ -1,0 +1,68 @@
+{
+  "name": "aigroup-mdtoword-mcp",
+  "version": "4.0.1",
+  "description": "本地 Markdown 到 Word 文档转换工具，支持最新 MCP 协议特性、完整的页眉页脚页码功能、增强的表格功能、数据导入和数学公式支持，修复本地相对路径图片嵌入问题",
+  "keywords": [
+    "markdown",
+    "docx",
+    "word",
+    "converter",
+    "mcp",
+    "model-context-protocol",
+    "文档转换",
+    "样式系统",
+    "zod",
+    "typescript"
+  ],
+  "author": {
+    "name": "AI Group",
+    "email": "jackdark425@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aigroup/aigroup-mdtoword-mcp.git"
+  },
+  "homepage": "https://github.com/jackdark425",
+  "bugs": {
+    "url": "https://github.com/aigroup/aigroup-mdtoword-mcp/issues"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "aigroup-mdtoword-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('pre-built')\"",
+    "start": "node dist/index.js",
+    "server:stdio": "node dist/index.js",
+    "server:http": "node dist/http-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.1",
+    "csv-parse": "^5.5.6",
+    "docx": "^9.5.0",
+    "express": "^4.21.2",
+    "markdown-it": "^14.1.0",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.10.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ]
+}

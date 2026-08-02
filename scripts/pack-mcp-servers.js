@@ -19,13 +19,13 @@ const execAsync = promisify(exec);
 const MCP_SERVERS = [
   'playwright-mcp@0.0.10',
   '@modelcontextprotocol/server-filesystem@latest',
-  'aigroup-mdtoword-mcp@latest',
   'bazi-mcp@latest',
 ];
 
 // Local MCP servers to bundle (from local source directories)
 const LOCAL_MCP_SERVERS = [
   { name: 'markitdown-mcp-server', dir: 'src/mcp-builtin/markitdown-mcp-server' },
+  { name: 'aigroup-mdtoword-mcp', dir: 'src/mcp-builtin/aigroup-mdtoword-mcp' },
 ];
 
 // Additional dependencies to pack from the main project's node_modules
