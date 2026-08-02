@@ -8,7 +8,7 @@
     "markitdown-mcp-server": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && copyfiles -u 1 src/vendor/turndown/**/* src/vendor/domino/**/* src/vendor/papaparse/**/* src/vendor/mammoth/**/* src/vendor/cheerio/**/* dist",
+    "build": "tsc && copyfiles -u 1 src/vendor/turndown/**/* src/vendor/domino/**/* src/vendor/papaparse/**/* src/vendor/mammoth/**/* src/vendor/cheerio/**/* src/vendor/jszip/**/* dist",
     "prepack": "npm run build"
   },
   "dependencies": {

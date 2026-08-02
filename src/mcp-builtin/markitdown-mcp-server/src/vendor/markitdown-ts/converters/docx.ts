@@ -21,14 +21,14 @@ export class DocxConverter implements DocumentConverter {
     opts: InternalConvertOptions,
   ): Promise<ConvertResult | null> {
     let mammoth: typeof import('../../mammoth/lib/index.js');
-    let JSZip: typeof import('jszip');
+    let JSZip: typeof import('../../jszip/lib/index.js');
     try {
       mammoth = await import('../../mammoth/lib/index.js');
     } catch {
       throw new MissingDependencyError('mammoth', 'pnpm add mammoth');
     }
     try {
-      JSZip = await import('jszip');
+      JSZip = await import('../../jszip/lib/index.js');
     } catch {
       throw new MissingDependencyError('jszip', 'pnpm add jszip');
     }
@@ -104,7 +104,7 @@ export class DocxConverter implements DocumentConverter {
 
   private async preProcessDocx(
     buffer: Uint8Array,
-    JSZip: typeof import('jszip'),
+    JSZip: typeof import('../../jszip/lib/index.js'),
   ): Promise<Uint8Array> {
     const zip = await JSZip.default.loadAsync(buffer);
 

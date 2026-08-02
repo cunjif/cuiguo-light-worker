@@ -20,7 +20,7 @@ export class DocxConverter {
             throw new MissingDependencyError('mammoth', 'pnpm add mammoth');
         }
         try {
-            JSZip = await import('jszip');
+            JSZip = await import('../../jszip/lib/index.js');
         }
         catch {
             throw new MissingDependencyError('jszip', 'pnpm add jszip');

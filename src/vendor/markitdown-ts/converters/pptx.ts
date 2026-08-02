@@ -35,9 +35,9 @@ export class PptxConverter implements DocumentConverter {
     _info: StreamInfo,
     opts: InternalConvertOptions,
   ): Promise<ConvertResult | null> {
-    let JSZip: typeof import('jszip');
+    let JSZip: typeof import('../../jszip/lib/index.js');
     try {
-      JSZip = await import('jszip');
+      JSZip = await import('../../jszip/lib/index.js');
     } catch {
       throw new MissingDependencyError('jszip', 'pnpm add jszip');
     }

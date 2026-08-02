@@ -26,7 +26,7 @@ export class PptxConverter {
     async convert(input, _info, opts) {
         let JSZip;
         try {
-            JSZip = await import('jszip');
+            JSZip = await import('../../jszip/lib/index.js');
         }
         catch {
             throw new MissingDependencyError('jszip', 'pnpm add jszip');

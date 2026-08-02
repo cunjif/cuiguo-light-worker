@@ -46,7 +46,7 @@ export class ZipConverter {
     async convert(input, info, opts) {
         let JSZip;
         try {
-            const mod = await import('jszip');
+            const mod = await import('../../jszip/lib/index.js');
             JSZip = mod.default ?? mod;
         }
         catch {
