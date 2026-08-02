@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as http from 'node:http';
-import * as compressing from 'compressing';
+import * as compressing from '../../vendor/compressing/index.js';
 
 /**
  * 最小可用的npm仓库服务

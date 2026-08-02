@@ -29,14 +29,14 @@ export class HtmlConverter implements DocumentConverter {
 
   async convertHtml(html: string, keepDataUris = false): Promise<ConvertResult> {
     let cheerio: typeof import('cheerio');
-    let TurndownService: typeof import('turndown');
+    let TurndownService: any;
     try {
       cheerio = await import('cheerio');
     } catch {
       throw new MissingDependencyError('cheerio', 'pnpm add cheerio');
     }
     try {
-      TurndownService = (await import('turndown')) as any;
+      TurndownService = (await import('../../turndown/lib/turndown.cjs.js')) as any;
     } catch {
       throw new MissingDependencyError('turndown', 'pnpm add turndown');
     }

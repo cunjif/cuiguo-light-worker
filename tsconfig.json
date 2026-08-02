@@ -26,6 +26,7 @@
     ],
     "exclude": [
       "node_modules",
-      "src/mcp-builtin/markitdown-mcp-server/src"
+      "src/mcp-builtin/markitdown-mcp-server/src",
+      "src/vendor/**/node_modules"
     ]
   }

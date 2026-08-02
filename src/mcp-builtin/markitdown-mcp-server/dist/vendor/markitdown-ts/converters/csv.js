@@ -13,7 +13,7 @@ export class CsvConverter {
     async convert(input, info, _opts) {
         let Papa;
         try {
-            Papa = await import('papaparse');
+            Papa = await import('../../papaparse/papaparse.js');
         }
         catch {
             throw new MissingDependencyError('papaparse', 'pnpm add papaparse');

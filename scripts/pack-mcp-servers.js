@@ -61,7 +61,7 @@ async function packLocalServers() {
 
     try {
       console.log(`Building local package: ${local.name}...`);
-      await execAsync('npx tsc', { cwd: localDir });
+      await execAsync('npm run build', { cwd: localDir });
       console.log(`✓ Built ${local.name}`);
     } catch (error) {
       console.error(`Failed to build ${local.name}:`, error.message);

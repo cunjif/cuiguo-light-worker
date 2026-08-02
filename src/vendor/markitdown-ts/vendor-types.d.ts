@@ -42,16 +42,8 @@ declare module '@azure/identity' {
   }
 }
 
-declare module 'papaparse' {
-  export function parse(text: string, config?: any): any;
-  const _default: { parse: typeof parse };
-  export default _default;
-}
 
-declare module 'turndown' {
-  const _default: any;
-  export default _default;
-}
+
 
 declare module 'pdfjs-dist/legacy/build/pdf.worker.mjs' {
   const _default: any;

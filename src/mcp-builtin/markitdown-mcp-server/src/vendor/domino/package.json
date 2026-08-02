@@ -1,0 +1,6 @@
+{
+  "name": "vendored-domino",
+  "version": "2.2.0",
+  "type": "commonjs",
+  "main": "lib/index.js"
+}

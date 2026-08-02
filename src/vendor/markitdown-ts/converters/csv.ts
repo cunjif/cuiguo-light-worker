@@ -19,9 +19,9 @@ export class CsvConverter implements DocumentConverter {
     info: StreamInfo,
     _opts: InternalConvertOptions,
   ): Promise<ConvertResult | null> {
-    let Papa: typeof import('papaparse');
+    let Papa: any;
     try {
-      Papa = await import('papaparse');
+      Papa = await import('../../papaparse/papaparse.js');
     } catch {
       throw new MissingDependencyError('papaparse', 'pnpm add papaparse');
     }

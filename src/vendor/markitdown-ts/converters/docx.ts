@@ -20,10 +20,10 @@ export class DocxConverter implements DocumentConverter {
     info: StreamInfo,
     opts: InternalConvertOptions,
   ): Promise<ConvertResult | null> {
-    let mammoth: typeof import('mammoth');
+    let mammoth: typeof import('../../mammoth/lib/index.js');
     let JSZip: typeof import('jszip');
     try {
-      mammoth = await import('mammoth');
+      mammoth = await import('../../mammoth/lib/index.js');
     } catch {
       throw new MissingDependencyError('mammoth', 'pnpm add mammoth');
     }

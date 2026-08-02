@@ -1,0 +1,6 @@
+{
+  "name": "vendored-turndown",
+  "version": "7.2.4",
+  "type": "commonjs",
+  "main": "lib/turndown.cjs.js"
+}

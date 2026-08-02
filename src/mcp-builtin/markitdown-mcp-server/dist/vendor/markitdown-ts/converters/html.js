@@ -27,7 +27,7 @@ export class HtmlConverter {
             throw new MissingDependencyError('cheerio', 'pnpm add cheerio');
         }
         try {
-            TurndownService = (await import('turndown'));
+            TurndownService = (await import('../../turndown/lib/turndown.cjs.js'));
         }
         catch {
             throw new MissingDependencyError('turndown', 'pnpm add turndown');

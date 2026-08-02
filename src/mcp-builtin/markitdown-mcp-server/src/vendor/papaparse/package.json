@@ -1,0 +1,6 @@
+{
+  "name": "vendored-papaparse",
+  "version": "5.5.4",
+  "type": "commonjs",
+  "main": "papaparse.js"
+}

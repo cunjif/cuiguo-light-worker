@@ -14,7 +14,7 @@ export class DocxConverter {
         let mammoth;
         let JSZip;
         try {
-            mammoth = await import('mammoth');
+            mammoth = await import('../../mammoth/lib/index.js');
         }
         catch {
             throw new MissingDependencyError('mammoth', 'pnpm add mammoth');
