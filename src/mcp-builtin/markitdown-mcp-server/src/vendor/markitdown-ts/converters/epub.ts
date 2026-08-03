@@ -3,7 +3,7 @@
 import type { DocumentConverter, StreamInfo, ConverterInput, InternalConvertOptions, ConvertResult } from '../types.js';
 import { MissingDependencyError } from '../errors.js';
 import { HtmlConverter } from './html.js';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from '../../fast-xml-parser/src/fxp.js';
 import { SAFE_XML_OPTIONS } from '../xml-utils.js';
 
 const ACCEPTED_EXTENSIONS = ['.epub'];

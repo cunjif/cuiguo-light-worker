@@ -2,7 +2,7 @@
 // src/utils/docx-math/omml-to-latex.ts
 // Ported from Python: markitdown/converter_utils/docx/math/omml.py
 // Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from '../../../../fast-xml-parser/src/fxp.js';
 import { SAFE_XML_OPTIONS } from '../../xml-utils.js';
 import { CHARS, CHR, CHR_BO, CHR_DEFAULT, POS, POS_DEFAULT, SUB, SUP, F, F_DEFAULT, T, FUNC, D, D_DEFAULT, RAD, RAD_DEFAULT, ARR, LIM_FUNC, LIM_TO, LIM_UPP, M, BRK, BLANK, BACKSLASH, ALN, FUNC_PLACE, } from './latex-dict.js';
 /**

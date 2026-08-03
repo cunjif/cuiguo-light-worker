@@ -1,5 +1,5 @@
 import { HtmlConverter } from './html.js';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from '../../fast-xml-parser/src/fxp.js';
 import { SAFE_XML_OPTIONS } from '../xml-utils.js';
 const PRECISE_EXTENSIONS = ['.rss', '.atom'];
 const PRECISE_MIME_PREFIXES = [

@@ -3,7 +3,7 @@
 // Ported from Python: markitdown/converter_utils/docx/math/omml.py
 // Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
 
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from '../../../../fast-xml-parser/src/fxp.js';
 import { SAFE_XML_OPTIONS } from '../../xml-utils.js';
 import {
   CHARS,
@@ -139,7 +139,7 @@ function jsonToElement(node: Record<string, unknown>): XmlElement | null {
 const OMML_PARSER_OPTIONS = {
   ...SAFE_XML_OPTIONS,
   preserveOrder: true,
-  // We do NOT strip namespace prefixes â€?we handle them ourselves via stripNs
+  // We do NOT strip namespace prefixes ï¿½?we handle them ourselves via stripNs
   removeNSPrefix: false,
 };
 
@@ -162,7 +162,7 @@ function parseOmml(xml: string): XmlElement | null {
 
   if (children.length === 1) return children[0]!;
 
-  // Multiple top-level nodes â€?wrap in a virtual root
+  // Multiple top-level nodes ï¿½?wrap in a virtual root
   return { tag: '__root__', attrs: {}, children, text: undefined };
 }
 
@@ -296,7 +296,7 @@ function processPr(elm: XmlElement): PrResult {
         const val = getAttr(child, 'val');
         (result as Record<string, unknown>)[stag] = val ?? null;
       }
-      // Returns null â€?doesn't add to text
+      // Returns null ï¿½?doesn't add to text
     }
     // Other children are ignored for Pr
   }
@@ -375,7 +375,7 @@ function processChildren(
     if (typeof t === 'string') {
       parts.push(t);
     } else {
-      // PrResult â€?use its text representation
+      // PrResult ï¿½?use its text representation
       parts.push(t.text);
     }
   }
@@ -383,7 +383,7 @@ function processChildren(
 }
 
 /**
- * Handle unknown tags â€?either direct processing or Pr creation.
+ * Handle unknown tags ï¿½?either direct processing or Pr creation.
  */
 function processUnknown(elm: XmlElement, stag: string): TagMethodResult {
   if (DIRECT_TAGS.has(stag)) {
@@ -475,7 +475,7 @@ function doFName(elm: XmlElement): string {
       if (funcTemplate) {
         latexChars.push(funcTemplate);
       } else {
-        // Unsupported function â€?fall back to raw text
+        // Unsupported function ï¿½?fall back to raw text
         latexChars.push(tStr);
       }
     } else {
@@ -518,7 +518,7 @@ function doLimLow(elm: XmlElement): string {
   const eText = tDict['e'] as string;
   const latexS = LIM_FUNC[eText];
   if (!latexS) {
-    // Unsupported limit function â€?fall back
+    // Unsupported limit function ï¿½?fall back
     return eText ?? '';
   }
   return formatNamed(latexS, { lim: tDict['lim'] as string ?? '' });

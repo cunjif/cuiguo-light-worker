@@ -1,7 +1,7 @@
 // src/converters/rss.ts
 import type { DocumentConverter, StreamInfo, ConverterInput, InternalConvertOptions, ConvertResult } from '../types.js';
 import { HtmlConverter } from './html.js';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from '../../fast-xml-parser/src/fxp.js';
 import { SAFE_XML_OPTIONS } from '../xml-utils.js';
 
 const PRECISE_EXTENSIONS = ['.rss', '.atom'];
