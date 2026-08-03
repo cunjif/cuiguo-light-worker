@@ -73,5 +73,5 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.2",
     "pdfjs-dist": "^4.0.0"
-  },
+  }
 }

@@ -34,7 +34,7 @@ export class XlsxConverter {
         }
         let ExcelJS;
         try {
-            ExcelJS = await import('exceljs');
+            ExcelJS = await import('../../exceljs/excel.js');
         }
         catch {
             throw new MissingDependencyError('exceljs', 'pnpm add exceljs');

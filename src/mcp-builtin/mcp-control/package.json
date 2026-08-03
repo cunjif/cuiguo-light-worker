@@ -1,0 +1,38 @@
+{
+  "name": "mcp-control",
+  "version": "0.2.0",
+  "description": "Windows control server for the Model Context Protocol",
+  "license": "MIT",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": "build/index.js",
+  "scripts": {
+    "build": "node -e \"console.log('pre-built')\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.2",
+    "clipboardy": "^4.0.0",
+    "keysender": "^2.3.0",
+    "sharp": "^0.34.1",
+    "ulid": "^3.0.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.17",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.32.0",
+    "@typescript-eslint/parser": "^8.32.1",
+    "@vitest/coverage-v8": "^3.1.3",
+    "audit-ci": "^7.1.0",
+    "eslint": "^9.26.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.0.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1",
+    "vitest": "^3.0.8"
+  }
+}
