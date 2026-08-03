@@ -547,12 +547,12 @@ export class PdfConverter implements DocumentConverter {
     // required in bundled serverless environments (Next.js on Vercel with
     // pnpm) where markitdown-ts is loaded outside the bundler's module
     // graph and Node can't walk up to find pdfjs-dist at runtime.
-    let pdfjsLib: typeof import('pdfjs-dist/legacy/build/pdf.mjs');
+    let pdfjsLib: typeof import('../../pdfjs-dist/legacy/build/pdf.mjs');
     if (injected?.pdfjsLib) {
-      pdfjsLib = injected.pdfjsLib as typeof import('pdfjs-dist/legacy/build/pdf.mjs');
+      pdfjsLib = injected.pdfjsLib as typeof import('../../pdfjs-dist/legacy/build/pdf.mjs');
     } else {
       try {
-        pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        pdfjsLib = await import('../../pdfjs-dist/legacy/build/pdf.mjs');
       } catch (err) {
         throw new MissingDependencyError(
           'pdfjs-dist',
@@ -573,10 +573,10 @@ export class PdfConverter implements DocumentConverter {
         (globalThis as any).pdfjsWorker = injected.pdfjsWorker;
       } else {
         try {
-          const workerModule = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+          const workerModule = await import('../../pdfjs-dist/legacy/build/pdf.worker.mjs');
           (globalThis as any).pdfjsWorker = workerModule;
         } catch {
-          // Worker pre-load failed â€?pdfjs will fall back to its own resolution
+          // Worker pre-load failed ï¿½?pdfjs will fall back to its own resolution
         }
       }
     }
@@ -584,7 +584,7 @@ export class PdfConverter implements DocumentConverter {
     // Resolve pdfjs-dist package location for standard fonts.
     // import.meta.resolve works in ESM but tsup's CJS shim sets import_meta = {},
     // so we fall back to createRequire anchored to __filename (CJS).
-    // In bundled environments (Next.js), neither works â€?fonts are optional
+    // In bundled environments (Next.js), neither works ï¿½?fonts are optional
     // unless the consumer injects nodeServices.pdfjsStandardFontDataUrl.
     let standardFontDataUrl: string | undefined = injected?.pdfjsStandardFontDataUrl;
     if (!standardFontDataUrl) {
@@ -594,7 +594,7 @@ export class PdfConverter implements DocumentConverter {
         try {
           const { fileURLToPath } = await import('url');
           pdfjsBuildDir = dirname(
-            fileURLToPath(import.meta.resolve('pdfjs-dist/legacy/build/pdf.mjs')),
+            fileURLToPath(import.meta.resolve('../../pdfjs-dist/legacy/build/pdf.mjs')),
           );
         } catch {
           const { createRequire } = await import('module');
@@ -606,16 +606,17 @@ export class PdfConverter implements DocumentConverter {
                 : undefined;
           if (anchor) {
             const req = createRequire(anchor);
-            pdfjsBuildDir = dirname(req.resolve('pdfjs-dist/legacy/build/pdf.mjs'));
+            pdfjsBuildDir = dirname(req.resolve('../../pdfjs-dist/legacy/build/pdf.mjs'));
           }
         }
         if (pdfjsBuildDir) {
           standardFontDataUrl = join(pdfjsBuildDir, '..', '..', 'standard_fonts/');
         }
       } catch {
-        // Font path resolution failed â€?PDFs with standard fonts may show warnings
+        // Font path resolution failed â€” PDFs with standard fonts may show warnings
       }
     }
+
 
     const buffer = await input.buffer();
 
@@ -648,7 +649,7 @@ export class PdfConverter implements DocumentConverter {
           const pageHeight = viewport.height;
           const pageWidth = viewport.width;
 
-          // Text extraction â€?individually wrapped so annotation extraction
+          // Text extraction ï¿½?individually wrapped so annotation extraction
           // can still run even if text extraction fails, and vice versa.
           try {
             const textContent = await page.getTextContent();
@@ -684,7 +685,7 @@ export class PdfConverter implements DocumentConverter {
             });
           }
 
-          // Annotations â€?independent from text extraction
+          // Annotations ï¿½?independent from text extraction
           try {
             const commentSection = await extractAnnotationComments(page);
             if (commentSection) {
@@ -726,7 +727,7 @@ export class PdfConverter implements DocumentConverter {
       // page throws is not a successful conversion.
       //
       // A PDF with zero text items but no errors (e.g. a scanned/image-only
-      // PDF) is a valid empty result â€?callers should OCR separately.
+      // PDF) is a valid empty result ï¿½?callers should OCR separately.
       if (pageErrors.length === doc.numPages && !markdown.trim()) {
         const errorSummary = pageErrors
           .map((e) => `page ${e.pageNum}: ${e.error}`)

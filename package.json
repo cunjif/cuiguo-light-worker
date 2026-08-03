@@ -34,7 +34,9 @@
       {
         "from": "./src/mcp-builtin",
         "to": "./mcp-builtin",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -64,14 +66,13 @@
     "@types/json-schema": "^7.0.15",
     "@types/node-notifier": "^8.0.5",
     "copyfiles": "^2.4.1",
-    "electron": "^39.2.1",
+    "electron": "^41.10.3",
     "electron-builder": "^26.2.0",
     "electron-debug": "^4.1.0",
     "node-notifier": "^10.0.1",
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.2",
-    "pdfjs-dist": "^4.0.0"
+    "@modelcontextprotocol/sdk": "^1.13.2"
   }
 }

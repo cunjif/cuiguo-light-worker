@@ -45,7 +45,3 @@ declare module '@azure/identity' {
 
 
 
-declare module 'pdfjs-dist/legacy/build/pdf.worker.mjs' {
-  const _default: any;
-  export default _default;
-}
