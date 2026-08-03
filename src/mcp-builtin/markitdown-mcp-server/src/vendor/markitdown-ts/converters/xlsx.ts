@@ -43,9 +43,9 @@ export class XlsxConverter implements DocumentConverter {
       throw new UnsupportedFormatError('.xls files are not supported. Convert to .xlsx first.');
     }
 
-    let ExcelJS: typeof import('exceljs');
+    let ExcelJS: typeof import('../../exceljs/excel.js');
     try {
-      ExcelJS = await import('exceljs');
+      ExcelJS = await import('../../exceljs/excel.js');
     } catch {
       throw new MissingDependencyError('exceljs', 'pnpm add exceljs');
     }

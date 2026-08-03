@@ -72,13 +72,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.2",
-    "exceljs": "^4.0.0",
-
-    "filesystem": "^1.0.1",
-    "pdfjs-dist": "^4.0.0",
-    "playwright-mcp": "^0.0.10"
+    "pdfjs-dist": "^4.0.0"
   },
-  "optionalDependencies": {
-    "mcp-control": "^0.2.0"
-  }
 }
