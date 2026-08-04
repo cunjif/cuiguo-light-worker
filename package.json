@@ -71,6 +71,5 @@
     "electron-debug": "^4.1.0",
     "node-notifier": "^10.0.1",
     "typescript": "^5.7.3"
-  },
-  "dependencies": {}
+  }
 }
