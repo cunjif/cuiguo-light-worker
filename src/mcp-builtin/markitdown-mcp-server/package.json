@@ -8,11 +8,8 @@
     "markitdown-mcp-server": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && copyfiles -u 1 src/vendor/turndown/**/* src/vendor/domino/**/* src/vendor/papaparse/**/* src/vendor/mammoth/**/* src/vendor/cheerio/**/* src/vendor/jszip/**/* src/vendor/fast-xml-parser/**/* src/vendor/exceljs/**/* dist",
+    "build": "tsc && copyfiles -u 1 src/vendor/turndown/**/* src/vendor/domino/**/* src/vendor/papaparse/**/* src/vendor/mammoth/**/* src/vendor/cheerio/**/* src/vendor/jszip/**/* src/vendor/fast-xml-parser/**/* src/vendor/exceljs/**/* src/vendor/pdfjs-dist/**/* src/vendor/mcp-sdk/**/* dist",
     "prepack": "npm run build"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.2",
-    "zod": "^3.24.3"
-  }
+  "dependencies": {}
 }

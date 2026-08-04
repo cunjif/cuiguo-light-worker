@@ -1,6 +1,6 @@
 // types.ts
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-export { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "../vendor/mcp-sdk/dist/esm/client/index.js";
+export { StdioClientTransport } from "../vendor/mcp-sdk/dist/esm/client/stdio.js";
 import { HttpClient } from "./client.js";
 
 export {Client, HttpClient}
@@ -20,7 +20,7 @@ export {
   ReadResourceResultSchema,
   ListResourceTemplatesResultSchema
 
-} from "@modelcontextprotocol/sdk/types.js";
+} from "../vendor/mcp-sdk/dist/esm/types.js";
 
 
 export interface McpServersConfig {

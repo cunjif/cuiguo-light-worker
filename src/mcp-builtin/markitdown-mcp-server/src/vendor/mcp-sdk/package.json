@@ -1,0 +1,91 @@
+{
+  "name": "@modelcontextprotocol/sdk",
+  "version": "1.25.3",
+  "description": "Model Context Protocol implementation for TypeScript",
+  "license": "MIT",
+  "author": "Anthropic, PBC (https://anthropic.com)",
+  "homepage": "https://modelcontextprotocol.io",
+  "bugs": "https://github.com/modelcontextprotocol/typescript-sdk/issues",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modelcontextprotocol/typescript-sdk.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "modelcontextprotocol",
+    "mcp"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./client": {
+      "import": "./dist/esm/client/index.js",
+      "require": "./dist/cjs/client/index.js"
+    },
+    "./server": {
+      "import": "./dist/esm/server/index.js",
+      "require": "./dist/cjs/server/index.js"
+    },
+    "./validation": {
+      "import": "./dist/esm/validation/index.js",
+      "require": "./dist/cjs/validation/index.js"
+    },
+    "./validation/ajv": {
+      "import": "./dist/esm/validation/ajv-provider.js",
+      "require": "./dist/cjs/validation/ajv-provider.js"
+    },
+    "./validation/cfworker": {
+      "import": "./dist/esm/validation/cfworker-provider.js",
+      "require": "./dist/cjs/validation/cfworker-provider.js"
+    },
+    "./experimental": {
+      "import": "./dist/esm/experimental/index.js",
+      "require": "./dist/cjs/experimental/index.js"
+    },
+    "./experimental/tasks": {
+      "import": "./dist/esm/experimental/tasks/index.js",
+      "require": "./dist/cjs/experimental/tasks/index.js"
+    },
+    "./*": {
+      "import": "./dist/esm/*",
+      "require": "./dist/cjs/*"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/esm/*"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "fetch:spec-types": "tsx scripts/fetch-spec-types.ts",
+    "typecheck": "tsgo --noEmit",
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json",
+    "build:esm:w": "npm run build:esm -- -w",
+    "build:cjs": "mkdir -p dist/cjs && echo '{\"type\": \"commonjs\"}' > dist/cjs/package.json && tsc -p tsconfig.cjs.json",
+    "build:cjs:w": "npm run build:cjs -- -w",
+    "examples:simple-server:w": "tsx --watch src/examples/server/simpleStreamableHttp.ts --oauth",
+    "prepack": "npm run build:esm && npm run build:cjs",
+    "lint": "eslint src/ && prettier --check .",
+    "lint:fix": "eslint src/ --fix && prettier --write .",
+    "check": "npm run typecheck && npm run lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "npm run server",
+    "server": "tsx watch --clear-screen=false scripts/cli.ts server",
+    "client": "tsx scripts/cli.ts client"
+  },
+  "resolutions": {
+    "strip-ansi": "6.0.1"
+  }
+}
