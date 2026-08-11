@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "start": "npm run build && electron ./dist/main/main.js",
-    "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
+    "build": "tsc && node scripts/copy-assets.cjs",
     "build-app": "npm run build && electron-builder",
     "build:linux": "bash build-linux.sh deb",
     "build:linux:all": "bash build-linux.sh all",
@@ -39,16 +39,6 @@
         ]
       }
     ],
-    "win": {
-      "target": "nsis",
-      "icon": "icon.ico",
-      "signAndEditExecutable": false,
-      "forceCodeSigning": false
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "icon.icns"
-    },
     "linux": {
       "target": [
         "deb"
@@ -59,6 +49,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.0"
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
