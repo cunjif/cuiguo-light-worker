@@ -69,7 +69,15 @@ function readConfig(configPath: string): McpServersConfig | null {
         if (cfg.args && Array.isArray(cfg.args)) {
           cfg.args = cfg.args.map((arg: string) => {
             if (typeof arg === 'string' && arg.startsWith('./mcp-builtin/')) {
-              return path.resolve(configDir, arg);
+              const packagedPath = path.resolve(configDir, arg);
+              if (fs.existsSync(packagedPath)) {
+                return packagedPath;
+              }
+              const devPath = path.resolve(configDir, '..', arg);
+              if (fs.existsSync(devPath)) {
+                return devPath;
+              }
+              return packagedPath;
             }
             return arg;
           });
@@ -274,6 +282,8 @@ async function createRegistryWindow() {
 
 let features: any[] = [];
 let mainWindowRef: BrowserWindow | null = null;
+// Track active MCP clients so we can close them gracefully on quit
+const activeClients = new Map<string, Client | HttpClient>();
 
 // Register IPC handlers for a MCP server
 function registerIpcHandlers(
@@ -371,6 +381,7 @@ async function bootstrapClientsFromConfig() {
       } else {
         features.push(feature);
       }
+      activeClients.set(name, client);
 
       console.log(`Server ${name} initialized and registered. Notifying renderer...`);
       BrowserWindow.getAllWindows().forEach(w => w.webContents.send('clients-updated'));
@@ -442,6 +453,7 @@ async function bootstrapSpecificClients(serverNames: string[]) {
         feature.config = serverConfig;
 
         features.push(feature);
+        activeClients.set(serverName, client);
         console.log(`Server ${serverName} registered with IPC handlers`);
       } catch (error) {
         console.error(`Failed to initialize server ${serverName}:`, error?.message);
@@ -568,6 +580,7 @@ app.whenReady().then(async () => {
         newServerFeature.config = serverConfig;
 
         features.push(newServerFeature);
+        activeClients.set(serverName, client);
         console.log(`[DEBUG] Features array now contains:`, features.map(f => ({ name: f.name, type: f.type, has_tools: !!f.tools })));
 
         console.log(`New server ${serverName} registered with IPC handlers`);
@@ -619,6 +632,17 @@ app.whenReady().then(async () => {
       }
 
       features.splice(serverIndex, 1);
+
+      // Close and remove the client
+      const client = activeClients.get(serverName);
+      if (client) {
+        try {
+          await (client as any).close?.();
+        } catch (error) {
+          console.warn(`Failed to close client ${serverName}:`, (error as Error)?.message);
+        }
+        activeClients.delete(serverName);
+      }
 
       // Remove from config file
       const config = readConfig(configPath);
@@ -936,7 +960,34 @@ app.whenReady().then(async () => {
 
 });
 
+// Gracefully close all active MCP clients to avoid EPIPE errors in child processes
+async function closeAllClients(): Promise<void> {
+  if (activeClients.size === 0) return;
+  console.log(`正在关闭 ${activeClients.size} 个 MCP 客户端...`);
+  const closePromises: Promise<void>[] = [];
+  for (const [name, client] of activeClients) {
+    closePromises.push(
+      Promise.race([
+        (async () => {
+          try {
+            await (client as any).close?.();
+            console.log(`✓ 客户端 ${name} 已关闭`);
+          } catch (error) {
+            console.warn(`关闭客户端 ${name} 失败:`, (error as Error)?.message);
+          }
+        })(),
+        new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+      ])
+    );
+  }
+  await Promise.all(closePromises);
+  activeClients.clear();
+}
+
 app.on('window-all-closed', async () => {
+  // 先优雅关闭 MCP 客户端
+  await closeAllClients();
+
   // 停止内部npm仓库
   console.log('正在停止内部npm仓库...');
   await npmRegistry.shutdown();
@@ -947,6 +998,9 @@ app.on('window-all-closed', async () => {
 
 // 确保在应用退出前停止内部npm仓库
 app.on('before-quit', async () => {
+  // 先优雅关闭 MCP 客户端
+  await closeAllClients();
+
   // 停止内部npm仓库
   console.log('应用即将退出，正在停止内部npm仓库...');
   await npmRegistry.shutdown();

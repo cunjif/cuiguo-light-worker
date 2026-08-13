@@ -31,15 +31,17 @@
       ]
     },
     "markitdown": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "markitdown-mcp-server"
+        "./mcp-builtin/markitdown-mcp-server/dist/index.js"
       ]
     },
     "MCPControl": {
-      "command": "mcp-control",
-      "args": ["--sse"],
+      "command": "node",
+      "args": [
+        "./mcp-builtin/mcp-control/build/index.js",
+        "--sse"
+      ],
       "platform": "win32"
     },
     "LinuxControl": {

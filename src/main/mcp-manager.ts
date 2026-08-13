@@ -106,24 +106,26 @@ function getNpxPath(): string {
 }
 
 // Publish built-in packages to internal registry
-async function publishBuiltinToRegistry(registryUrl: string = 'http://localhost:4873'): Promise<boolean> {
+// Returns the number of packages successfully published
+async function publishBuiltinToRegistry(registryUrl: string = 'http://localhost:4873'): Promise<number> {
   const packagesDir = getBuiltinPackagesDir();
   
   if (!fs.existsSync(packagesDir)) {
-    console.log('No built-in packages directory found, skipping');
-    return true;
+    console.log('No built-in packages directory found, skipping publish');
+    return 0;
   }
   
   const tgzFiles = fs.readdirSync(packagesDir).filter(f => f.endsWith('.tgz'));
   
   if (tgzFiles.length === 0) {
-    console.log('No built-in packages found, skipping');
-    return true;
+    console.log('No built-in packages found, skipping publish');
+    return 0;
   }
   
   console.log(`Found ${tgzFiles.length} built-in packages to publish`);
   
   const npmPath = getNpmPath();
+  let publishedCount = 0;
   
   for (const file of tgzFiles) {
     const filePath = path.join(packagesDir, file);
@@ -131,13 +133,14 @@ async function publishBuiltinToRegistry(registryUrl: string = 'http://localhost:
       console.log(`Publishing ${file}...`);
       await execAsync(`"${npmPath}" publish "${filePath}" --registry ${registryUrl}`);
       console.log(`✓ ${file} published`);
+      publishedCount++;
     } catch (error) {
       console.warn(`Failed to publish ${file}: ${error.message}`);
       // Continue with other packages
     }
   }
   
-  return true;
+  return publishedCount;
 }
 
 // Install MCP servers to user data directory
@@ -255,7 +258,16 @@ export async function initializeMcpServers(
     console.log('Initializing built-in MCP servers...');
     
     // Step 1: Publish built-in packages to internal registry
-    await publishBuiltinToRegistry(registryUrl);
+    const publishedCount = await publishBuiltinToRegistry(registryUrl);
+    
+    // If no pre-packaged bundles were published, skip installation from the
+    // internal registry (it would only produce 404 errors). Fall back to the
+    // existing config.json which uses npx against the public registry.
+    if (publishedCount === 0) {
+      console.log('No pre-packaged MCP servers found, using config.json as-is');
+      markInitialized();
+      return true;
+    }
     
     // Step 2: Install MCP servers to user data directory
     const installedServers = await installMcpServers(registryUrl);
