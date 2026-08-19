@@ -1,5 +1,5 @@
 // main.ts
-import { app, BrowserWindow, ipcMain, Menu, MenuItem } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import {
   Client, McpServersConfig, HttpClient,
   ListToolsResultSchema, CallToolResultSchema,

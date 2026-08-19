@@ -1,5 +1,6 @@
 export type ProviderType =
   | 'openai-compatible'
+  | 'icbc-compatible'
   | 'anthropic-compatible'
   | 'glm'
   | 'qwen'

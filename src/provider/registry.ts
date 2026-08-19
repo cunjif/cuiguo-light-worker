@@ -1,5 +1,6 @@
 import { ProviderType, ProviderConfig, ConnectionPreset, Capabilities, RequestSkeleton, ModelConfig } from './types.js';
 import { registerOpenAICompatible, openaiResponseTransformer, openaiErrorTransformer } from './providers/openai-compatible.js';
+import { registerICBCCompatible } from './providers/icbc-compatible.js';
 import { registerAnthropicCompatible } from './providers/anthropic-compatible.js';
 import { registerGLM } from './providers/glm.js';
 import { registerQwen } from './providers/qwen.js';
@@ -67,6 +68,7 @@ export function getCapabilities(type: ProviderType): Capabilities {
 
 export function initProviders(): void {
   registerOpenAICompatible();
+  registerICBCCompatible();
   registerAnthropicCompatible();
   registerGLM();
   registerQwen();

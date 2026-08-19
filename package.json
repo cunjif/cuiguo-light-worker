@@ -11,7 +11,8 @@
   "scripts": {
     "start": "npm run build && electron ./dist/main/main.js",
     "build": "tsc && node scripts/copy-assets.cjs",
-    "build-app": "npm run build && electron-builder",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3",
+    "build-app": "npm run rebuild:native && npm run build && electron-builder",
     "build:linux": "bash build-linux.sh deb",
     "build:linux:all": "bash build-linux.sh all",
     "build:linux:appimage": "bash build-linux.sh AppImage",
@@ -51,15 +52,17 @@
     }
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.0",
-    "buffer-crc32": "^1.0.0"
+    "better-sqlite3": "^12.0.0",
+    "buffer-crc32": "^1.0.0",
+    "tar": "^7.5.22"
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
     "@types/node-notifier": "^8.0.5",
+    "@types/tar": "^6.1.13",
     "copyfiles": "^2.4.1",
-    "electron": "^41.10.3",
-    "electron-builder": "^26.2.0",
+    "electron": "30.0.1",
+    "electron-builder": "^24.13.3",
     "electron-debug": "^4.1.0",
     "node-notifier": "^10.0.1",
     "typescript": "^5.7.3"
