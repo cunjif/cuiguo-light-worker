@@ -77,9 +77,14 @@ Write-Host ""
 # 4. 导出 tar.gz
 Write-Host "[4/5] 从镜像中导出 chatmcp.tar.gz..." -ForegroundColor Yellow
 $containerName = "tmp-offline-export-$(Get-Random)"
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 docker create --name $containerName $ImageTag 2>&1 | Out-Null
+$ErrorActionPreference = $prevEAP
 docker cp "${containerName}:/chatmcp.tar.gz" $OutputFile
+$ErrorActionPreference = "Continue"
 docker rm $containerName 2>&1 | Out-Null
+$ErrorActionPreference = $prevEAP
 
 if (-not (Test-Path $OutputFile)) {
     Write-Host "ERROR: 产物文件不存在!" -ForegroundColor Red

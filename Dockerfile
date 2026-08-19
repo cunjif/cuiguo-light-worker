@@ -62,9 +62,9 @@ COPY . .
 # 5. 主项目 npm install (--ignore-scripts 跳过 electron postinstall, QEMU 下太慢)
 RUN npm install --ignore-scripts
 
-# 6. 下载 Electron arm64 二进制到 @electron/get 缓存 + 预下载头文件
+# 6. 下载 Electron arm64 二进制到 @electron/get 缓存 + 解压预下载的头文件
 #    electron postinstall 被 --ignore-scripts 跳过, 手动下载 zip 到缓存目录
-#    同时下载 electron 头文件供 better-sqlite3 编译用
+#    头文件由构建脚本预下载到 scripts/electron-headers/ (electronjs.org/headers), 离线解压供 better-sqlite3 编译用
 RUN ELECTRON_VERSION=$(node -p "require('/app/node_modules/electron/package.json').version") && \
     ELECTRON_ZIP="electron-v${ELECTRON_VERSION}-linux-arm64.zip" && \
     MIRROR_HASH=$(node -e "const c=require('crypto');const u=new URL('https://npmmirror.com/mirrors/electron/v'+'${ELECTRON_VERSION}'+'/'+'${ELECTRON_ZIP}');u.pathname=require('path').posix.dirname(u.pathname);console.log(c.createHash('sha256').update(u.toString()).digest('hex'))") && \
@@ -77,11 +77,7 @@ RUN ELECTRON_VERSION=$(node -p "require('/app/node_modules/electron/package.json
     HEADERS_DIR=/root/.electron-gyp/${ELECTRON_VERSION} && \
     mkdir -p ${HEADERS_DIR} && \
     HEADERS_FILE="node-v${ELECTRON_VERSION}-headers.tar.gz" && \
-    (curl -fsSL --connect-timeout 15 --max-time 120 "https://registry.npmmirror.com/-/binary/electron/v${ELECTRON_VERSION}/${HEADERS_FILE}" || \
-     (echo "npmmirror headers 404, falling back to electronjs.org..." && \
-      curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
-        "https://electronjs.org/headers/v${ELECTRON_VERSION}/${HEADERS_FILE}")) \
-      | tar -xz -C ${HEADERS_DIR} --strip-components=1 && \
+    tar -xzf /app/scripts/electron-headers/${HEADERS_FILE} -C ${HEADERS_DIR} --strip-components=1 && \
     cp ${HEADERS_DIR}/include/node/common.gypi ${HEADERS_DIR}/common.gypi && \
     cp ${HEADERS_DIR}/include/node/config.gypi ${HEADERS_DIR}/config.gypi && \
     echo "Electron ${ELECTRON_VERSION} arm64 binary + headers cached."
@@ -227,9 +223,10 @@ echo "  npm run build-app  # 打包 deb 安装包"\n\
 echo "  npm run pack:mcp   # 打包 MCP 服务器"\n\
 ' > /app/setup-offline-env.sh && chmod +x /app/setup-offline-env.sh
 
-# 14. 打包所有内容到 /chatmcp.tar (仅归档不压缩, QEMU下gzip太慢; 宿主机上再gzip)
+# 14. 打包所有内容到 /chatmcp.tar.gz
 #     包含: 项目源码+node_modules, npm缓存, electron缓存, electron-builder缓存, 系统库deb, 工具链deb, 部署脚本
 #     使用 --ignore-failed-read 容忍缺失目录(如 electron-builder 缓存可能未生成)
+#     gzip -1 快速压缩 (QEMU 下可接受)
 RUN mkdir -p /root/.cache/electron /root/.cache/electron-builder && \
     tar --ignore-failed-read -cf /chatmcp.tar \
     -C / \
@@ -239,6 +236,6 @@ RUN mkdir -p /root/.cache/electron /root/.cache/electron-builder && \
     root/.cache/electron-builder \
     debs \
     toolchain-debs && \
-    ls -lh /chatmcp.tar && \
-    echo "=== Bundle complete ===" && \
-    echo "Output: /chatmcp.tar (宿主机上执行 gzip -k chatmcp.tar 生成 chatmcp.tar.gz)"
+    gzip -1 /chatmcp.tar && \
+    ls -lh /chatmcp.tar.gz && \
+    echo "=== Bundle complete ==="

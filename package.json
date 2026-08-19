@@ -11,17 +11,15 @@
   "type": "module",
   "scripts": {
     "start": "npm run build && electron ./dist/main/main.js",
-    "build": "tsc && node scripts/copy-assets.cjs",
-    "rebuild:native": "electron-rebuild -f -w better-sqlite3",
-    "build-app": "npm run rebuild:native && npm run build && electron-builder",
-    "build:linux": "bash build-linux.sh deb",
-    "build:linux:all": "bash build-linux.sh all",
-    "build:linux:appimage": "bash build-linux.sh AppImage",
+    "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
+    "build-app": "npm run build && electron-builder",
+    "build-deb": "bash build-linux.sh deb",
     "pack:mcp": "node scripts/pack-mcp-servers.js",
     "build:with-mcp": "npm run pack:mcp && npm run build-app"
   },
   "build": {
     "appId": "com.cuiguo.lightworkstation",
+    "npmRebuild": false,
     "directories": {
       "output": "artifacts"
     },
@@ -55,7 +53,9 @@
   "dependencies": {
     "better-sqlite3": "^12.0.0",
     "buffer-crc32": "^1.0.0",
-    "tar": "^7.5.22"
+    "node-notifier": "^10.0.1",
+    "tar": "^7.5.22",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15",
@@ -65,7 +65,6 @@
     "electron": "30.0.1",
     "electron-builder": "^26.15.3",
     "electron-debug": "^4.1.0",
-    "node-notifier": "^10.0.1",
     "typescript": "^5.7.3"
   }
 }
