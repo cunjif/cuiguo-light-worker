@@ -76,7 +76,11 @@ RUN ELECTRON_VERSION=$(node -p "require('/app/node_modules/electron/package.json
        /root/.cache/electron/${GH_HASH}/${ELECTRON_ZIP} && \
     HEADERS_DIR=/root/.electron-gyp/${ELECTRON_VERSION} && \
     mkdir -p ${HEADERS_DIR} && \
-    curl -fsSL "https://registry.npmmirror.com/-/binary/electron/v${ELECTRON_VERSION}/node-v${ELECTRON_VERSION}-headers.tar.gz" \
+    HEADERS_FILE="node-v${ELECTRON_VERSION}-headers.tar.gz" && \
+    (curl -fsSL --connect-timeout 15 --max-time 120 "https://registry.npmmirror.com/-/binary/electron/v${ELECTRON_VERSION}/${HEADERS_FILE}" || \
+     (echo "npmmirror headers 404, falling back to electronjs.org..." && \
+      curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 30 --max-time 300 \
+        "https://electronjs.org/headers/v${ELECTRON_VERSION}/${HEADERS_FILE}")) \
       | tar -xz -C ${HEADERS_DIR} --strip-components=1 && \
     cp ${HEADERS_DIR}/include/node/common.gypi ${HEADERS_DIR}/common.gypi && \
     cp ${HEADERS_DIR}/include/node/config.gypi ${HEADERS_DIR}/config.gypi && \
@@ -109,15 +113,18 @@ RUN cd /app/src/mcp-builtin/mcp-control && npm install --ignore-scripts && echo 
 #    pack:mcp 会: 创建 symlink -> npm run build -> npm pack, 以及下载 @modelcontextprotocol/server-filesystem 和 bazi-mcp
 RUN npm run pack:mcp || echo "WARN: pack:mcp partial failure, pre-built tgz may still be available."
 
-# 10. 预下载 electron-builder 所需二进制 (fpm/app-builder 等) 到缓存
-#     先 tsc 构建, 再用 electron-builder 完整打包 deb 预热缓存 (会下载 fpm 等工具到 ELECTRON_BUILDER_CACHE)
-#     QEMU 下较慢, 用 timeout 限制 15 分钟, 允许失败 (缓存部分预热即可)
-RUN npm run build 2>/dev/null ; \
-    timeout 900 npx electron-builder --linux deb 2>/dev/null || \
-    echo "WARN: electron-builder deb packaging partial failure, cache may be partially populated." ; \
+# 10. 预下载 electron-builder 所需的 fpm 到缓存 (仅 deb 打包需要)
+#     electron-builder 26.x 通过 getFpmPath() 下载 fpm@2.1.4 预编译包 (自带 ruby 运行时, 无需系统 ruby)
+#     arm64 对应资产: fpm-1.17.0-ruby-3.4.3-linux-arm64v8.7z (~8MB), 缓存到 /root/.cache/electron-builder/fpm@2.1.4/
+#     先 tsc 构建, 再跑 electron-builder --linux deb 触发 fpm 下载并完整打出 deb 验证流程
+#     注意: 不吞 stderr, 让真实错误暴露; QEMU 下较慢用 timeout 限制 20 分钟, 允许失败 (fpm 已下载到缓存即可)
+RUN npm run build ; \
+    timeout 1200 npx electron-builder --linux deb || \
+    echo "WARN: electron-builder deb packaging did not complete, check logs above; fpm cache may still be populated." ; \
     ELECTRON_VERSION=$(node -p "require('/app/node_modules/electron/package.json').version") && \
     echo "electron-builder cache prepared for electron ${ELECTRON_VERSION}." ; \
-    ls -la /root/.cache/electron-builder/ 2>/dev/null || true
+    echo "=== fpm cache contents ===" ; \
+    ls -laR /root/.cache/electron-builder/ 2>/dev/null || true
 
 # 11. 下载 Electron 运行时所需的 GTK 系统库 .deb (离线机器无法 apt-get install)
 RUN mkdir -p /debs && \
