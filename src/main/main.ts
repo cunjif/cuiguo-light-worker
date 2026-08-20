@@ -214,47 +214,7 @@ async function createWindow() {
     }
   });
 
-  // 创建应用菜单
-  const menu = Menu.buildFromTemplate([
-    {
-      label: '应用',
-      submenu: [
-        // {
-        //   label: '插件管理',
-        //   click: () => {
-        //     createRegistryWindow();
-        //   }
-        // },
-        // { type: 'separator' },
-        {
-          label: '退出',
-          click: () => {
-            console.log('应用即将退出，正在停止内部npm仓库...');
-            npmRegistry.shutdown().then(() => {
-              console.log('✓ 内部npm仓库已停止');
-              app.quit();
-            });
-          }
-        }
-      ]
-    },
-    // {
-    //   label: '视图',
-    //   submenu: [
-    //     { role: 'reload' },
-    //     { role: 'forceReload' },
-    //     { role: 'toggleDevTools' },
-    //     { type: 'separator' },
-    //     { role: 'resetZoom' },
-    //     { role: 'zoomIn' },
-    //     { role: 'zoomOut' },
-    //     { type: 'separator' },
-    //     { role: 'togglefullscreen' }
-    //   ]
-    // }
-  ]);
-
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(null);
 
   // You can uncomment the following line to enable DevTools permanently.
   // mainWindow.webContents.openDevTools();
