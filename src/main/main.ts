@@ -469,7 +469,7 @@ async function bootstrapSpecificClients(serverNames: string[]) {
 
 app.whenReady().then(async () => {
 
-  // 启动内部npm仓库
+  // 启动内部npm仓库（仅用于动态安装/卸载外部 MCP，与内置 MCP 加载无关）
   console.log('正在启动内部npm仓库...');
   const registryInitialized = await npmRegistry.initialize(4873);
   if (registryInitialized) {
@@ -479,20 +479,6 @@ app.whenReady().then(async () => {
       title: '插件管理已启动',
       message: '私有 npm 仓库运行在 http://localhost:4873'
     });
-    
-    // 初始化内置 MCP servers（首次启动时）
-    console.log('正在初始化内置 MCP servers...');
-    const mcpInitSuccess = await initializeMcpServers(configPath);
-    if (mcpInitSuccess) {
-      console.log('✓ 内置 MCP servers 初始化成功');
-      notifier.notify({
-        appID: 'CUIGUO',
-        title: 'MCP Servers 已就绪',
-        message: '内置 MCP servers 已开箱即用'
-      });
-    } else {
-      console.warn('⚠ 内置 MCP servers 初始化失败，将使用 config.json 中的配置');
-    }
   } else {
     console.error('✗ 内部npm仓库启动失败');
     notifier.notify({
@@ -500,6 +486,20 @@ app.whenReady().then(async () => {
       title: '内部npm仓库启动失败',
       message: '私有 npm 仓库无法启动'
     });
+  }
+
+  // 初始化内置 MCP servers（offline self-contained，不依赖 npm registry）
+  console.log('正在初始化内置 MCP servers...');
+  const mcpInitSuccess = await initializeMcpServers(configPath);
+  if (mcpInitSuccess) {
+    console.log('✓ 内置 MCP servers 初始化成功');
+    notifier.notify({
+      appID: 'CUIGUO',
+      title: 'MCP Servers 已就绪',
+      message: '内置 MCP servers 已开箱即用'
+    });
+  } else {
+    console.warn('⚠ 内置 MCP servers 初始化失败，将使用 config.json 中的配置');
   }
 
   createWindow();

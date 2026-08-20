@@ -13,9 +13,13 @@ import * as path from 'node:path';
 import { app } from 'electron';
 import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 
 const execAsync = promisify(exec);
+
+// ESM 下 __dirname 不是全局变量，需手动构造
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Built-in MCP server definitions
 interface BuiltinMcpServer {
@@ -223,8 +227,12 @@ function generateConfig(servers: BuiltinMcpServer[] = BUILTIN_SERVERS): Record<s
         entry,
         ...(server.args || []),
       ],
+      // 必须继承系统环境变量（PATH/SystemRoot/TEMP 等），否则 Windows 下子进程 Node 会崩溃；
+      // ELECTRON_RUN_AS_NODE=1 让 electron.exe 以 Node.js 模式运行 js 入口而非启动 Electron 窗口
       env: {
+        ...process.env,
         NODE_ENV: 'production',
+        ELECTRON_RUN_AS_NODE: '1',
       },
     };
   }
@@ -261,12 +269,9 @@ export async function initializeMcpServers(
   registryUrl: string = 'http://localhost:4873'
 ): Promise<boolean> {
   try {
-    // Check if already initialized
-    if (isInitialized()) {
-      console.log('MCP servers already initialized, skipping');
-      return true;
-    }
-
+    // 注意：不使用 .initialized 标记跳过。build 脚本每次会用 src/main/config.json
+    // 覆盖 dist/main/config.json，若此处跳过则内置配置丢失后永不恢复。
+    // 下面的合并逻辑本身幂等（先剔除同名内置项再写入），每次执行安全。
     console.log('Initializing built-in MCP servers (offline self-contained mode)...');
 
     const enabledServers = BUILTIN_SERVERS.filter(s => s.enabled);
