@@ -448,7 +448,7 @@ export class PdfConverter {
         }
         else {
             try {
-                pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+                pdfjsLib = await import('../../pdfjs-dist/legacy/build/pdf.mjs');
             }
             catch (err) {
                 throw new MissingDependencyError('pdfjs-dist', 'pnpm add pdfjs-dist, or pass nodeServices.pdfjsLib to MarkItDown for bundled/serverless environments. Underlying resolution error: '
@@ -467,7 +467,7 @@ export class PdfConverter {
             }
             else {
                 try {
-                    const workerModule = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+                    const workerModule = await import('../../pdfjs-dist/legacy/build/pdf.worker.mjs');
                     globalThis.pdfjsWorker = workerModule;
                 }
                 catch {
@@ -487,7 +487,7 @@ export class PdfConverter {
                 let pdfjsBuildDir;
                 try {
                     const { fileURLToPath } = await import('url');
-                    pdfjsBuildDir = dirname(fileURLToPath(import.meta.resolve('pdfjs-dist/legacy/build/pdf.mjs')));
+                    pdfjsBuildDir = dirname(fileURLToPath(import.meta.resolve('../../pdfjs-dist/legacy/build/pdf.mjs')));
                 }
                 catch {
                     const { createRequire } = await import('module');
@@ -498,7 +498,7 @@ export class PdfConverter {
                             : undefined;
                     if (anchor) {
                         const req = createRequire(anchor);
-                        pdfjsBuildDir = dirname(req.resolve('pdfjs-dist/legacy/build/pdf.mjs'));
+                        pdfjsBuildDir = dirname(req.resolve('../../pdfjs-dist/legacy/build/pdf.mjs'));
                     }
                 }
                 if (pdfjsBuildDir) {
@@ -506,7 +506,7 @@ export class PdfConverter {
                 }
             }
             catch {
-                // Font path resolution failed �?PDFs with standard fonts may show warnings
+                // Font path resolution failed — PDFs with standard fonts may show warnings
             }
         }
         const buffer = await input.buffer();

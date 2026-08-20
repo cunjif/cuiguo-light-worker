@@ -1,0 +1,8 @@
+{
+  "name": "bazi-server",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "bazi-mcp": "^0.1.0"
+  }
+}

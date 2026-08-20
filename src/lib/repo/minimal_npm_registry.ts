@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import * as http from 'node:http';
 import * as compressing from '../../vendor/compressing/index.js';
 
+const PUBLIC_REGISTRY = process.env.MCP_PUBLIC_REGISTRY || 'https://registry.npmmirror.com';
+
 /**
  * 最小可用的npm仓库服务
  */
@@ -384,7 +386,7 @@ class MinimalNpmRegistryServer {
     /**
      * 处理包信息请求
      */
-    private handlePackageInfo(req: http.IncomingMessage, res: http.ServerResponse): void {
+    private async handlePackageInfo(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
         const packageName = req.url?.substring(1) || '';
 
         if (!packageName) {
@@ -396,6 +398,19 @@ class MinimalNpmRegistryServer {
         const versionMap = this.packages.get(packageName);
 
         if (!versionMap || versionMap.size === 0) {
+            try {
+                const upstreamUrl = `${PUBLIC_REGISTRY}/${packageName}`;
+                const upstream = await fetch(upstreamUrl);
+                if (upstream.ok) {
+                    const text = await upstream.text();
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(text);
+                    console.log(`本地无 ${packageName}，已代理到公共 registry`);
+                    return;
+                }
+            } catch (e) {
+                console.warn(`代理公共 registry 失败 (${packageName}):`, (e as Error).message);
+            }
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: '包不存在' }));
             return;

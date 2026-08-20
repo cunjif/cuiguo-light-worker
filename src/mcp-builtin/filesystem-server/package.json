@@ -1,0 +1,8 @@
+{
+  "name": "filesystem-server",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "^2026.7.10"
+  }
+}

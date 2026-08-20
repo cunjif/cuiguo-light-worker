@@ -1,5 +1,5 @@
 import { McpServer } from './vendor/mcp-sdk/dist/esm/server/mcp.js';
-import { z } from './vendor/mcp-sdk/node_modules/zod/v4/index.js';
+import { z } from 'zod';
 import { validateFilePath } from './file-validator.js';
 import { convertFile, inferFileType } from './converter.js';
 import * as logger from './logger.js';

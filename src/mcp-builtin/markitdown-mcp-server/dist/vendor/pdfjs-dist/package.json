@@ -1,0 +1,9 @@
+{
+  "name": "pdfjs-dist",
+  "version": "4.10.38",
+  "type": "module",
+  "main": "legacy/build/pdf.mjs",
+  "types": "legacy/build/pdf.d.mts",
+  "description": "Generic build of Mozilla's PDF.js library. (vendored)",
+  "license": "Apache-2.0"
+}

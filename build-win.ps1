@@ -38,7 +38,7 @@ $task = if ($WithMcp) { "build:with-mcp" } else { "build-app" }
 Write-Host "执行: npm run $task" -ForegroundColor Green
 
 # npm 的日志走 stderr, 不能用 ErrorActionPreference=Stop, 改用退出码判断
-& npm run $task
+& npm run $task --verbose
 $code = $LASTEXITCODE
 if ($code -ne 0) {
     Write-Host "------------------------------------------------------------" -ForegroundColor Red

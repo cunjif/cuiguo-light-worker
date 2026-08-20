@@ -21,42 +21,56 @@ const execAsync = promisify(exec);
 interface BuiltinMcpServer {
   name: string;
   package: string;
+  dir: string;
+  entry: string;
   version?: string;
   args?: string[];
   enabled: boolean;
 }
 
-// Default built-in servers
+// Default built-in servers (offline self-contained)
+// dir: 相对 resources/mcp-builtin 的子目录；entry: 相对 dir 的入口文件
 const BUILTIN_SERVERS: BuiltinMcpServer[] = [
   {
-    name: 'playwright',
-    package: 'playwright-mcp',
+    name: 'markitdown',
+    package: 'markitdown-mcp-server',
+    dir: 'markitdown-mcp-server',
+    entry: 'dist/index.js',
     args: [],
     enabled: true,
   },
   {
     name: 'filesystem',
     package: '@modelcontextprotocol/server-filesystem',
+    dir: 'filesystem-server',
+    entry: 'node_modules/@modelcontextprotocol/server-filesystem/dist/index.js',
     args: ['./', 'C:\\', '/', '*/**'],
     enabled: true,
   },
   {
     name: 'aigroup-mdtoword-mcp',
     package: 'aigroup-mdtoword-mcp',
+    dir: 'aigroup-mdtoword-mcp',
+    entry: 'dist/index.js',
     args: [],
     enabled: true,
   },
   {
     name: 'Bazi',
     package: 'bazi-mcp',
+    dir: 'bazi-server',
+    entry: 'node_modules/bazi-mcp/dist/index.js',
     args: [],
     enabled: true,
   },
   {
-    name: 'markitdown',
-    package: 'markitdown-mcp-server',
+    // playwright 需要浏览器二进制，离线打包后续单独处理
+    name: 'playwright',
+    package: 'playwright-mcp',
+    dir: 'playwright-mcp',
+    entry: 'dist/server.js',
     args: [],
-    enabled: true,
+    enabled: false,
   },
 ];
 
@@ -64,6 +78,14 @@ const BUILTIN_SERVERS: BuiltinMcpServer[] = [
 function getMcpServersDir(): string {
   const userDataPath = app.getPath('userData');
   return path.join(userDataPath, 'mcp-servers');
+}
+
+// Get the built-in servers directory (self-contained, offline)
+function getBuiltinServersDir(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'mcp-builtin');
+  }
+  return path.join(__dirname, '..', '..', 'src', 'mcp-builtin');
 }
 
 // Get the built-in packages directory
@@ -194,21 +216,20 @@ async function installMcpServers(
   return installedServers;
 }
 
-// Generate config.json with local paths
+// Generate config.json pointing at self-contained server directories
 function generateConfig(servers: BuiltinMcpServer[] = BUILTIN_SERVERS): Record<string, any> {
-  const mcpDir = getMcpServersDir();
-  const npmPath = getNpmPath();
-  
+  const serversDir = getBuiltinServersDir();
+
   const mcpServers: Record<string, any> = {};
-  
+
   for (const server of servers) {
     if (!server.enabled) continue;
-    
-    // Use node to run the installed MCP server
+
+    const entry = path.join(serversDir, server.dir, server.entry);
     mcpServers[server.name] = {
       command: process.execPath, // Use Electron's bundled Node.js
       args: [
-        path.join(mcpDir, 'node_modules', server.package),
+        entry,
         ...(server.args || []),
       ],
       env: {
@@ -216,7 +237,7 @@ function generateConfig(servers: BuiltinMcpServer[] = BUILTIN_SERVERS): Record<s
       },
     };
   }
-  
+
   return { mcpServers };
 }
 
@@ -243,7 +264,7 @@ function readConfig(configPath: string): Record<string, any> | null {
   }
 }
 
-// Main initialization function
+// Main initialization function (offline self-contained mode)
 export async function initializeMcpServers(
   configPath: string,
   registryUrl: string = 'http://localhost:4873'
@@ -254,36 +275,35 @@ export async function initializeMcpServers(
       console.log('MCP servers already initialized, skipping');
       return true;
     }
-    
-    console.log('Initializing built-in MCP servers...');
-    
-    // Step 1: Publish built-in packages to internal registry
-    const publishedCount = await publishBuiltinToRegistry(registryUrl);
-    
-    // If no pre-packaged bundles were published, skip installation from the
-    // internal registry (it would only produce 404 errors). Fall back to the
-    // existing config.json which uses npx against the public registry.
-    if (publishedCount === 0) {
-      console.log('No pre-packaged MCP servers found, using config.json as-is');
-      markInitialized();
-      return true;
+
+    console.log('Initializing built-in MCP servers (offline self-contained mode)...');
+
+    const enabledServers = BUILTIN_SERVERS.filter(s => s.enabled);
+    const serversDir = getBuiltinServersDir();
+
+    // 验证各 server 入口存在
+    let allOk = true;
+    for (const s of enabledServers) {
+      const entry = path.join(serversDir, s.dir, s.entry);
+      if (fs.existsSync(entry)) {
+        console.log(`✓ ${s.name}: ${entry}`);
+      } else {
+        console.error(`✗ ${s.name}: entry not found at ${entry}`);
+        allOk = false;
+      }
     }
-    
-    // Step 2: Install MCP servers to user data directory
-    const installedServers = await installMcpServers(registryUrl);
-    if (installedServers.length === 0) {
-      console.error('Failed to install any MCP servers');
+
+    if (!allOk) {
+      console.error('Some built-in servers are missing, aborting init');
       return false;
     }
-    
-    // Step 3: Generate and save config (only for successfully installed servers)
-    const config = generateConfig(installedServers);
+
+    // 生成 config.json 指向自包含目录，不联网、不 npm install
+    const config = generateConfig(enabledServers);
     saveConfig(configPath, config);
-    
-    // Step 4: Mark as initialized
     markInitialized();
-    
-    console.log('MCP servers initialized successfully');
+
+    console.log('MCP servers initialized successfully (offline)');
     return true;
   } catch (error) {
     console.error('Failed to initialize MCP servers:', error);

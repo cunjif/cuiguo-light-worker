@@ -1,196 +1,94 @@
 #!/usr/bin/env node
 /**
- * Pack MCP Servers
- * 
- * This script downloads and packs MCP server packages into .tgz files
- * for bundling with the Electron app.
- * 
+ * Pack MCP Servers (offline self-contained mode)
+ *
+ * 为每个 MCP server 在其目录下 npm install 完整依赖树，
+ * 产物（server 代码 + node_modules）由 electron-builder 的 extraFiles
+ * 打进 resources/mcp-builtin，运行时直接指向，不联网、不 npm install。
+ *
  * Usage: node scripts/pack-mcp-servers.js
  */
 
-import { exec, execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
-// MCP servers to bundle (from npm registry)
-const MCP_SERVERS = [
-  '@modelcontextprotocol/server-filesystem@latest',
-  'bazi-mcp@latest',
-];
-
-// Local MCP servers to bundle (from local source directories)
+// 本地 server（源码在 src/mcp-builtin/<dir>）
+// build=true 的需要先 tsc/copyfiles，build=false 的 dist 已 pre-built
 const LOCAL_MCP_SERVERS = [
-  { name: 'markitdown-mcp-server', dir: 'src/mcp-builtin/markitdown-mcp-server' },
-  { name: 'aigroup-mdtoword-mcp', dir: 'src/mcp-builtin/aigroup-mdtoword-mcp' },
-  { name: 'playwright-mcp', dir: 'src/mcp-builtin/playwright-mcp' },
-  { name: 'mcp-control', dir: 'src/mcp-builtin/mcp-control' },
+  { name: 'markitdown-mcp-server', dir: 'src/mcp-builtin/markitdown-mcp-server', build: true },
+  { name: 'aigroup-mdtoword-mcp', dir: 'src/mcp-builtin/aigroup-mdtoword-mcp', build: false },
 ];
 
-// Additional dependencies to pack from the main project's node_modules
-// (for packages not available on the public npm registry)
-const EXTRA_PACKAGES_TO_PACK = [];
+// npm registry 上的 server，install 到独立自包含目录
+const NPM_MCP_SERVERS = [
+  { name: 'filesystem-server', pkg: '@modelcontextprotocol/server-filesystem@latest', dir: 'src/mcp-builtin/filesystem-server' },
+  { name: 'bazi-server', pkg: 'bazi-mcp@latest', dir: 'src/mcp-builtin/bazi-server' },
+];
 
-// Output directory
-const OUTPUT_DIR = path.join(process.cwd(), 'src', 'mcp-builtin', 'packages');
-
-async function packLocalServers() {
-  const projectNodeModules = path.join(process.cwd(), 'node_modules');
-
-  for (const local of LOCAL_MCP_SERVERS) {
-    const localDir = path.join(process.cwd(), local.dir);
-    if (!fs.existsSync(localDir)) {
-      console.warn(`Local package directory not found: ${local.dir}, skipping`);
+async function prepareLocalServers() {
+  for (const s of LOCAL_MCP_SERVERS) {
+    const dir = path.join(process.cwd(), s.dir);
+    if (!fs.existsSync(dir)) {
+      console.warn(`Local server directory not found: ${s.dir}, skipping`);
       continue;
     }
 
-    const localNodeModules = path.join(localDir, 'node_modules');
-    let createdSymlink = false;
+    console.log(`\n=== ${s.name} ===`);
+    console.log(`Installing dependencies (build machine online)...`);
+    await execAsync('npm install --ignore-scripts', { cwd: dir });
 
-    if (!fs.existsSync(localNodeModules) && fs.existsSync(projectNodeModules)) {
-      try {
-        fs.symlinkSync(projectNodeModules, localNodeModules, 'junction');
-        createdSymlink = true;
-        console.log(`Linked node_modules for ${local.name}`);
-      } catch (error) {
-        console.warn(`Failed to link node_modules for ${local.name}:`, error.message);
-        continue;
-      }
+    if (s.build) {
+      console.log(`Building ${s.name}...`);
+      await execAsync('npm run build', { cwd: dir });
+      console.log(`✓ Built ${s.name}`);
     }
 
-    try {
-      console.log(`Building local package: ${local.name}...`);
-      await execAsync('npm run build', { cwd: localDir });
-      console.log(`✓ Built ${local.name}`);
-    } catch (error) {
-      console.error(`Failed to build ${local.name}:`, error.message);
-      if (createdSymlink) {
-        try { fs.unlinkSync(localNodeModules); } catch {}
-      }
-      continue;
-    }
+    console.log(`Pruning devDependencies (keep runtime deps only)...`);
+    await execAsync('npm prune --production', { cwd: dir });
 
-    try {
-      console.log(`Packing local package: ${local.name}...`);
-      const { stdout } = await execAsync(`npm pack "${localDir}" --ignore-scripts`, { cwd: OUTPUT_DIR });
-      const packedFile = stdout.trim();
-      console.log(`✓ Packed: ${packedFile}`);
-    } catch (error) {
-      console.error(`Failed to pack ${local.name}:`, error.message);
-    }
-
-    if (createdSymlink) {
-      try { fs.unlinkSync(localNodeModules); } catch {}
-    }
+    const nmDir = path.join(dir, 'node_modules');
+    const hasDeps = fs.existsSync(nmDir);
+    console.log(`✓ ${s.name} self-contained${hasDeps ? '' : ' (no runtime deps)'}`);
   }
 }
 
-async function packExtraDependencies() {
-  const projectNodeModules = path.join(process.cwd(), 'node_modules');
+async function prepareNpmServers() {
+  for (const s of NPM_MCP_SERVERS) {
+    const dir = path.join(process.cwd(), s.dir);
+    fs.mkdirSync(dir, { recursive: true });
 
-  for (const pkg of EXTRA_PACKAGES_TO_PACK) {
-    const pkgDir = path.join(projectNodeModules, pkg);
-    if (!fs.existsSync(pkgDir)) {
-      console.warn(`Extra dependency not found in node_modules: ${pkg}, skipping`);
-      continue;
+    const pkgJsonPath = path.join(dir, 'package.json');
+    if (!fs.existsSync(pkgJsonPath)) {
+      fs.writeFileSync(pkgJsonPath, JSON.stringify({
+        name: s.name,
+        version: '1.0.0',
+        private: true,
+      }, null, 2));
     }
 
-    try {
-      console.log(`Packing extra dependency: ${pkg}...`);
-      const { stdout } = await execAsync(`npm pack "${pkgDir}"`, { cwd: OUTPUT_DIR });
-      const packedFile = stdout.trim();
-      console.log(`✓ Packed: ${packedFile}`);
-    } catch (error) {
-      console.error(`Failed to pack ${pkg}:`, error.message);
-    }
+    console.log(`\n=== ${s.name} ===`);
+    console.log(`Installing ${s.pkg}...`);
+    await execAsync(`npm install ${s.pkg} --ignore-scripts`, { cwd: dir });
+    console.log(`✓ ${s.name} self-contained`);
   }
 }
 
 async function main() {
-  console.log('Packing MCP servers...');
-  console.log(`Output directory: ${OUTPUT_DIR}`);
-  
-  // Create output directory
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
-  
-  // Pack local MCP servers first
-  await packLocalServers();
+  console.log('Preparing self-contained MCP servers (offline-ready)...');
+  console.log(`Project: ${process.cwd()}`);
 
-  // Pack extra dependencies from main project's node_modules
-  await packExtraDependencies();
+  await prepareLocalServers();
+  await prepareNpmServers();
 
-  // Create a temporary directory for packing npm packages
-  const tempDir = path.join(process.cwd(), 'temp-mcp-pack');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-  }
-  
-  // Create package.json for the temp directory
-  const packageJson = {
-    name: 'temp-mcp-pack',
-    version: '1.0.0',
-    private: true,
-    dependencies: {},
-  };
-  
-  for (const server of MCP_SERVERS) {
-    const atIndex = server.indexOf('@', server.startsWith('@') ? 1 : 0);
-    const name = atIndex > 0 ? server.substring(0, atIndex) : server;
-    const version = atIndex > 0 ? server.substring(atIndex + 1) : 'latest';
-    packageJson.dependencies[name] = version;
-  }
-  
-  fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
-  
-  // Install dependencies
-  console.log('Installing MCP server packages...');
-  try {
-    await execAsync('npm install --ignore-scripts', { cwd: tempDir });
-    console.log('✓ Packages installed');
-  } catch (error) {
-    console.error('Failed to install packages:', error.message);
-    process.exit(1);
-  }
-  
-  // Pack each package
-  console.log('Packing packages...');
-  const nodeModulesDir = path.join(tempDir, 'node_modules');
-  
-  for (const server of MCP_SERVERS) {
-    const atIndex = server.indexOf('@', server.startsWith('@') ? 1 : 0);
-    const packageName = atIndex > 0 ? server.substring(0, atIndex) : server;
-    const packageDir = path.join(nodeModulesDir, packageName);
-    
-    if (!fs.existsSync(packageDir)) {
-      console.warn(`Package not found: ${packageName}, skipping`);
-      continue;
-    }
-    
-    try {
-      console.log(`Packing ${packageName}...`);
-      const { stdout } = await execAsync(`npm pack "${packageDir}"`, { cwd: OUTPUT_DIR });
-      const packedFile = stdout.trim();
-      console.log(`✓ Packed: ${packedFile}`);
-    } catch (error) {
-      console.error(`Failed to pack ${packageName}:`, error.message);
-    }
-  }
-  
-  // Clean up temp directory
-  console.log('Cleaning up...');
-  try {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-    console.log('✓ Temp directory removed');
-  } catch (error) {
-    console.warn('Failed to remove temp directory:', error.message);
-  }
-  
-  console.log('\nDone! Packed files are in:', OUTPUT_DIR);
-  console.log('Files:', fs.readdirSync(OUTPUT_DIR));
+  console.log('\n============================================================');
+  console.log('Done. All servers are self-contained in src/mcp-builtin/.');
+  console.log('electron-builder extraFiles will bundle them into resources/mcp-builtin.');
+  console.log('Runtime uses them directly — no npm install, no network.');
+  console.log('============================================================');
 }
 
 main().catch((err) => {

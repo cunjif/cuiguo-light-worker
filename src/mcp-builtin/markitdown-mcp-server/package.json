@@ -11,5 +11,15 @@
     "build": "tsc && copyfiles -u 1 src/vendor/turndown/**/* src/vendor/domino/**/* src/vendor/papaparse/**/* src/vendor/mammoth/**/* src/vendor/cheerio/**/* src/vendor/jszip/**/* src/vendor/fast-xml-parser/**/* src/vendor/exceljs/**/* src/vendor/pdfjs-dist/**/* src/vendor/mcp-sdk/**/* dist",
     "prepack": "npm run build"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.25.3",
+    "zod": "^4.4.3",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "copyfiles": "^2.4.1",
+    "typescript": "^5.7.3"
+  },
+  "files": ["dist"]
 }
