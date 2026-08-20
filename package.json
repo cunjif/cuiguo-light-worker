@@ -11,7 +11,7 @@
   "type": "module",
   "scripts": {
     "start": "npm run build && electron ./dist/main/main.js",
-    "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts dist",
+    "build": "tsc && copyfiles -u 1 src/**/* -e src/**/*.ts -e src/mcp-builtin/**/* dist",
     "build-app": "npm run build && electron-builder",
     "pack:mcp": "node scripts/pack-mcp-servers.js",
     "build:with-mcp": "npm run pack:mcp && npm run build-app"
@@ -23,7 +23,8 @@
       "output": "artifacts"
     },
     "files": [
-      "**/*"
+      "**/*",
+      "!src/mcp-builtin/**/*"
     ],
     "extraFiles": [
       {

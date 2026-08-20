@@ -59,18 +59,9 @@ const BUILTIN_SERVERS: BuiltinMcpServer[] = [
     name: 'Bazi',
     package: 'bazi-mcp',
     dir: 'bazi-server',
-    entry: 'node_modules/bazi-mcp/dist/index.js',
+    entry: 'node_modules/bazi-mcp/dist/stdio.js',
     args: [],
     enabled: true,
-  },
-  {
-    // playwright 需要浏览器二进制，离线打包后续单独处理
-    name: 'playwright',
-    package: 'playwright-mcp',
-    dir: 'playwright-mcp',
-    entry: 'dist/server.js',
-    args: [],
-    enabled: false,
   },
 ];
 
@@ -298,9 +289,19 @@ export async function initializeMcpServers(
       return false;
     }
 
-    // 生成 config.json 指向自包含目录，不联网、不 npm install
-    const config = generateConfig(enabledServers);
-    saveConfig(configPath, config);
+    // 生成内置 server 配置，合并到现有 config（保留用户手动配的外部 server，如 playwright npx）
+    const builtinConfig = generateConfig(enabledServers);
+    const existingConfig = readConfig(configPath);
+    const existingServers = (existingConfig?.mcpServers) || {};
+    const builtinNames = new Set(enabledServers.map(s => s.name));
+    const mergedServers: Record<string, any> = {};
+    for (const [name, cfg] of Object.entries(existingServers)) {
+      if (!builtinNames.has(name)) {
+        mergedServers[name] = cfg;
+      }
+    }
+    Object.assign(mergedServers, builtinConfig.mcpServers);
+    saveConfig(configPath, { mcpServers: mergedServers });
     markInitialized();
 
     console.log('MCP servers initialized successfully (offline)');

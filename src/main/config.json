@@ -1,49 +1,5 @@
 {
   "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": [
-        "@playwright/mcp@latest"
-      ]
-    },
-    "filesystem": {
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "./",
-        "C:\\",
-        "/",
-        "*/**"
-      ],
-      "command": "npx"
-    },
-    "aigroup-mdtoword-mcp": {
-      "args": [
-        "-y",
-        "aigroup-mdtoword-mcp"
-      ],
-      "command": "npx"
-    },
-    "Bazi": {
-      "command": "npx",
-      "args": [
-        "bazi-mcp"
-      ]
-    },
-    "markitdown": {
-      "command": "node",
-      "args": [
-        "./mcp-builtin/markitdown-mcp-server/dist/index.js"
-      ]
-    },
-    "MCPControl": {
-      "command": "node",
-      "args": [
-        "./mcp-builtin/mcp-control/build/index.js",
-        "--sse"
-      ],
-      "platform": "win32"
-    },
     "LinuxControl": {
       "command": "node",
       "args": ["./mcp-builtin/linux-control/index.js"],
