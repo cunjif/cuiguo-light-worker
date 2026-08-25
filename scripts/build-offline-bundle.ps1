@@ -43,10 +43,10 @@ Write-Host "  OK: Docker $dockerVersion"
 
 # 2. 检查 arm64 QEMU 支持
 Write-Host "[2/5] 检查 QEMU arm64 支持..." -ForegroundColor Yellow
-$arm64Test = docker run --rm --platform linux/arm64 alpine:latest echo "arm64 OK" 2>&1
+$arm64Test = docker run --platform linux/arm64 alpine:latest echo "arm64 OK" 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  QEMU arm64 未注册, 尝试注册..."
-    docker run --rm --privileged tonistiigi/binfmt --install arm64
+    docker run --privileged tonistiigi/binfmt --install arm64
 }
 Write-Host "  OK: arm64 模拟可用。"
 Write-Host ""

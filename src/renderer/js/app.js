@@ -737,7 +737,7 @@ const DocProcessor = {
  */
 const MultimodalAdapter = {
     /** @type {string[]} 使用 OpenAI 格式的 Provider */
-    OPENAI_PROVIDERS: ['openai-compatible', 'glm', 'qwen', 'kimi', 'minimax', 'doubao-seed'],
+    OPENAI_PROVIDERS: ['openai-compatible', 'icbc-compatible', 'glm', 'qwen', 'kimi', 'minimax', 'doubao-seed'],
 
     /**
      * 构建多模态消息内容

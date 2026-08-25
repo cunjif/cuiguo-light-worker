@@ -10,7 +10,7 @@
  * 支持的 Provider 类型列表
  * @type {string[]}
  */
-const PROVIDER_TYPES = ['openai-compatible', 'anthropic-compatible', 'glm', 'qwen', 'kimi', 'minimax', 'doubao-seed'];
+const PROVIDER_TYPES = ['openai-compatible', 'icbc-compatible', 'anthropic-compatible', 'glm', 'qwen', 'kimi', 'minimax', 'doubao-seed'];
 
 /**
  * Provider 注册表，存储所有已注册的 Provider 配置
@@ -206,6 +206,27 @@ registerProvider({
         defaultModel: 'gpt-4o',
         authHeaderName: 'Authorization',
         authPrefix: 'Bearer '
+    },
+    capabilities: {
+        streamSupported: true,
+        toolCallSupported: true,
+        reasoningSupported: true,
+        seedSupported: false
+    },
+    requestTransformer: openaiRequestTransformer,
+    responseTransformer: openaiResponseTransformer,
+    errorTransformer: openaiErrorTransformer,
+});
+
+// 注册 ICBC Compatible
+registerProvider({
+    type: 'icbc-compatible',
+    connectionPreset: {
+        defaultUrl: 'https://api.openai.com',
+        defaultPath: '/v1/chat/completions',
+        defaultModel: 'gpt-4o',
+        authHeaderName: 'Authorization',
+        authPrefix: ''
     },
     capabilities: {
         streamSupported: true,
@@ -509,6 +530,7 @@ migrateAllConfigs();
  */
 const PROVIDER_DISPLAY_NAMES = {
     'openai-compatible': 'OpenAI',
+    'icbc-compatible': 'ICBC',
     'anthropic-compatible': 'Anthropic',
     'glm': 'GLM',
     'qwen': 'Qwen',
