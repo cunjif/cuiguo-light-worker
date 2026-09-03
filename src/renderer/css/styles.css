@@ -434,4 +434,178 @@
     border-radius: 6px;
 }
 
+/* ==========================================================================
+ * Workspace 工作目录功能样式
+ * ========================================================================== */
+
+.function-panel {
+    position: relative;
+}
+
+.function-panel.sidebar-right:not(.workspace-mode) {
+    padding-right: 48px;
+}
+
+.function-panel.sidebar-left:not(.workspace-mode) {
+    padding-left: 48px;
+}
+
+.function-panel.workspace-mode > :not(.workspace-sidebar):not(.workspace-explorer) {
+    display: none !important;
+}
+
+.workspace-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 36px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 2px;
+    background-color: rgba(var(--v-theme-surface-variant), 0.3);
+}
+
+.workspace-sidebar--right {
+    right: 0;
+    border-left: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.workspace-sidebar--left {
+    left: 0;
+    border-right: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.workspace-explorer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    overflow: hidden;
+}
+
+.function-panel.sidebar-left > .workspace-explorer {
+    left: 48px;
+    right: 0;
+}
+
+.function-panel.sidebar-right > .workspace-explorer {
+    left: 0;
+    right: 48px;
+}
+
+.workspace-explorer-header {
+    flex-shrink: 0;
+    font-weight: 500;
+}
+
+.workspace-explorer-path {
+    flex-shrink: 0;
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.workspace-explorer-tree {
+    min-height: 0;
+}
+
+.workspace-switching-overlay {
+    z-index: 10;
+}
+
+.file-editor-container {
+    width: 100vw;
+}
+
+.chat-panel-file-editor {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
+.pdf-page-canvas {
+    background: #fff;
+    max-width: 100%;
+}
+
+.docx-preview-wrapper .docx-wrapper {
+    background: #fff;
+    box-shadow: none;
+}
+
+.file-editor-preview table {
+    border-collapse: collapse;
+}
+
+.file-editor-preview table td {
+    border: 1px solid #ddd;
+    padding: 2px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.file-editor-header {
+    flex-shrink: 0;
+    background-color: rgba(var(--v-theme-surface-variant), 0.3);
+}
+
+.file-editor-body {
+    min-height: 0;
+    width: 100%;
+}
+
+.file-editor-preview {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.editor-tab-bar {
+    flex-shrink: 0;
+    height: 36px;
+    background-color: rgba(var(--v-theme-surface-variant), 0.3);
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+    user-select: none;
+}
+
+.editor-tab-bar-scroll {
+    height: 100%;
+    overflow: hidden;
+    cursor: grab;
+}
+
+.editor-tab-bar-scroll:active {
+    cursor: grabbing;
+}
+
+.editor-tab-bar-track {
+    height: 100%;
+    white-space: nowrap;
+    will-change: transform;
+}
+
+.editor-tab-item {
+    height: 100%;
+    border-right: 1px solid rgba(var(--v-theme-on-surface), 0.06);
+    cursor: pointer;
+    transition: background-color 0.15s;
+    flex-shrink: 0;
+}
+
+.editor-tab-item:hover {
+    background-color: rgba(var(--v-theme-primary), 0.08);
+}
+
+.editor-tab-item--active {
+    background-color: rgba(var(--v-theme-primary), 0.12);
+    border-bottom: 2px solid rgb(var(--v-theme-primary));
+}
+
+.editor-tab-item--dirty {
+    font-style: italic;
+}
 

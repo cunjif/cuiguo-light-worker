@@ -1,5 +1,5 @@
 // main.ts
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import {
   Client, McpServersConfig, HttpClient,
   ListToolsResultSchema, CallToolResultSchema,
@@ -12,6 +12,12 @@ import notifier from 'node-notifier';
 
 import { npmRegistry } from '../lib/repo/internal_repo.js';
 import * as skillEngine from './skills/engine.js';
+import * as workflowStore from './skills/workflow-store.js';
+import * as workflowRunner from './skills/workflow-runner.js';
+import * as workspaceStore from './workspaces/workspace-store.js';
+import { validatePath as validateWorkspacePath, getDefaultPath } from './workspaces/path-validator.js';
+import * as fileService from './workspaces/file-service.js';
+import * as gitService from './workspaces/git-service.js';
 import * as memoryStore from './self-evolution/memory-store.js';
 import { convertDocumentToMarkdown } from './document-converter.js';
 import { initializeMcpServers, getMcpServersDir, BUILTIN_SERVERS } from './mcp-manager.js';
@@ -826,6 +832,225 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Workflow management IPC handlers
+  ipcMain.handle('skills:workflow-list', () => {
+    return workflowStore.listWorkflows();
+  });
+
+  ipcMain.handle('skills:workflow-get', async (event, id: string) => {
+    return workflowStore.getWorkflow(id);
+  });
+
+  ipcMain.handle('skills:workflow-create', async (event, name: string, steps: any[]) => {
+    return workflowStore.createWorkflow(name, steps);
+  });
+
+  ipcMain.handle('skills:workflow-rename', async (event, id: string, name: string) => {
+    return workflowStore.renameWorkflow(id, name);
+  });
+
+  ipcMain.handle('skills:workflow-save', async (event, id: string, steps: any[]) => {
+    return workflowStore.saveWorkflow(id, steps);
+  });
+
+  ipcMain.handle('skills:workflow-delete', async (event, id: string) => {
+    return workflowStore.deleteWorkflow(id);
+  });
+
+  ipcMain.handle('skills:workflow-count-skill-refs', async (event, skillName: string) => {
+    return workflowStore.countWorkflowsReferencingSkill(skillName);
+  });
+
+  ipcMain.handle('skills:workflow-export', async (event, id: string) => {
+    return workflowStore.exportWorkflow(id);
+  });
+
+  ipcMain.handle('skills:workflow-import', async (event, payload: { name: string; steps: any[] }) => {
+    return workflowStore.importWorkflow(payload);
+  });
+
+  ipcMain.handle('skills:workflow-versions', async (event, workflowId: string) => {
+    return workflowStore.listVersions(workflowId);
+  });
+
+  ipcMain.handle('skills:workflow-rollback', async (event, workflowId: string, versionId: number) => {
+    return workflowStore.rollbackWorkflow(workflowId, versionId);
+  });
+
+  ipcMain.handle('skills:workflow-run', async (event, workflowId: string, currentInstalled: any[]) => {
+    return await workflowRunner.runWorkflow(workflowId, currentInstalled);
+  });
+
+  ipcMain.handle('skills:workflow-check-cycle', async (event, rootWorkflowId: string, refWorkflowId: string) => {
+    return workflowRunner.detectCycle(rootWorkflowId, refWorkflowId);
+  });
+
+  // Workspace management IPC handlers
+  ipcMain.handle('workspace:list', () => {
+    return workspaceStore.list();
+  });
+
+  ipcMain.handle('workspace:get-by-id', async (event, id: string) => {
+    return workspaceStore.getById(id);
+  });
+
+  ipcMain.handle('workspace:create', async (event, name: string, p: string) => {
+    return workspaceStore.create(name, p);
+  });
+
+  ipcMain.handle('workspace:rename', async (event, id: string, name: string) => {
+    return workspaceStore.rename(id, name);
+  });
+
+  ipcMain.handle('workspace:set-active', async (event, id: string) => {
+    return workspaceStore.setActive(id);
+  });
+
+  ipcMain.handle('workspace:get-active', async () => {
+    return workspaceStore.getActive();
+  });
+
+  ipcMain.handle('workspace:mark-invalid', async (event, id: string) => {
+    workspaceStore.markInvalid(id);
+    return { success: true };
+  });
+
+  ipcMain.handle('workspace:update-path', async (event, id: string, newPath: string) => {
+    return workspaceStore.updatePath(id, newPath);
+  });
+
+  ipcMain.handle('workspace:validate-path', async (event, p: string) => {
+    return validateWorkspacePath(p);
+  });
+
+  ipcMain.handle('workspace:get-default-path', async () => {
+    return getDefaultPath();
+  });
+
+  ipcMain.handle('workspace:choose-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindowRef!, {
+      properties: ['openDirectory']
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('workspace:validate-on-startup', async () => {
+    workspaceStore.validateAllOnStartup();
+    return { success: true };
+  });
+
+  // File service IPC handlers
+  ipcMain.handle('workspace:list-dir', async (event, dir: string) => {
+    try {
+      return { success: true, entries: fileService.listDir(dir) };
+    } catch (err: any) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('workspace:read-file', async (event, filePath: string) => {
+    return fileService.readFile(filePath);
+  });
+
+  ipcMain.handle('workspace:read-file-binary', async (event, filePath: string) => {
+    return fileService.readFileBinary(filePath);
+  });
+
+  ipcMain.handle('workspace:write-file', async (event, filePath: string, content: string) => {
+    return fileService.writeFile(filePath, content);
+  });
+
+  // Preview file (PDF/DOCX/PPTX/XLSX) by path → Markdown
+  ipcMain.handle('workspace:preview-file', async (event, filePath: string) => {
+    try {
+      const resolved = path.resolve(filePath);
+      const fileName = path.basename(resolved);
+      const data = fs.readFileSync(resolved);
+      const ext = path.extname(resolved).toLowerCase().replace('.', '');
+      const supported = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'html', 'htm', 'csv'];
+      if (!supported.includes(ext)) {
+        return { success: false, markdown: null, error: `Unsupported preview type: .${ext}` };
+      }
+      const result = await convertDocumentToMarkdown({
+        fileName,
+        data: new Uint8Array(data),
+      });
+      return result;
+    } catch (error: any) {
+      return { success: false, markdown: null, error: String(error) };
+    }
+  });
+
+  // Filesystem MCP rebuild IPC handler
+  ipcMain.handle('workspace:rebuild-filesystem', async (event, rootPath: string) => {
+    try {
+      const { rebuildFilesystemServer } = await import('./mcp-manager.js');
+      await rebuildFilesystemServer(rootPath);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // Await drain (wait for in-flight LLM/MCP calls to complete)
+  ipcMain.handle('workspace:await-drain', async () => {
+    return { success: true };
+  });
+
+  // Git service IPC handlers
+  ipcMain.handle('workspace:git-check', async (event, dir: string) => {
+    try {
+      return await gitService.gitCheck(dir);
+    } catch (err: any) {
+      return { installed: false, hasRepo: false };
+    }
+  });
+
+  ipcMain.handle('workspace:git-status', async (event, dir: string) => {
+    try {
+      const entries = await gitService.gitStatus(dir);
+      return { success: true, entries };
+    } catch (err: any) {
+      return { success: false, error: String(err), entries: [] };
+    }
+  });
+
+  ipcMain.handle('workspace:git-stage', async (event, dir: string, files: string[]) => {
+    try {
+      await gitService.gitStage(dir, files);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('workspace:git-unstage', async (event, dir: string, files: string[]) => {
+    try {
+      await gitService.gitUnstage(dir, files);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('workspace:git-commit', async (event, dir: string, message: string) => {
+    try {
+      const output = await gitService.gitCommit(dir, message);
+      return { success: true, output };
+    } catch (err: any) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('workspace:git-diff', async (event, dir: string, file?: string) => {
+    try {
+      const diff = await gitService.gitDiff(dir, file);
+      return { success: true, diff };
+    } catch (err: any) {
+      return { success: false, error: String(err), diff: '' };
+    }
+  });
+
   // MCP Server management IPC handlers
   ipcMain.handle('mcp:list-installed', async () => {
     const { listInstalledMcpServers } = await import('./mcp-manager.js');
@@ -969,4 +1194,8 @@ app.on('before-quit', async () => {
   // 关闭自进化数据库
   memoryStore.closeDb();
   console.log('✓ 自进化数据库已关闭');
+
+  // 关闭工作流数据库
+  workflowStore.closeWorkflowDb();
+  console.log('✓ 工作流数据库已关闭');
 });

@@ -42,18 +42,23 @@
          ====================================================================== -->
     <div id="app" v-cloak>
         <v-app>
+            <init-workspace-dialog v-model="showInitWorkspaceDialog"></init-workspace-dialog>
             <v-container fluid class="main-layout pa-0">
                 <v-row no-gutters class="main-row">
                     <v-col :cols="settingStore.leftColValue"
                         :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
-                            <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
+                            <div v-if="settingStore.functionTab === 'workspace'" class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
+                                <editor-tab-bar></editor-tab-bar>
+                                <file-editor class="flex-grow-1"></file-editor>
+                            </div>
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie" class="text-center text-h5"
                                     data-component-id="chat-mcp.chat.loading-animation">
                                     {{$t('$vuetify.dataIterator.title')}}
                                 </div>
                             </v-container>
-                            <v-container v-show="messageStore.conversation.length > 0" class="chat-bot">
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length > 0" class="chat-bot">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
@@ -70,7 +75,9 @@
                             </v-container>
                         </template>
                         <template v-else>
-                            <div class="function-panel">
+                            <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-left': settingStore.activePanel !== 'chat', 'sidebar-right': settingStore.activePanel === 'chat' }">
+                                <workspace-sidebar></workspace-sidebar>
+                                <workspace-explorer v-if="settingStore.functionTab === 'workspace'" @file-select="onFileSelect"></workspace-explorer>
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
                                     :class="{ 'drag-over-panel': isDragging }">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
@@ -180,7 +187,7 @@
                                         {{ $t('$vuetify.dataIterator.mcp.title') }}
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
-                                        @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills();"
+                                        @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills(); skillStore.loadWorkflows();"
                                         prepend-icon="mdi-auto-fix"
                                         v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
                                         data-component-id="chat-mcp.chat.skill-button-nav">
@@ -264,7 +271,7 @@
                     <v-col :cols="settingStore.rightColValue"
                         :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
-                            <div class="function-panel">
+                            <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-right': settingStore.activePanel === 'chat', 'sidebar-left': settingStore.activePanel !== 'chat' }">
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
                                     :class="{ 'drag-over-panel': isDragging }">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
@@ -374,7 +381,7 @@
                                         {{ $t('$vuetify.dataIterator.mcp.title') }}
                                     </v-btn>
                                     <v-btn size="small" variant="tonal"
-                                        @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills();"
+                                        @click="settingStore.skillDialog = true; settingStore.skillTab = 'registry'; skillStore.loadRegistrySkills(); skillStore.loadWorkflows();"
                                         prepend-icon="mdi-auto-fix"
                                         v-tooltip:bottom="$t('$vuetify.dataIterator.skill.title')"
                                         data-component-id="chat-mcp.chat.skill-button-nav">
@@ -452,16 +459,22 @@
                                         </div>
                                     </div>
                                 </div>
+                                <workspace-explorer v-if="settingStore.functionTab === 'workspace'" @file-select="onFileSelect"></workspace-explorer>
+                                <workspace-sidebar></workspace-sidebar>
                             </div>
                         </template>
                         <template v-else>
-                            <v-container v-show="messageStore.conversation.length === 0" class="fill-height">
+                            <div v-if="settingStore.functionTab === 'workspace'" class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
+                                <editor-tab-bar></editor-tab-bar>
+                                <file-editor class="flex-grow-1"></file-editor>
+                            </div>
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie-alt" class="text-center text-h5"
                                     data-component-id="chat-mcp.chat.loading-animation-alt">
                                     {{$t('$vuetify.dataIterator.title')}}
                                 </div>
                             </v-container>
-                            <v-container v-show="messageStore.conversation.length > 0" class="chat-bot-alt">
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length > 0" class="chat-bot-alt">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
@@ -479,6 +492,11 @@
                     </v-col>
                 </v-row>
             </v-container>
+
+            <!-- ================================================================
+                 Editor Confirm Dialog
+                 ================================================================ -->
+            <editor-confirm-dialog></editor-confirm-dialog>
 
             <!-- ================================================================
                  Snackbar 消息提示
@@ -1548,64 +1566,120 @@
                                         type="info" variant="tonal" class="mb-4">
                                         {{ $t('$vuetify.dataIterator.skill.noEnabledForWorkflow') }}
                                     </v-alert>
-                                    <div v-else>
-                                        <div class="d-flex align-center justify-space-between mb-3">
-                                            <span class="text-subtitle-2 font-weight-bold">{{
-                                                $t('$vuetify.dataIterator.skill.workflowSteps') }}</span>
-                                            <div class="d-flex ga-2">
-                                                <v-btn size="small" variant="outlined"
-                                                    @click="skillStore.workflowSteps = []">
-                                                    <v-icon start>mdi-delete-sweep</v-icon>{{
-                                                    $t('$vuetify.dataIterator.skill.clearWorkflow') }}
-                                                </v-btn>
+                                    <div v-else class="d-flex ga-3" style="min-height: 400px;">
+                                        <!-- 左侧：方案列表 -->
+                                        <div class="flex-1-1-33" style="min-width: 200px;">
+                                            <div class="d-flex align-center justify-space-between mb-2">
+                                                <span class="text-subtitle-2 font-weight-bold">编排方案</span>
+                                                <v-btn size="x-small" variant="flat" color="primary" icon="mdi-plus"
+                                                    @click="skillStore.newWorkflowName = ''; skillStore.showCreateDialog = true"></v-btn>
+                                            </div>
+                                            <v-list class="bg-transparent" v-if="skillStore.workflows.length > 0">
+                                                <v-list-item v-for="wf in skillStore.workflows" :key="wf.id"
+                                                    :active="skillStore.selectedWorkflowId === wf.id"
+                                                    @click="skillStore.selectWorkflow(wf.id)"
+                                                    :disabled="skillStore.invalidSteps(wf).length > 0 && skillStore.selectedWorkflowId !== wf.id">
+                                                    <template v-slot:prepend>
+                                                        <v-icon icon="mdi-format-list-checks" class="mr-2"></v-icon>
+                                                    </template>
+                                                    <v-list-item-title class="text-truncate">
+                                                        {{ wf.name }}
+                                                        <v-icon v-if="skillStore.selectedWorkflowId === wf.id && skillStore.dirty"
+                                                            size="x-small" color="warning">mdi-circle-medium</v-icon>
+                                                    </v-list-item-title>
+                                                    <template v-slot:append>
+                                                        <v-icon v-if="skillStore.invalidSteps(wf).length > 0"
+                                                            size="x-small" color="error">mdi-alert-circle</v-icon>
+                                                        <v-icon v-if="skillStore.runningWorkflowId === wf.id"
+                                                            size="x-small" color="success">mdi-play-circle</v-icon>
+                                                    </template>
+                                                </v-list-item>
+                                            </v-list>
+                                            <div v-else class="text-center text-grey pa-4">
+                                                <v-icon size="large" class="mb-2">mdi-inbox-outline</v-icon>
+                                                <p class="text-caption">暂无编排方案，点击右上角创建</p>
                                             </div>
                                         </div>
-                                        <v-list class="bg-transparent" style="min-height: 100px;">
-                                            <v-list-item v-for="(step, idx) in skillStore.workflowSteps" :key="idx"
-                                                class="mb-2" variant="outlined" rounded="lg" draggable="true"
-                                                @dragstart="skillStore.workflowDragIndex = idx" @dragover.prevent
-                                                @drop="skillStore.reorderWorkflowStep(skillStore.workflowDragIndex, idx)">
-                                                <template v-slot:prepend>
-                                                    <v-icon icon="mdi-drag-vertical" class="mr-2 cursor-move"
-                                                        style="cursor: move;"></v-icon>
-                                                    <v-chip size="small" variant="tonal" color="primary" class="mr-2">{{
-                                                        idx + 1 }}</v-chip>
-                                                    <v-icon
-                                                        :icon="skillStore.registrySkills.find(s => s.name === step)?.icon || 'mdi-puzzle'"
-                                                        color="primary"></v-icon>
-                                                </template>
-                                                <v-list-item-title>
-                                                    {{ skillStore.registrySkills.find(s => s.name ===
-                                                    step)?.displayName?.zh || step }}
-                                                </v-list-item-title>
-                                                <template v-slot:append>
-                                                    <v-btn size="x-small" variant="text" icon="mdi-close" color="error"
-                                                        @click="skillStore.workflowSteps.splice(idx, 1)"></v-btn>
-                                                </template>
-                                            </v-list-item>
-                                        </v-list>
-                                        <v-divider class="my-3"></v-divider>
-                                        <p class="text-caption text-grey mb-2">{{
-                                            $t('$vuetify.dataIterator.skill.addStepHint') }}</p>
-                                        <div class="d-flex flex-wrap ga-2">
-                                            <v-chip
-                                                v-for="installed in skillStore.installedSkills.filter(s => s.enabled && !skillStore.workflowSteps.includes(s.name))"
-                                                :key="installed.name" size="small" variant="tonal"
-                                                @click="skillStore.workflowSteps.push(installed.name)">
-                                                <v-icon start size="small">{{ skillStore.registrySkills.find(s => s.name
-                                                    === installed.name)?.icon || 'mdi-puzzle' }}</v-icon>
-                                                {{ skillStore.registrySkills.find(s => s.name ===
-                                                installed.name)?.displayName?.zh || installed.name }}
-                                                <v-icon end size="small">mdi-plus</v-icon>
-                                            </v-chip>
-                                        </div>
-                                        <v-divider class="my-3" v-if="skillStore.workflowSteps.length > 1"></v-divider>
-                                        <div v-if="skillStore.workflowSteps.length > 1" class="d-flex ga-2">
-                                            <v-btn size="small" variant="flat" color="primary"
-                                                @click="skillStore.activateWorkflow()">
-                                                <v-icon start>mdi-play</v-icon>{{
-                                                $t('$vuetify.dataIterator.skill.runWorkflow') }}
-                                            </v-btn>
+
+                                        <v-divider vertical></v-divider>
+
+                                        <!-- 右侧：步骤编辑区 -->
+                                        <div class="flex-1-1-66">
+                                            <div v-if="!skillStore.selectedWorkflowId" class="text-center text-grey pa-8">
+                                                <v-icon size="large" class="mb-2">mdi-cursor-default-click-outline</v-icon>
+                                                <p class="text-caption">从左侧选择或新建一个编排方案</p>
+                                            </div>
+                                            <div v-else>
+                                                <!-- 方案操作栏 -->
+                                                <div class="d-flex align-center justify-space-between mb-3">
+                                                    <span class="text-subtitle-2 font-weight-bold text-truncate">
+                                                        {{ skillStore.selectedWorkflow()?.name || '' }}
+                                                    </span>
+                                                    <div class="d-flex ga-2">
+                                                        <v-btn size="small" variant="outlined" color="primary"
+                                                            :disabled="!skillStore.dirty"
+                                                            @click="skillStore.saveCurrentWorkflow()">
+                                                            <v-icon start>mdi-content-save</v-icon>保存
+                                                        </v-btn>
+                                                        <v-btn size="small" variant="flat" color="error"
+                                                            variant="text" icon="mdi-delete"
+                                                            @click="skillStore.confirmDeleteWorkflow()"></v-btn>
+                                                    </div>
+                                                </div>
+
+                                                <!-- 失效提示 -->
+                                                <v-alert v-if="skillStore.invalidSteps(skillStore.selectedWorkflow()).length > 0"
+                                                    type="warning" variant="tonal" class="mb-3" density="compact">
+                                                    失效步骤: {{ skillStore.invalidSteps(skillStore.selectedWorkflow()).join(', ') }}
+                                                </v-alert>
+
+                                                <!-- 步骤列表 -->
+                                                <v-list class="bg-transparent" style="min-height: 100px;">
+                                                    <v-list-item v-for="(step, idx) in skillStore.editingSteps" :key="step.id || idx"
+                                                        class="mb-2" variant="outlined" rounded="lg" draggable="true"
+                                                        @dragstart="skillStore.workflowDragIndex = idx" @dragover.prevent
+                                                        @drop="skillStore.reorderEditingStep(skillStore.workflowDragIndex, idx)">
+                                                        <template v-slot:prepend>
+                                                            <v-icon icon="mdi-drag-vertical" class="mr-2" style="cursor: move;"></v-icon>
+                                                            <v-chip size="small" variant="tonal" color="primary" class="mr-2">{{ idx + 1 }}</v-chip>
+                                                            <v-icon
+                                                                :icon="skillStore.registrySkills.find(s => s.name === step.ref)?.icon || 'mdi-puzzle'"
+                                                                :color="skillStore.invalidSteps(skillStore.selectedWorkflow()).includes(step.ref) ? 'error' : 'primary'"></v-icon>
+                                                        </template>
+                                                        <v-list-item-title>
+                                                            {{ skillStore.registrySkills.find(s => s.name === step.ref)?.displayName?.zh || step.ref }}
+                                                        </v-list-item-title>
+                                                        <template v-slot:append>
+                                                            <v-btn size="x-small" variant="text" icon="mdi-close" color="error"
+                                                                @click="skillStore.removeEditingStep(idx)"></v-btn>
+                                                        </template>
+                                                    </v-list-item>
+                                                </v-list>
+
+                                                <v-divider class="my-3"></v-divider>
+                                                <p class="text-caption text-grey mb-2">{{
+                                                    $t('$vuetify.dataIterator.skill.addStepHint') }}</p>
+                                                <div class="d-flex flex-wrap ga-2">
+                                                    <v-chip
+                                                        v-for="installed in skillStore.installedSkills.filter(s => s.enabled && !skillStore.editingSteps?.some(st => st.ref === s.name))"
+                                                        :key="installed.name" size="small" variant="tonal"
+                                                        @click="skillStore.addEditingStep(installed.name)">
+                                                        <v-icon start size="small">{{ skillStore.registrySkills.find(s => s.name
+                                                            === installed.name)?.icon || 'mdi-puzzle' }}</v-icon>
+                                                        {{ skillStore.registrySkills.find(s => s.name ===
+                                                        installed.name)?.displayName?.zh || installed.name }}
+                                                        <v-icon end size="small">mdi-plus</v-icon>
+                                                    </v-chip>
+                                                </div>
+                                                <v-divider class="my-3" v-if="skillStore.editingSteps && skillStore.editingSteps.length > 0"></v-divider>
+                                                <div v-if="skillStore.editingSteps && skillStore.editingSteps.length > 0" class="d-flex ga-2">
+                                                    <v-btn size="small" variant="flat" color="primary"
+                                                        @click="skillStore.runWorkflow()">
+                                                        <v-icon start>mdi-play</v-icon>{{
+                                                        $t('$vuetify.dataIterator.skill.runWorkflow') }}
+                                                    </v-btn>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1624,8 +1698,92 @@
             </v-dialog>
 
             <!-- ================================================================
-                 Skill Config 对话框
+                 Workflow 新建方案弹窗
                  ================================================================ -->
+            <v-dialog v-model="skillStore.showCreateDialog" max-width="500" class="dialog-card">
+                <v-card prepend-icon="mdi-plus" title="新建编排方案">
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        <v-text-field v-model="skillStore.newWorkflowName" label="方案名称" density="compact"
+                            variant="outlined" class="mb-3" autofocus
+                            :rules="[v => !!v?.trim() || '名称不能为空']"></v-text-field>
+                        <p class="text-subtitle-2 mb-3">从模板创建</p>
+                        <div class="d-flex flex-wrap ga-2 mb-4">
+                            <v-chip v-for="tpl in workflowTemplates" :key="tpl.id" size="small" variant="tonal"
+                                :disabled="!skillStore.newWorkflowName?.trim()"
+                                @click="skillStore.createFromTemplate(tpl.steps)">
+                                <v-icon start size="small">mdi-flash</v-icon>{{ tpl.displayName }}
+                            </v-chip>
+                        </div>
+                        <v-divider class="mb-3"></v-divider>
+                        <v-btn variant="outlined" block
+                            :disabled="!skillStore.selectedWorkflowId || !skillStore.newWorkflowName?.trim()"
+                            @click="skillStore.copyCurrentWorkflow()">
+                            <v-icon start>mdi-content-copy</v-icon>拷贝当前选中方案
+                        </v-btn>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="skillStore.showCreateDialog = false">取消</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- ================================================================
+                 Workflow 删除确认弹窗
+                 ================================================================ -->
+            <v-dialog v-model="skillStore.showDeleteConfirm" max-width="400" class="dialog-card">
+                <v-card prepend-icon="mdi-delete" title="确认删除">
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        确定要删除方案"{{ skillStore.selectedWorkflow()?.name }}"吗？此操作不可撤销。
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="skillStore.showDeleteConfirm = false">取消</v-btn>
+                        <v-btn variant="flat" color="error" @click="skillStore.deleteWorkflow()">删除</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- ================================================================
+                 Workflow 重命名弹窗
+                 ================================================================ -->
+            <v-dialog v-model="skillStore.showRenameDialog" max-width="400" class="dialog-card">
+                <v-card prepend-icon="mdi-rename" title="重命名方案">
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        <v-text-field v-model="skillStore.renameInput" label="方案名称" density="compact"
+                            variant="outlined" autofocus></v-text-field>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="skillStore.showRenameDialog = false">取消</v-btn>
+                        <v-btn variant="flat" color="primary"
+                            @click="skillStore.renameCurrentWorkflow(skillStore.renameInput).then(r => { if (r.success) skillStore.showRenameDialog = false; })">确定</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- ================================================================
+                 Workflow 脏态切换弹窗
+                 ================================================================ -->
+            <v-dialog v-model="skillStore.showDirtyDialog" max-width="400" class="dialog-card">
+                <v-card prepend-icon="mdi-alert" title="未保存的改动">
+                    <v-divider></v-divider>
+                    <v-card-text>
+                        当前方案有未保存的改动，是否保存？
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-btn variant="text" color="error"
+                            @click="skillStore.showDirtyDialog = false; skillStore.clearDirty(); skillStore.dirtyDialogCallback?.();">丢弃</v-btn>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="skillStore.showDirtyDialog = false">取消</v-btn>
+                        <v-btn variant="flat" color="primary"
+                            @click="skillStore.saveCurrentWorkflow().then(() => { skillStore.showDirtyDialog = false; skillStore.dirtyDialogCallback?.(); })">保存</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
             <v-dialog v-model="skillStore.skillConfigDialog" max-width="600" class="dialog-card">
                 <v-card prepend-icon="mdi-cog" :title="$t('$vuetify.dataIterator.skill.config')">
                     <v-divider></v-divider>
@@ -1714,6 +1872,7 @@
                     </v-card-actions>
                 </v-card>
             </v-dialog>
+
         </v-app>
     </div>
 
@@ -2069,6 +2228,9 @@
     <script src="../lib/js/mammoth.browser.js"></script>
     <script src="../lib/js/jszip.min.js"></script>
     <script src="../lib/js/pdf.min.js"></script>
+    <!-- 原文档预览渲染库（docx/xlsx） -->
+    <script src="../lib/js/docx-preview.min.js"></script>
+    <script src="../lib/js/xlsx.full.min.js"></script>
     <!-- Vue Draggable 拖拽排序 -->
     <script src="../lib/js/Sortable.min.js"></script>
     <script src="../lib/js/vuedraggable.umd.min.js"></script>
@@ -2084,8 +2246,21 @@
     <script src="js/model-role-dispatcher.js"></script>
     <!-- 2. Pinia 状态管理 Store -->
     <script src="js/stores.js"></script>
+    <!-- 2.1 Workspace Store -->
+    <script src="js/workspace-store.js"></script>
+    <!-- 2.2 Editor Tab Store -->
+    <script src="js/editor-tab-store.js"></script>
     <!-- 3. Vue 组件定义 -->
     <script src="js/components.js"></script>
+    <!-- 3.1 Workspace 组件定义 -->
+    <script src="js/workspace-components.js"></script>
+    <!-- 3.2 Monaco Editor loader -->
+    <script src="lib/monaco/vs/loader.js"></script>
+    <script>
+        if (window.require) {
+            window.require.config({ paths: { vs: 'lib/monaco/vs' } });
+        }
+    </script>
     <!-- 4. 国际化消息 -->
     <script src="js/i18n.js"></script>
     <!-- 5. 应用主逻辑和初始化 -->

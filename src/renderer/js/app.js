@@ -1165,6 +1165,13 @@ const app = createApp({
         'chat-mcp-chat-thumbnail-item': ChatThumbnailItem,
         'chat-mcp-chat-document-card': ChatDocumentCard,
         'mcp-server-tools': McpServerTools,
+        'init-workspace-dialog': InitWorkspaceDialog,
+        'workspace-sidebar': WorkspaceSidebar,
+        'workspace-explorer': WorkspaceExplorer,
+        'file-editor': FileEditor,
+        'editor-tab-bar': EditorTabBar,
+        'editor-tab-item': EditorTabItem,
+        'editor-confirm-dialog': EditorConfirmDialog,
     },
     setup() {
         // ======================================================================
@@ -1176,6 +1183,21 @@ const app = createApp({
         const settingStore = useSettingStore();
         const resourceStore = useResourceStore();
         const skillStore = useSkillStore();
+        const workspaceStore = useWorkspaceStore();
+
+        const showInitWorkspaceDialog = ref(false);
+        const editorTabStore = useEditorTabStore();
+
+        async function onFileSelect(filePath) {
+            const result = await editorTabStore.openTab(filePath);
+            if (!result.success) {
+                if (result.reason === 'capacity') {
+                    snackbarStore.showWarningMessage('workspace.editor.capacityReached');
+                } else {
+                    snackbarStore.showErrorMessage('workspace.editor.fileNotFound');
+                }
+            }
+        }
 
         // ======================================================================
         // Language Store（依赖 useI18n 的 locale，必须在 setup 内定义）
@@ -1784,6 +1806,40 @@ const app = createApp({
                 const container = getScrollContainer();
                 bindScrollListener(container);
             });
+
+            await workspaceStore.load();
+            if (!workspaceStore.hasWorkspaces) {
+                showInitWorkspaceDialog.value = true;
+            }
+
+            window.addEventListener('dragover', (e) => {
+                if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+                    e.preventDefault();
+                }
+            });
+            window.addEventListener('drop', async (e) => {
+                if (!e.dataTransfer || !e.dataTransfer.items) return;
+                const items = Array.from(e.dataTransfer.items);
+                for (const item of items) {
+                    const entry = item.webkitGetAsEntry?.();
+                    if (entry && entry.isDirectory) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        entry.file(async (file) => {
+                            const filePath = file.path || (window.electronAPI?.getPathForFile?.(file));
+                            if (!filePath) return;
+                            const result = await workspaceStore.switchTo(filePath, undefined,
+                                async () => { if (window.workspaceAPI.awaitDrain) await window.workspaceAPI.awaitDrain(); },
+                                async (newPath) => { if (window.workspaceAPI.rebuildFilesystem) await window.workspaceAPI.rebuildFilesystem(newPath); }
+                            );
+                            if (!result.success) {
+                                snackbarStore.showSnackbar(result.error || 'Failed to switch workspace', 'error');
+                            }
+                        });
+                        break;
+                    }
+                }
+            });
         });
 
         onUnmounted(() => {
@@ -1874,9 +1930,22 @@ const app = createApp({
         };
 
         // ======================================================================
+        // 编排方案内置模板
+        // ======================================================================
+        const workflowTemplates = [
+            { id: 'tpl-empty', displayName: '空方案', steps: [] },
+            { id: 'tpl-prd', displayName: 'PRD全流程', steps: ['prd-generator', 'doc-expert'] },
+            { id: 'tpl-data-report', displayName: '数据分析报告', steps: ['data-analysis', 'doc-expert'] },
+            { id: 'tpl-frontend', displayName: '前端开发全流程', steps: ['frontend-design', 'i18n-integration', 'code-review'] },
+            { id: 'tpl-review-archive', displayName: '代码审查归档', steps: ['code-review', 'doc-expert'] },
+            { id: 'tpl-solution-review', displayName: '技术方案评审', steps: ['prd-generator', 'doc-expert', 'code-review'] },
+        ];
+
+        // ======================================================================
         // 返回模板绑定
         // ======================================================================
         return {
+            workflowTemplates,
             importFileInput,
             triggerImport,
             handleImportFile,
@@ -1910,6 +1979,11 @@ const app = createApp({
             snackbarStore,
             mcpStore,
             skillStore,
+            workspaceStore,
+
+            showInitWorkspaceDialog,
+            onFileSelect,
+            editorTabStore,
 
             messageStore,
             defaultChoiceStore,

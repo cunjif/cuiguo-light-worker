@@ -967,7 +967,12 @@ const useSettingStore = defineStore("settingStore", {
         /** @type {number} 聊天面板列数 */
         chatPanelCols: 7,
         /** @type {number} 功能面板列数 */
-        functionPanelCols: 5
+        functionPanelCols: 5,
+
+        /** @type {string} 功能面板内当前 tab: 'function' | 'workspace' */
+        functionTab: 'function',
+        /** @type {boolean} 工作目录侧边栏是否折叠 */
+        sidebarCollapsed: false,
     }),
 
     getters: {
@@ -1020,6 +1025,20 @@ const useSettingStore = defineStore("settingStore", {
             this.panelTransitioning = true;
             this.activePanel = this.activePanel === 'chat' ? 'function' : 'chat';
             setTimeout(() => { this.panelTransitioning = false; }, 300);
+        },
+
+        /**
+         * 设置功能面板内的 tab（功能 / 工作目录）
+         */
+        setFunctionTab(tab) {
+            this.functionTab = tab;
+        },
+
+        /**
+         * 切换侧边栏折叠状态
+         */
+        toggleSidebar() {
+            this.sidebarCollapsed = !this.sidebarCollapsed;
         },
 
         /**
@@ -1696,6 +1715,40 @@ const useSkillStore = defineStore("skillStore", {
         workflowSteps: [],
         /** @type {number|null} 工作流拖拽索引 */
         workflowDragIndex: null,
+        /** @type {Array} 编排方案列表 */
+        workflows: [],
+        /** @type {string|null} 当前选中的方案id */
+        selectedWorkflowId: null,
+        /** @type {string|null} 当前已运行的方案id */
+        runningWorkflowId: null,
+        /** @type {boolean} 脏态标记 */
+        dirty: false,
+        /** @type {Array|null} 当前编辑的步骤副本 */
+        editingSteps: null,
+        /** @type {boolean} 方案加载中 */
+        loadingWorkflows: false,
+        /** @type {boolean} 显示新建方案弹窗 */
+        showCreateDialog: false,
+        /** @type {string} 新建方案名称输入 */
+        newWorkflowName: '',
+        /** @type {boolean} 显示删除确认弹窗 */
+        showDeleteConfirm: false,
+        /** @type {boolean} 显示脏态切换弹窗 */
+        showDirtyDialog: false,
+        /** @type {Function|null} 脏态弹窗确认后的回调 */
+        dirtyDialogCallback: null,
+        /** @type {boolean} 显示重命名弹窗 */
+        showRenameDialog: false,
+        /** @type {string} 重命名输入值 */
+        renameInput: '',
+        /** @type {boolean} 显示历史面板 */
+        showHistoryPanel: false,
+        /** @type {Array} 版本历史列表 */
+        workflowVersions: [],
+        /** @type {Array} 撤销栈 */
+        undoStack: [],
+        /** @type {Array} 重做栈 */
+        redoStack: [],
     }),
 
     getters: {
@@ -2049,12 +2102,341 @@ const useSkillStore = defineStore("skillStore", {
                 this.activeSkillPrompt = prompts.join('\n\n---\n\n');
             }
         },
+
+        /**
+         * 加载编排方案列表
+         */
+        async loadWorkflows() {
+            this.loadingWorkflows = true;
+            try {
+                this.workflows = await window.workflowsAPI.list();
+            } catch (error) {
+                console.error('Failed to load workflows:', error);
+                this.workflows = [];
+            } finally {
+                this.loadingWorkflows = false;
+            }
+        },
+
+        /**
+         * 选中方案，清空已运行状态
+         * @param {string|null} id - 方案id
+         */
+        selectWorkflow(id) {
+            this.selectedWorkflowId = id;
+            this.runningWorkflowId = null;
+            this.activeSkill = null;
+            this.activeSkillPrompt = '';
+            this.dirty = false;
+            if (id) {
+                const wf = this.workflows.find(w => w.id === id);
+                this.editingSteps = wf ? JSON.parse(JSON.stringify(wf.steps)) : null;
+            } else {
+                this.editingSteps = null;
+            }
+        },
+
+        /**
+         * 标记脏态
+         */
+        markDirty() {
+            this.dirty = true;
+        },
+
+        /**
+         * 清除脏态
+         */
+        clearDirty() {
+            this.dirty = false;
+        },
+
+        /**
+         * 获取当前选中方案
+         * @returns {Object|null}
+         */
+        selectedWorkflow() {
+            if (!this.selectedWorkflowId) return null;
+            return this.workflows.find(w => w.id === this.selectedWorkflowId) || null;
+        },
+
+        /**
+         * 计算方案中的失效步骤
+         * @param {Object} workflow - 方案
+         * @returns {Array} 失效步骤ref列表
+         */
+        invalidSteps(workflow) {
+            if (!workflow) return [];
+            const invalid = [];
+            const checkSteps = (steps) => {
+                for (const step of steps) {
+                    if (step.type === 'skill') {
+                        const installed = this.installedSkills.find(s => s.name === step.ref);
+                        if (!installed || !installed.enabled) {
+                            invalid.push(step.ref);
+                        }
+                    } else if (step.type === 'branch') {
+                        for (const branch of step.branches) {
+                            checkSteps(branch.children);
+                        }
+                        if (step.default) checkSteps(step.default);
+                    } else if (step.type === 'loop' || step.type === 'parallel') {
+                        checkSteps(step.children);
+                    }
+                }
+            };
+            checkSteps(workflow.steps);
+            return [...new Set(invalid)];
+        },
+
+        /**
+         * 重新排序编辑步骤
+         */
+        reorderEditingStep(fromIndex, toIndex) {
+            if (fromIndex === null || fromIndex === toIndex || !this.editingSteps) return;
+            this._pushUndo();
+            const step = this.editingSteps.splice(fromIndex, 1)[0];
+            this.editingSteps.splice(toIndex, 0, step);
+            this.markDirty();
+        },
+
+        /**
+         * 添加编辑步骤
+         */
+        addEditingStep(skillName) {
+            if (!this.editingSteps) return;
+            this._pushUndo();
+            this.editingSteps.push({ id: crypto.randomUUID(), type: 'skill', ref: skillName });
+            this.markDirty();
+        },
+
+        /**
+         * 移除编辑步骤
+         */
+        removeEditingStep(idx) {
+            if (!this.editingSteps) return;
+            this._pushUndo();
+            this.editingSteps.splice(idx, 1);
+            this.markDirty();
+        },
+
+        /**
+         * 压入撤销栈
+         */
+        _pushUndo() {
+            if (this.editingSteps) {
+                this.undoStack.push(JSON.parse(JSON.stringify(this.editingSteps)));
+                this.redoStack = [];
+            }
+        },
+
+        /**
+         * 撤销
+         */
+        undo() {
+            if (this.undoStack.length === 0) return;
+            this.redoStack.push(JSON.parse(JSON.stringify(this.editingSteps)));
+            this.editingSteps = this.undoStack.pop();
+            this.markDirty();
+        },
+
+        /**
+         * 重做
+         */
+        redo() {
+            if (this.redoStack.length === 0) return;
+            this.undoStack.push(JSON.parse(JSON.stringify(this.editingSteps)));
+            this.editingSteps = this.redoStack.pop();
+            this.markDirty();
+        },
+
+        /**
+         * 自动生成方案名
+         */
+        _autoName(steps) {
+            const initials = steps.map(s => s.ref?.charAt(0) || 'x').join('');
+            return `${initials}-${Date.now()}`;
+        },
+
+        /**
+         * 从模板创建方案
+         */
+        async createFromTemplate(templateSteps) {
+            const name = this.newWorkflowName.trim();
+            if (!name) return { success: false, error: 'name empty' };
+            const steps = templateSteps.map(s => typeof s === 'string'
+                ? { id: (crypto.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`), type: 'skill', ref: s }
+                : s);
+            const result = await window.workflowsAPI.create(name, steps);
+            if (result.success) {
+                await this.loadWorkflows();
+                this.selectWorkflow(result.workflow.id);
+            }
+            this.showCreateDialog = false;
+            this.newWorkflowName = '';
+            return result;
+        },
+
+        /**
+         * 拷贝当前选中方案
+         */
+        async copyCurrentWorkflow() {
+            const current = this.selectedWorkflow();
+            if (!current) return;
+            const name = this.newWorkflowName.trim();
+            if (!name) return { success: false, error: 'name empty' };
+            const stepsCopy = JSON.parse(JSON.stringify(current.steps));
+            const result = await window.workflowsAPI.create(name, stepsCopy);
+            if (result.success) {
+                await this.loadWorkflows();
+                this.selectWorkflow(result.workflow.id);
+            }
+            this.showCreateDialog = false;
+            this.newWorkflowName = '';
+            return result;
+        },
+
+        /**
+         * 保存当前方案
+         */
+        async saveCurrentWorkflow() {
+            const id = this.selectedWorkflowId;
+            if (!id || !this.editingSteps) return;
+            const result = await window.workflowsAPI.save(id, JSON.parse(JSON.stringify(this.editingSteps)));
+            if (result.success) {
+                this.clearDirty();
+                await this.loadWorkflows();
+            }
+            return result;
+        },
+
+        /**
+         * 确认删除方案
+         */
+        confirmDeleteWorkflow() {
+            this.showDeleteConfirm = true;
+        },
+
+        /**
+         * 执行删除方案
+         */
+        async deleteWorkflow() {
+            const id = this.selectedWorkflowId;
+            if (!id) return;
+            const result = await window.workflowsAPI.delete(id);
+            if (result.success) {
+                if (this.runningWorkflowId === id) {
+                    this.runningWorkflowId = null;
+                }
+                this.selectWorkflow(null);
+                await this.loadWorkflows();
+            }
+            this.showDeleteConfirm = false;
+            return result;
+        },
+
+        /**
+         * 重命名当前方案
+         */
+        async renameCurrentWorkflow(name) {
+            const id = this.selectedWorkflowId;
+            if (!id) return { success: false, error: 'no selected workflow' };
+            const trimmed = name.trim();
+            if (trimmed.length < 1) return { success: false, error: 'name empty' };
+            const result = await window.workflowsAPI.rename(id, trimmed);
+            if (result.success) {
+                await this.loadWorkflows();
+            }
+            return result;
+        },
+
+        /**
+         * 运行方案
+         */
+        async runWorkflow() {
+            const id = this.selectedWorkflowId;
+            if (!id) return;
+            if (this.dirty) {
+                await this.saveCurrentWorkflow();
+            }
+            const wf = this.workflows.find(w => w.id === id);
+            if (!wf) return;
+            const invalid = this.invalidSteps(wf);
+            if (invalid.length > 0) {
+                console.warn('Cannot run workflow with invalid steps:', invalid);
+                return;
+            }
+            try {
+                const result = await window.workflowsAPI.run(id, this._rawInstalled());
+                if (result && result.activeSkill) {
+                    this.activeSkill = result.activeSkill;
+                    this.activeSkillPrompt = result.activeSkillPrompt;
+                    this.runningWorkflowId = id;
+                }
+                if (result?.warnings?.length > 0) {
+                    console.warn('Workflow run warnings:', result.warnings);
+                }
+            } catch (error) {
+                console.error('Failed to run workflow:', error);
+            }
+        },
+
+        /**
+         * 导出当前方案
+         */
+        async exportCurrentWorkflow() {
+            const id = this.selectedWorkflowId;
+            if (!id) return null;
+            return await window.workflowsAPI.export(id);
+        },
+
+        /**
+         * 导入方案
+         */
+        async importWorkflowFromJson(payload) {
+            const result = await window.workflowsAPI.import(payload);
+            if (result.success) {
+                await this.loadWorkflows();
+                this.selectWorkflow(result.workflow.id);
+            }
+            return result;
+        },
+
+        /**
+         * 加载版本历史
+         */
+        async loadVersions() {
+            const id = this.selectedWorkflowId;
+            if (!id) return;
+            this.workflowVersions = await window.workflowsAPI.versions(id);
+        },
+
+        /**
+         * 回滚到指定版本
+         */
+        async rollbackToVersion(versionId) {
+            const id = this.selectedWorkflowId;
+            if (!id) return;
+            const result = await window.workflowsAPI.rollback(id, versionId);
+            if (result.success) {
+                await this.loadWorkflows();
+                this.selectWorkflow(id);
+            }
+            return result;
+        },
+
+        /**
+         * 卸载技能前检查方案引用
+         */
+        async checkSkillRefsBeforeUninstall(skillName) {
+            const count = await window.workflowsAPI.countSkillRefs(skillName);
+            return count;
+        },
     },
 
     persist: {
         enabled: true,
         strategies: [{ storage: localStorage }],
-        paths: ['installedSkills', 'workflowSteps'],
+        paths: ['installedSkills'],
     },
 });
 

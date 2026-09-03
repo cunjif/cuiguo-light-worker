@@ -359,6 +359,54 @@ contextBridge.exposeInMainWorld('skillsAPI', {
   readFileForExport: (filePath: string) => ipcRenderer.invoke('skills:read-file-for-export', filePath),
 });
 
+// Workflow 编排方案管理 API
+contextBridge.exposeInMainWorld('workflowsAPI', {
+  list: () => ipcRenderer.invoke('skills:workflow-list'),
+  get: (id: string) => ipcRenderer.invoke('skills:workflow-get', id),
+  create: (name: string, steps: any[]) => ipcRenderer.invoke('skills:workflow-create', name, steps),
+  rename: (id: string, name: string) => ipcRenderer.invoke('skills:workflow-rename', id, name),
+  save: (id: string, steps: any[]) => ipcRenderer.invoke('skills:workflow-save', id, steps),
+  delete: (id: string) => ipcRenderer.invoke('skills:workflow-delete', id),
+  countSkillRefs: (skillName: string) => ipcRenderer.invoke('skills:workflow-count-skill-refs', skillName),
+  export: (id: string) => ipcRenderer.invoke('skills:workflow-export', id),
+  import: (payload: { name: string; steps: any[] }) => ipcRenderer.invoke('skills:workflow-import', payload),
+  versions: (workflowId: string) => ipcRenderer.invoke('skills:workflow-versions', workflowId),
+  rollback: (workflowId: string, versionId: number) => ipcRenderer.invoke('skills:workflow-rollback', workflowId, versionId),
+  run: (workflowId: string, currentInstalled: any[]) => ipcRenderer.invoke('skills:workflow-run', workflowId, currentInstalled),
+  checkCycle: (rootWorkflowId: string, refWorkflowId: string) => ipcRenderer.invoke('skills:workflow-check-cycle', rootWorkflowId, refWorkflowId),
+});
+
+// Workspace 工作目录管理 API
+contextBridge.exposeInMainWorld('workspaceAPI', {
+  list: () => ipcRenderer.invoke('workspace:list'),
+  getById: (id: string) => ipcRenderer.invoke('workspace:get-by-id', id),
+  create: (name: string, path: string) => ipcRenderer.invoke('workspace:create', name, path),
+  rename: (id: string, name: string) => ipcRenderer.invoke('workspace:rename', id, name),
+  setActive: (id: string) => ipcRenderer.invoke('workspace:set-active', id),
+  getActive: () => ipcRenderer.invoke('workspace:get-active'),
+  markInvalid: (id: string) => ipcRenderer.invoke('workspace:mark-invalid', id),
+  updatePath: (id: string, newPath: string) => ipcRenderer.invoke('workspace:update-path', id, newPath),
+  validatePath: (p: string) => ipcRenderer.invoke('workspace:validate-path', p),
+  getDefaultPath: () => ipcRenderer.invoke('workspace:get-default-path'),
+  chooseDirectory: () => ipcRenderer.invoke('workspace:choose-directory'),
+  validateOnStartup: () => ipcRenderer.invoke('workspace:validate-on-startup'),
+  listDir: (dir: string) => ipcRenderer.invoke('workspace:list-dir', dir).then((r: any) => r.success ? r.entries : []),
+  readFile: (filePath: string) => ipcRenderer.invoke('workspace:read-file', filePath),
+  readFileBinary: (filePath: string) => ipcRenderer.invoke('workspace:read-file-binary', filePath),
+  writeFile: (filePath: string, content: string) => ipcRenderer.invoke('workspace:write-file', filePath, content),
+  previewFile: (filePath: string) => ipcRenderer.invoke('workspace:preview-file', filePath),
+  rebuildFilesystem: (rootPath: string) => ipcRenderer.invoke('workspace:rebuild-filesystem', rootPath),
+  awaitDrain: () => ipcRenderer.invoke('workspace:await-drain'),
+  git: {
+    check: (dir: string) => ipcRenderer.invoke('workspace:git-check', dir),
+    status: (dir: string) => ipcRenderer.invoke('workspace:git-status', dir),
+    stage: (dir: string, files: string[]) => ipcRenderer.invoke('workspace:git-stage', dir, files),
+    unstage: (dir: string, files: string[]) => ipcRenderer.invoke('workspace:git-unstage', dir, files),
+    commit: (dir: string, message: string) => ipcRenderer.invoke('workspace:git-commit', dir, message),
+    diff: (dir: string, file?: string) => ipcRenderer.invoke('workspace:git-diff', dir, file),
+  },
+});
+
 // MCP Server 管理 API
 contextBridge.exposeInMainWorld('mcpAPI', {
   listInstalled: () => ipcRenderer.invoke('mcp:list-installed'),

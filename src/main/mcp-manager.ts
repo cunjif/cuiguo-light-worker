@@ -391,3 +391,48 @@ export { getMcpServersDir };
 // Export built-in server definitions
 export { BUILTIN_SERVERS };
 export type { BuiltinMcpServer };
+
+/**
+ * Rebuild the filesystem MCP server with a new root path.
+ * Updates BUILTIN_SERVERS args and regenerates config.json.
+ */
+export async function rebuildFilesystemServer(rootPath: string): Promise<boolean> {
+  try {
+    const fsServer = BUILTIN_SERVERS.find(s => s.name === 'filesystem');
+    if (!fsServer) {
+      console.error('Filesystem server not found in BUILTIN_SERVERS');
+      return false;
+    }
+
+    fsServer.args = [rootPath];
+    console.log(`Filesystem MCP server root path updated to: ${rootPath}`);
+
+    const { app } = await import('electron');
+    let appPath;
+    if (app.isPackaged) {
+      appPath = path.dirname(process.execPath);
+    } else {
+      appPath = path.dirname(fileURLToPath(import.meta.url));
+    }
+    const configPath = path.join(appPath, 'config.json');
+
+    const builtinConfig = generateConfig(BUILTIN_SERVERS.filter(s => s.enabled));
+    const existingConfig = readConfig(configPath);
+    const existingServers = existingConfig?.mcpServers || {};
+    const builtinNames = new Set(BUILTIN_SERVERS.filter(s => s.enabled).map(s => s.name));
+    const mergedServers: Record<string, any> = {};
+    for (const [name, cfg] of Object.entries(existingServers)) {
+      if (!builtinNames.has(name)) {
+        mergedServers[name] = cfg;
+      }
+    }
+    Object.assign(mergedServers, builtinConfig.mcpServers);
+    saveConfig(configPath, { mcpServers: mergedServers });
+
+    console.log('Filesystem MCP server rebuilt successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to rebuild filesystem server:', error);
+    return false;
+  }
+}
