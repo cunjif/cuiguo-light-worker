@@ -237,6 +237,16 @@ const SHORTCUT_DEFINITIONS = [
         action: 'zoomReset',
         context: ['panelFocused'],
     },
+
+    // ----------------------------------------------------------------------
+    // 软换行类
+    // ----------------------------------------------------------------------
+    {
+        id: 'toggle-soft-wrap',
+        keyCombo: { mainKey: 'z', modifiers: ['Alt'] },
+        action: 'toggleSoftWrap',
+        context: ['editViewFocused'],
+    },
 ];
 
 if (typeof window !== 'undefined') {

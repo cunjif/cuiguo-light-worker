@@ -38,6 +38,8 @@ function dispatchAction(definition, store) {
             return store.zoomOut();
         case 'zoomReset':
             return store.zoomReset();
+        case 'toggleSoftWrap':
+            return store.toggleSoftWrap();
         case 'delegateMonaco': {
             const editor = store.activeEditor;
             if (!editor) return;

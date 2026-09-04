@@ -403,7 +403,11 @@ contextBridge.exposeInMainWorld('workspaceAPI', {
     stage: (dir: string, files: string[]) => ipcRenderer.invoke('workspace:git-stage', dir, files),
     unstage: (dir: string, files: string[]) => ipcRenderer.invoke('workspace:git-unstage', dir, files),
     commit: (dir: string, message: string) => ipcRenderer.invoke('workspace:git-commit', dir, message),
-    diff: (dir: string, file?: string) => ipcRenderer.invoke('workspace:git-diff', dir, file),
+    diff: (dir: string, file?: string, staged?: boolean) => ipcRenderer.invoke('workspace:git-diff', dir, file, staged),
+    log: (dir: string, opts?: { skip?: number; limit?: number }) => ipcRenderer.invoke('workspace:git-log', dir, opts),
+    show: (dir: string, hash: string) => ipcRenderer.invoke('workspace:git-show', dir, hash),
+    pull: (dir: string) => ipcRenderer.invoke('workspace:git-pull', dir),
+    push: (dir: string) => ipcRenderer.invoke('workspace:git-push', dir),
   },
 });
 

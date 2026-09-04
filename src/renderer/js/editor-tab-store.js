@@ -62,6 +62,8 @@ const useEditorTabStore = defineStore("editorTabStore", {
         editorInstances: {},
         /** @type {number} 代码编辑视图字号（受 ZoomStep 约束） */
         fontSize: loadFontSize(),
+        /** @type {boolean} 面板级软换行开关（false=off/true=on），默认 off，不持久化 */
+        softWrap: false,
     }),
 
     getters: {
@@ -454,6 +456,54 @@ const useEditorTabStore = defineStore("editorTabStore", {
         },
 
         // ----------------------------------------------------------------------
+        // 软换行（面板级，作用于全部存活代码编辑视图）
+        // ----------------------------------------------------------------------
+        _collectEditViews() {
+            const views = [];
+            for (const path of Object.keys(this.editorInstances)) {
+                const tab = this.tabs.find(t => t.path === path);
+                if (tab && tab.viewMode === 'edit') {
+                    const editor = this.editorInstances[path];
+                    if (editor) views.push(editor);
+                }
+            }
+            return views;
+        },
+
+        _applySoftWrap(editor, wordWrap) {
+            if (!editor) return false;
+            try {
+                editor.updateOptions({ wordWrap });
+                return true;
+            } catch (e) {
+                console.debug('[EditorTab] applySoftWrap failed:', e);
+                return false;
+            }
+        },
+
+        toggleSoftWrap() {
+            const prevWrap = this.softWrap;
+            const views = this._collectEditViews();
+            if (views.length === 0) {
+                console.debug('[EditorTab] toggleSoftWrap aborted: no alive edit views');
+                return;
+            }
+            this.softWrap = !prevWrap;
+            const wordWrap = this.softWrap ? 'on' : 'off';
+            let successCount = 0;
+            let skipCount = 0;
+            for (const editor of views) {
+                if (this._applySoftWrap(editor, wordWrap)) {
+                    successCount++;
+                } else {
+                    skipCount++;
+                }
+            }
+            console.debug('[EditorTab] toggleSoftWrap:', prevWrap, '->', this.softWrap,
+                'success:', successCount, 'skip:', skipCount);
+        },
+
+        // ----------------------------------------------------------------------
         // 溢出与滑动
         // ----------------------------------------------------------------------
         setTabWidth(path, width) {
@@ -556,6 +606,7 @@ const useEditorTabStore = defineStore("editorTabStore", {
             this.overflowMenuOpen = false;
             this.overflowTabs = [];
             this.overflowButtonVisible = false;
+            this.softWrap = false;
             console.log('[EditorTab] reset on workspace switch');
             return true;
         },

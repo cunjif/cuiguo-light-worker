@@ -1042,12 +1042,46 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle('workspace:git-diff', async (event, dir: string, file?: string) => {
+  ipcMain.handle('workspace:git-diff', async (event, dir: string, file?: string, staged?: boolean) => {
     try {
-      const diff = await gitService.gitDiff(dir, file);
-      return { success: true, diff };
+      const result = await gitService.gitDiff(dir, file, staged);
+      return { success: true, patch: result.patch, binary: result.binary };
     } catch (err: any) {
-      return { success: false, error: String(err), diff: '' };
+      return { success: false, error: String(err), patch: '', binary: false };
+    }
+  });
+
+  ipcMain.handle('workspace:git-log', async (event, dir: string, opts?: { skip?: number; limit?: number }) => {
+    try {
+      const entries = await gitService.gitLog(dir, opts);
+      return { success: true, entries };
+    } catch (err: any) {
+      return { success: false, error: String(err), entries: [] };
+    }
+  });
+
+  ipcMain.handle('workspace:git-show', async (event, dir: string, hash: string) => {
+    try {
+      const result = await gitService.gitShow(dir, hash);
+      return { success: true, files: result.files, patch: result.patch };
+    } catch (err: any) {
+      return { success: false, error: String(err), files: [], patch: '' };
+    }
+  });
+
+  ipcMain.handle('workspace:git-pull', async (event, dir: string) => {
+    try {
+      return await gitService.gitPull(dir);
+    } catch (err: any) {
+      return { success: false, output: String(err), conflicted: false };
+    }
+  });
+
+  ipcMain.handle('workspace:git-push', async (event, dir: string) => {
+    try {
+      return await gitService.gitPush(dir);
+    } catch (err: any) {
+      return { success: false, output: String(err), rejected: false, noUpstream: false };
     }
   });
 

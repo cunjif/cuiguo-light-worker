@@ -54,13 +54,13 @@
                                     <file-editor class="flex-grow-1"></file-editor>
                                 </div>
                             </editor-shortcuts>
-                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length === 0" class="fill-height">
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && settingStore.functionTab !== 'git' && messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie" class="text-center text-h5"
                                     data-component-id="chat-mcp.chat.loading-animation">
                                     {{$t('$vuetify.dataIterator.title')}}
                                 </div>
                             </v-container>
-                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length > 0" class="chat-bot">
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && settingStore.functionTab !== 'git' && messageStore.conversation.length > 0" class="chat-bot">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
@@ -80,8 +80,9 @@
                             <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-left': settingStore.activePanel !== 'chat', 'sidebar-right': settingStore.activePanel === 'chat' }">
                                 <workspace-sidebar></workspace-sidebar>
                                 <workspace-explorer v-if="settingStore.functionTab === 'workspace'" @file-select="onFileSelect"></workspace-explorer>
+                                <git-panel v-if="settingStore.functionTab === 'git'"></git-panel>
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
-                                    :class="{ 'drag-over-panel': isDragging }">
+                                    :class="{ 'drag-over-panel': isDragging }" v-if="settingStore.functionTab !== 'git'">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
                                         <v-btn icon size="small" variant="text"
                                             :disabled="messageStore.attachments.some(a => a.status === 'processing')"
@@ -274,8 +275,9 @@
                         :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-right': settingStore.activePanel === 'chat', 'sidebar-left': settingStore.activePanel !== 'chat' }">
+                                <git-panel v-if="settingStore.functionTab === 'git'"></git-panel>
                                 <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
-                                    :class="{ 'drag-over-panel': isDragging }">
+                                    :class="{ 'drag-over-panel': isDragging }" v-if="settingStore.functionTab !== 'git'">
                                     <div class="d-flex align-center flex-grow-1" style="min-width:0;">
                                         <v-btn icon size="small" variant="text"
                                             :disabled="messageStore.attachments.some(a => a.status === 'processing')"
@@ -462,6 +464,7 @@
                                     </div>
                                 </div>
                                 <workspace-explorer v-if="settingStore.functionTab === 'workspace'" @file-select="onFileSelect"></workspace-explorer>
+                                <git-panel v-if="settingStore.functionTab === 'git'"></git-panel>
                                 <workspace-sidebar></workspace-sidebar>
                             </div>
                         </template>
@@ -472,13 +475,13 @@
                                     <file-editor class="flex-grow-1"></file-editor>
                                 </div>
                             </editor-shortcuts>
-                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length === 0" class="fill-height">
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && settingStore.functionTab !== 'git' && messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie-alt" class="text-center text-h5"
                                     data-component-id="chat-mcp.chat.loading-animation-alt">
                                     {{$t('$vuetify.dataIterator.title')}}
                                 </div>
                             </v-container>
-                            <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length > 0" class="chat-bot-alt">
+                            <v-container v-show="settingStore.functionTab !== 'workspace' && settingStore.functionTab !== 'git' && messageStore.conversation.length > 0" class="chat-bot-alt">
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
@@ -2252,12 +2255,18 @@
     <script src="js/stores.js"></script>
     <!-- 2.1 Workspace Store -->
     <script src="js/workspace-store.js"></script>
+    <!-- 2.1.1 Git Store -->
+    <script src="js/git-store.js"></script>
     <!-- 2.2 Editor Tab Store -->
     <script src="js/editor-tab-store.js"></script>
     <!-- 3. Vue 组件定义 -->
     <script src="js/components.js"></script>
     <!-- 3.1 Workspace 组件定义 -->
     <script src="js/workspace-components.js"></script>
+    <!-- 3.1.0 Git AI Commit Generator -->
+    <script src="js/git-ai-commit.js"></script>
+    <!-- 3.1.2 Git 组件定义 -->
+    <script src="js/git-components.js"></script>
     <!-- 3.1.1 Editor 快捷键模块 -->
     <script src="js/editor-shortcuts/platform.js"></script>
     <script src="js/editor-shortcuts/shortcut-definitions.js"></script>

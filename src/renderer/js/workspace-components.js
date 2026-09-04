@@ -135,6 +135,15 @@ const WorkspaceSidebar = defineComponent({
             :title="$t('workspace.sidebar.workspaceTab')">
             <v-icon>mdi-folder</v-icon>
         </v-btn>
+        <v-btn
+            :icon="true"
+            :variant="settingStore.functionTab === 'git' ? 'flat' : 'text'"
+            :color="settingStore.functionTab === 'git' ? 'primary' : 'default'"
+            size="small"
+            @click="settingStore.setFunctionTab('git')"
+            :title="$t('workspace.sidebar.gitTab')">
+            <v-icon>mdi-git</v-icon>
+        </v-btn>
     </div>
     `,
     setup() {
@@ -605,6 +614,7 @@ const FileEditor = defineComponent({
                             theme: 'vs',
                             automaticLayout: true,
                             fontSize: editorTabStore.fontSize,
+                            wordWrap: editorTabStore.softWrap ? 'on' : 'off',
                             minimap: { enabled: false },
                             scrollBeyondLastLine: false,
                         });
@@ -660,6 +670,11 @@ const FileEditor = defineComponent({
         watch(() => editorTabStore.fontSize, (newSize) => {
             if (viewMode.value === 'edit' && editor) {
                 try { editor.updateOptions({ fontSize: newSize }); } catch (e) {}
+            }
+        });
+        watch(() => editorTabStore.softWrap, (on) => {
+            if (viewMode.value === 'edit' && editor) {
+                try { editor.updateOptions({ wordWrap: on ? 'on' : 'off' }); } catch (e) {}
             }
         });
 

@@ -1168,6 +1168,7 @@ const app = createApp({
         'init-workspace-dialog': InitWorkspaceDialog,
         'workspace-sidebar': WorkspaceSidebar,
         'workspace-explorer': WorkspaceExplorer,
+        'git-panel': GitPanel,
         'file-editor': FileEditor,
         'editor-tab-bar': EditorTabBar,
         'editor-tab-item': EditorTabItem,

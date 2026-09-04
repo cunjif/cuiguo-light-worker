@@ -969,7 +969,7 @@ const useSettingStore = defineStore("settingStore", {
         /** @type {number} 功能面板列数 */
         functionPanelCols: 5,
 
-        /** @type {string} 功能面板内当前 tab: 'function' | 'workspace' */
+        /** @type {string} 功能面板内当前 tab: 'function' | 'workspace' | 'git' */
         functionTab: 'function',
         /** @type {boolean} 工作目录侧边栏是否折叠 */
         sidebarCollapsed: false,
