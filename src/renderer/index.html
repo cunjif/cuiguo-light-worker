@@ -48,10 +48,12 @@
                     <v-col :cols="settingStore.leftColValue"
                         :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
-                            <div v-if="settingStore.functionTab === 'workspace'" class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
-                                <editor-tab-bar></editor-tab-bar>
-                                <file-editor class="flex-grow-1"></file-editor>
-                            </div>
+                            <editor-shortcuts v-if="settingStore.functionTab === 'workspace'">
+                                <div class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
+                                    <editor-tab-bar></editor-tab-bar>
+                                    <file-editor class="flex-grow-1"></file-editor>
+                                </div>
+                            </editor-shortcuts>
                             <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie" class="text-center text-h5"
                                     data-component-id="chat-mcp.chat.loading-animation">
@@ -464,10 +466,12 @@
                             </div>
                         </template>
                         <template v-else>
-                            <div v-if="settingStore.functionTab === 'workspace'" class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
-                                <editor-tab-bar></editor-tab-bar>
-                                <file-editor class="flex-grow-1"></file-editor>
-                            </div>
+                            <editor-shortcuts v-if="settingStore.functionTab === 'workspace'">
+                                <div class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
+                                    <editor-tab-bar></editor-tab-bar>
+                                    <file-editor class="flex-grow-1"></file-editor>
+                                </div>
+                            </editor-shortcuts>
                             <v-container v-show="settingStore.functionTab !== 'workspace' && messageStore.conversation.length === 0" class="fill-height">
                                 <div id="lottie-alt" class="text-center text-h5"
                                     data-component-id="chat-mcp.chat.loading-animation-alt">
@@ -2254,6 +2258,14 @@
     <script src="js/components.js"></script>
     <!-- 3.1 Workspace 组件定义 -->
     <script src="js/workspace-components.js"></script>
+    <!-- 3.1.1 Editor 快捷键模块 -->
+    <script src="js/editor-shortcuts/platform.js"></script>
+    <script src="js/editor-shortcuts/shortcut-definitions.js"></script>
+    <script src="js/editor-shortcuts/context-evaluator.js"></script>
+    <script src="js/editor-shortcuts/key-matcher.js"></script>
+    <script src="js/editor-shortcuts/monaco-delegate.js"></script>
+    <script src="js/editor-shortcuts/action-dispatcher.js"></script>
+    <script src="js/editor-shortcuts/editor-shortcuts.js"></script>
     <!-- 3.2 Monaco Editor loader -->
     <script src="lib/monaco/vs/loader.js"></script>
     <script>

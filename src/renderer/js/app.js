@@ -1172,6 +1172,7 @@ const app = createApp({
         'editor-tab-bar': EditorTabBar,
         'editor-tab-item': EditorTabItem,
         'editor-confirm-dialog': EditorConfirmDialog,
+        'editor-shortcuts': EditorShortcuts,
     },
     setup() {
         // ======================================================================

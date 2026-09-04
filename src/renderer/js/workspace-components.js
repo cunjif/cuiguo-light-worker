@@ -432,7 +432,11 @@ const FileEditor = defineComponent({
         function cleanupEditor() {
             editorDisposables.forEach(d => { try { d.dispose(); } catch (e) {} });
             editorDisposables = [];
-            if (editor) { editor.dispose(); editor = null; }
+            if (editor) {
+                if (currentLoadedPath) editorTabStore.unregisterEditorInstance(currentLoadedPath);
+                editor.dispose();
+                editor = null;
+            }
         }
 
         function cleanup() {
@@ -600,10 +604,11 @@ const FileEditor = defineComponent({
                             language: getLanguage(path),
                             theme: 'vs',
                             automaticLayout: true,
-                            fontSize: 14,
+                            fontSize: editorTabStore.fontSize,
                             minimap: { enabled: false },
                             scrollBeyondLastLine: false,
                         });
+                        editorTabStore.registerEditorInstance(path, editor);
                         editorTabStore.registerContentProvider(path, () => editor ? editor.getValue() : '');
                         editorTabStore.registerViewStateProvider(path, () => editor ? editor.saveViewState() : null);
                         editorDisposables.push(editor.onDidChangeModelContent(() => {
@@ -651,6 +656,11 @@ const FileEditor = defineComponent({
                 editorTabStore.unregisterViewStateProvider(oldPath);
             }
             loadFile();
+        });
+        watch(() => editorTabStore.fontSize, (newSize) => {
+            if (viewMode.value === 'edit' && editor) {
+                try { editor.updateOptions({ fontSize: newSize }); } catch (e) {}
+            }
         });
 
         return {

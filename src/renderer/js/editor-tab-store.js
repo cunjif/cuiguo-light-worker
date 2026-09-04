@@ -11,6 +11,14 @@ const EDITOR_TAB_CAPACITY_DEFAULT = 20;
 const EDITOR_TAB_CAPACITY_MIN = 1;
 const EDITOR_TAB_CAPACITY_MAX = 50;
 
+const EDITOR_FONT_SIZE_KEY = 'editor_font_size';
+const ZoomStep = {
+    minFontSize: 8,
+    maxFontSize: 32,
+    defaultFontSize: 14,
+    step: 1,
+};
+
 const PREVIEW_EXTENSIONS = new Set(['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt']);
 
 function getExt(name) {
@@ -50,6 +58,10 @@ const useEditorTabStore = defineStore("editorTabStore", {
         contentProviders: {},
         /** @type {Object<string, function>} 视图状态提供者 path -> () => monacoState */
         viewStateProviders: {},
+        /** @type {Object<string, *>} Monaco 编辑器实例注册表 path -> IStandaloneCodeEditor */
+        editorInstances: {},
+        /** @type {number} 代码编辑视图字号（受 ZoomStep 约束） */
+        fontSize: loadFontSize(),
     }),
 
     getters: {
@@ -70,6 +82,11 @@ const useEditorTabStore = defineStore("editorTabStore", {
         maxOffset() {
             const extra = this.totalWidth - this.viewportWidth;
             return extra > 0 ? extra : 0;
+        },
+        /** 当前活动 path 对应的存活 Monaco 实例，无活动页或未注册时返回 null */
+        activeEditor(state) {
+            if (!state.activePath) return null;
+            return state.editorInstances[state.activePath] || null;
         },
     },
 
@@ -136,6 +153,30 @@ const useEditorTabStore = defineStore("editorTabStore", {
             if (this.overflowTabs.includes(path)) {
                 this.scrollTabIntoView(path);
             }
+        },
+
+        nextTab() {
+            if (this.tabs.length < 2) return;
+            const idx = this.tabs.findIndex(t => t.path === this.activePath);
+            if (idx < 0) return;
+            const nextIdx = (idx + 1) % this.tabs.length;
+            this.activateTab(this.tabs[nextIdx].path);
+        },
+
+        prevTab() {
+            if (this.tabs.length < 2) return;
+            const idx = this.tabs.findIndex(t => t.path === this.activePath);
+            if (idx < 0) return;
+            const prevIdx = (idx - 1 + this.tabs.length) % this.tabs.length;
+            this.activateTab(this.tabs[prevIdx].path);
+        },
+
+        gotoTab(n) {
+            const num = Math.round(Number(n));
+            if (isNaN(num)) return;
+            const idx = num - 1;
+            if (idx < 0 || idx >= this.tabs.length) return;
+            this.activateTab(this.tabs[idx].path);
         },
 
         scrollTabIntoView(path) {
@@ -308,6 +349,16 @@ const useEditorTabStore = defineStore("editorTabStore", {
             delete this.viewStateProviders[path];
         },
 
+        registerEditorInstance(path, editor) {
+            if (!path) return;
+            this.editorInstances[path] = editor;
+        },
+
+        unregisterEditorInstance(path) {
+            if (!path) return;
+            delete this.editorInstances[path];
+        },
+
         // ----------------------------------------------------------------------
         // 保存
         // ----------------------------------------------------------------------
@@ -366,6 +417,40 @@ const useEditorTabStore = defineStore("editorTabStore", {
                 snackbar.showErrorMessage('workspace.editor.saveFailed');
                 return false;
             }
+        },
+
+        // ----------------------------------------------------------------------
+        // 视图缩放
+        // ----------------------------------------------------------------------
+        _applyFontSize(editor) {
+            if (editor) {
+                try { editor.updateOptions({ fontSize: this.fontSize }); } catch (e) {}
+            }
+        },
+
+        _persistFontSize() {
+            try { localStorage.setItem(EDITOR_FONT_SIZE_KEY, String(this.fontSize)); } catch (e) {}
+        },
+
+        zoomIn() {
+            if (this.fontSize >= ZoomStep.maxFontSize) return;
+            this.fontSize = Math.min(ZoomStep.maxFontSize, this.fontSize + ZoomStep.step);
+            this._applyFontSize(this.activeEditor);
+            this._persistFontSize();
+        },
+
+        zoomOut() {
+            if (this.fontSize <= ZoomStep.minFontSize) return;
+            this.fontSize = Math.max(ZoomStep.minFontSize, this.fontSize - ZoomStep.step);
+            this._applyFontSize(this.activeEditor);
+            this._persistFontSize();
+        },
+
+        zoomReset() {
+            if (this.fontSize === ZoomStep.defaultFontSize) return;
+            this.fontSize = ZoomStep.defaultFontSize;
+            this._applyFontSize(this.activeEditor);
+            this._persistFontSize();
         },
 
         // ----------------------------------------------------------------------
@@ -486,5 +571,17 @@ function loadCapacity() {
         return Math.min(EDITOR_TAB_CAPACITY_MAX, Math.max(EDITOR_TAB_CAPACITY_MIN, n));
     } catch (e) {
         return EDITOR_TAB_CAPACITY_DEFAULT;
+    }
+}
+
+function loadFontSize() {
+    try {
+        const raw = localStorage.getItem(EDITOR_FONT_SIZE_KEY);
+        if (raw === null || raw === undefined) return ZoomStep.defaultFontSize;
+        const n = Math.round(Number(raw));
+        if (isNaN(n)) return ZoomStep.defaultFontSize;
+        return Math.min(ZoomStep.maxFontSize, Math.max(ZoomStep.minFontSize, n));
+    } catch (e) {
+        return ZoomStep.defaultFontSize;
     }
 }
