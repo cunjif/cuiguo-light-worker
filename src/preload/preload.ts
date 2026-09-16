@@ -447,4 +447,11 @@ contextBridge.exposeInMainWorld('selfEvolutionAPI', {
   pendingReject: (id: number) => ipcRenderer.invoke('pending:reject', id),
 });
 
+// 窗口控制 API（自定义标题栏使用）
+contextBridge.exposeInMainWorld('windowAPI', {
+  minimize: () => ipcRenderer.invoke('window:minimize'),
+  maximize: () => ipcRenderer.invoke('window:maximize'),
+  close: () => ipcRenderer.invoke('window:close'),
+});
+
 exposeAPIs();

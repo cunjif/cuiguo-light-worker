@@ -1168,7 +1168,9 @@ const app = createApp({
         'init-workspace-dialog': InitWorkspaceDialog,
         'workspace-sidebar': WorkspaceSidebar,
         'workspace-explorer': WorkspaceExplorer,
-        'git-panel': GitPanel,
+        'title-bar': TitleBar,
+        'model-selector': ModelSelector,
+        'git-page': GitPage,
         'file-editor': FileEditor,
         'editor-tab-bar': EditorTabBar,
         'editor-tab-item': EditorTabItem,
@@ -1317,6 +1319,7 @@ const app = createApp({
         }
 
         // ======================================================================
+
         // 拖拽事件处理
         // ======================================================================
 
@@ -2019,6 +2022,7 @@ const app = createApp({
             isAtBottom,
             unreadCount,
             handleScrollToBottom,
+
         };
     }
 });

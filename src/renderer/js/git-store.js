@@ -9,6 +9,7 @@
 // 常量
 const TIMELINE_PAGE_SIZE = 50;
 const DIFF_VIRTUAL_THRESHOLD = 1000;
+const AI_GENERATE_TIMEOUT_MS = 15000;
 
 const useGitStore = defineStore("gitStore", {
     state: () => ({
@@ -185,6 +186,35 @@ const useGitStore = defineStore("gitStore", {
         },
 
         /**
+         * 按当前选中文件的新分组语义重取 diff（操作成功后的同步刷新）
+         * 后置条件：selectedFile 仍在 statusEntries 中 → diffResult 更新为新语义 diff；
+         *           已不在 → selectedFile/diffResult 置空（回空态）
+         * 异常映射：diff 命令失败 → Snackbar 提示，保留选中态允许重试
+         */
+        async refreshSelectedDiff() {
+            const dir = this.getDir();
+            if (!dir || !this.selectedFile) return;
+            if (!this.statusEntries.some(e => e.file === this.selectedFile)) {
+                this.selectedFile = null;
+                this.diffResult = null;
+                return;
+            }
+            this.loading.diff = true;
+            try {
+                const entry = this.statusEntries.find(e => e.file === this.selectedFile);
+                const staged = entry?.staged ?? false;
+                const result = await window.workspaceAPI.git.diff(dir, this.selectedFile, staged);
+                if (result.success) {
+                    this.diffResult = { patch: result.patch, binary: result.binary };
+                } else {
+                    useSnackbarStore().showErrorMessage(result.error || 'Failed to load diff');
+                }
+            } finally {
+                this.loading.diff = false;
+            }
+        },
+
+        /**
          * 暂存文件
          */
         async stageFiles(files) {
@@ -195,6 +225,9 @@ const useGitStore = defineStore("gitStore", {
                 const result = await window.workspaceAPI.git.stage(dir, files);
                 if (result.success) {
                     await this.refreshStatus();
+                    if (this.selectedFile) {
+                        await this.refreshSelectedDiff();
+                    }
                 } else {
                     useSnackbarStore().showErrorMessage(result.error || 'Stage failed');
                 }
@@ -214,6 +247,9 @@ const useGitStore = defineStore("gitStore", {
                 const result = await window.workspaceAPI.git.unstage(dir, files);
                 if (result.success) {
                     await this.refreshStatus();
+                    if (this.selectedFile) {
+                        await this.refreshSelectedDiff();
+                    }
                 } else {
                     useSnackbarStore().showErrorMessage(result.error || 'Unstage failed');
                 }
@@ -253,6 +289,9 @@ const useGitStore = defineStore("gitStore", {
                     this.commitMessage = '';
                     this.commitSource = 'manual';
                     await this.refreshStatus();
+                    if (this.selectedFile) {
+                        await this.refreshSelectedDiff();
+                    }
                 } else {
                     useSnackbarStore().showErrorMessage(result.error || 'Commit failed');
                 }
@@ -316,7 +355,7 @@ const useGitStore = defineStore("gitStore", {
                 if (result.success) {
                     this.showResult = { files: result.files || [], patch: result.patch || '' };
                 } else {
-                    this.showResult = { files: [], patch: '' };
+                    this.showResult = null;
                     useSnackbarStore().showErrorMessage(result.error || 'Failed to load commit detail');
                 }
             } finally {
@@ -336,10 +375,16 @@ const useGitStore = defineStore("gitStore", {
                 if (result.success && !result.conflicted) {
                     useSnackbarStore().showSuccessMessage('Pull successful');
                     await this.refreshStatus();
+                    if (this.selectedFile) {
+                        await this.refreshSelectedDiff();
+                    }
                     await this.loadTimeline();
                 } else if (result.conflicted) {
                     useSnackbarStore().showWarningMessage('Pull produced conflicts, please resolve manually');
                     await this.refreshStatus();
+                    if (this.selectedFile) {
+                        await this.refreshSelectedDiff();
+                    }
                 } else {
                     useSnackbarStore().showErrorMessage(result.output || 'Pull failed');
                 }
@@ -399,6 +444,22 @@ const useGitStore = defineStore("gitStore", {
             }
             this.loading.aiGenerate = true;
             this.abortController = new AbortController();
+            // 15 秒超时自动中止：优先组合原生超时信号，环境不支持时降级为定时器 abort
+            let timeoutTimer = null;
+            let signal = this.abortController.signal;
+            const handleTimeout = () => {
+                useSnackbarStore().showWarningMessage('AI generation timed out, partial content retained');
+            };
+            if (typeof AbortSignal.any === 'function' && typeof AbortSignal.timeout === 'function') {
+                signal = AbortSignal.any([this.abortController.signal, AbortSignal.timeout(AI_GENERATE_TIMEOUT_MS)]);
+            } else {
+                timeoutTimer = setTimeout(() => {
+                    if (this.abortController) {
+                        handleTimeout();
+                        this.abortController.abort();
+                    }
+                }, AI_GENERATE_TIMEOUT_MS);
+            }
             try {
                 // 获取已暂存 diff
                 const diffResult = await window.workspaceAPI.git.diff(dir, undefined, true);
@@ -410,18 +471,24 @@ const useGitStore = defineStore("gitStore", {
                 this.commitMessage = '';
                 this.commitSource = 'ai';
                 const chatbotStore = useChatbotStore();
-                for await (const delta of generateCommitMessage(diffResult.patch, chatbotStore, this.abortController.signal)) {
+                for await (const delta of generateCommitMessage(diffResult.patch, chatbotStore, signal)) {
                     if (delta?.content) {
                         this.commitMessage += delta.content;
                     }
                 }
             } catch (err) {
-                if (err?.name === 'AbortError') {
-                    // 中止，保留已生成部分
+                if (err?.name === 'AbortError' || err?.name === 'TimeoutError') {
+                    // 手动中止或超时中止，保留已生成部分文本
+                    if (err?.name === 'TimeoutError') {
+                        handleTimeout();
+                    }
                 } else {
                     useSnackbarStore().showErrorMessage('AI generation failed, please input manually or retry');
                 }
             } finally {
+                if (timeoutTimer) {
+                    clearTimeout(timeoutTimer);
+                }
                 this.loading.aiGenerate = false;
                 this.abortController = null;
             }

@@ -2,12 +2,13 @@
  * ==========================================================================
  * Git 组件定义
  * ==========================================================================
- * 包含：GitPanel（主面板，内含 Toolbar/ChangesView/DiffView/CommitArea/TimelineView）
+ * 包含：GitPage（页面编排：操作面板 + 差异面板双区域布局）
+ *       GitOpsPanel（操作面板：空态分支/Toolbar/ChangesView/CommitArea/TimelineView）
+ *       GitDiffPanel（差异面板：empty/file-diff/commit-detail 三态）
+ *       GitDiffView（Diff 按行渲染与虚拟滚动，被 GitDiffPanel 复用）
  * 依赖：Vue（全局 UMD）、Vuetify、useGitStore、useWorkspaceStore、useSettingStore、useSnackbarStore
  */
 
-// Diff 虚拟滚动阈值
-const DIFF_VIRTUAL_THRESHOLD = 1000;
 
 // ==========================================================================
 // GitDiffView - Diff 按行渲染与虚拟滚动
@@ -292,19 +293,6 @@ const GitTimelineView = defineComponent({
                 </div>
             </template>
         </div>
-        <v-divider></v-divider>
-        <div v-if="gitStore.selectedCommit && gitStore.showResult" class="git-timeline-detail" style="max-height:40%;overflow-y:auto;">
-            <div class="px-3 py-1 text-caption text-grey">
-                {{ gitStore.selectedCommit.substring(0, 7) }} · {{ gitStore.showResult.files.length }} files
-            </div>
-            <div v-for="f in gitStore.showResult.files" :key="f.file" class="px-3 py-1 text-body-2 d-flex align-center">
-                <v-icon size="small" class="mr-2">{{ fileStatusIcon(f.status) }}</v-icon>
-                <span class="text-truncate">{{ f.file }}</span>
-            </div>
-            <git-diff-view :patch="gitStore.showResult.patch" :loading="gitStore.loading.show"
-                @close="gitStore.selectedCommit = null; gitStore.showResult = null;">
-            </git-diff-view>
-        </div>
     </div>
     `,
     setup() {
@@ -323,11 +311,6 @@ const GitTimelineView = defineComponent({
                 return time;
             }
         }
-        function fileStatusIcon(status) {
-            if (status === 'A') return 'mdi-file-plus';
-            if (status === 'D') return 'mdi-file-minus';
-            return 'mdi-file-edit';
-        }
         function onScroll() {
             const el = timelineContainer.value;
             if (!el) return;
@@ -336,17 +319,17 @@ const GitTimelineView = defineComponent({
             }
         }
 
-        return { gitStore, timelineContainer, shortHash, formatTime, fileStatusIcon, onScroll };
+        return { gitStore, timelineContainer, shortHash, formatTime, onScroll };
     },
 });
 
 // ==========================================================================
-// GitPanel - 主面板
+// GitOpsPanel - Git 操作面板（功能面板位置，不含 diff 内容区）
 // ==========================================================================
-const GitPanel = defineComponent({
-    name: 'GitPanel',
+const GitOpsPanel = defineComponent({
+    name: 'GitOpsPanel',
     template: `
-    <div class="git-panel d-flex flex-column" style="height:100%;width:100%;">
+    <div class="git-ops-panel d-flex flex-column" style="height:100%;width:100%;">
         <div v-if="gitStore.loading.check && !gitStore.checkResult"
             class="d-flex align-center justify-center fill-height">
             <v-progress-circular indeterminate size="32"></v-progress-circular>
@@ -392,29 +375,22 @@ const GitPanel = defineComponent({
                     :title="$t('workspace.git.refresh')">
                     <v-icon>mdi-refresh</v-icon>
                 </v-btn>
+                <v-btn icon size="small" variant="text"
+                    :disabled="settingStore.panelTransitioning"
+                    @click="settingStore.switchPanel()"
+                    :title="$t('workspace.git.switchPanelPosition')">
+                    <v-icon>mdi-swap-horizontal</v-icon>
+                </v-btn>
             </div>
             <v-divider></v-divider>
-            <div class="git-panel-body flex-grow-1 d-flex" style="min-height:0;">
-                <template v-if="gitStore.view === 'changes'">
-                    <div style="width:50%;border-right:1px solid rgba(var(--v-theme-on-surface),0.12);">
-                        <git-changes-view></git-changes-view>
-                    </div>
-                    <div style="width:50%;">
-                        <git-diff-view
-                            :patch="gitStore.diffResult?.patch || ''"
-                            :binary="gitStore.diffResult?.binary || false"
-                            :loading="gitStore.loading.diff"
-                            :file-name="gitStore.selectedFile || ''"
-                            @close="gitStore.selectedFile = null; gitStore.diffResult = null;">
-                        </git-diff-view>
-                    </div>
-                </template>
-                <template v-else>
-                    <git-timeline-view style="width:100%;"></git-timeline-view>
-                </template>
+            <div class="git-ops-body flex-grow-1" style="min-height:0;">
+                <git-changes-view v-if="gitStore.view === 'changes'"></git-changes-view>
+                <git-timeline-view v-else style="width:100%;"></git-timeline-view>
             </div>
-            <v-divider></v-divider>
-            <git-commit-area v-if="gitStore.view === 'changes'"></git-commit-area>
+            <template v-if="gitStore.view === 'changes'">
+                <v-divider></v-divider>
+                <git-commit-area></git-commit-area>
+            </template>
         </template>
         <v-dialog v-model="gitStore.pushConfirmDialog" max-width="400">
             <v-card>
@@ -434,21 +410,170 @@ const GitPanel = defineComponent({
     </div>
     `,
     components: {
-        'git-diff-view': GitDiffView,
         'git-changes-view': GitChangesView,
         'git-commit-area': GitCommitArea,
         'git-timeline-view': GitTimelineView,
     },
     setup() {
         const gitStore = useGitStore();
+        const settingStore = useSettingStore();
         const workspaceStore = useWorkspaceStore();
 
         const activeWorkspace = computed(() => workspaceStore.activeWorkspace);
+
+        return { gitStore, settingStore, activeWorkspace };
+    },
+});
+
+// ==========================================================================
+// GitDiffPanel - 差异显示面板（主内容区位置，三态：empty/file-diff/commit-detail）
+// ==========================================================================
+const GitDiffPanel = defineComponent({
+    name: 'GitDiffPanel',
+    template: `
+    <div class="git-diff-panel d-flex flex-column" style="height:100%;width:100%;">
+        <template v-if="mode === 'file-diff'">
+            <div class="git-diff-panel-header px-3 py-2 d-flex align-center">
+                <v-icon size="small" class="mr-2">mdi-file-compare</v-icon>
+                <span class="text-body-2 text-truncate flex-grow-1">{{ gitStore.selectedFile }}</span>
+                <v-btn icon size="x-small" variant="text"
+                    @click="closeFileDiff"
+                    :title="$t('workspace.git.close')">
+                    <v-icon>mdi-close</v-icon>
+                </v-btn>
+            </div>
+            <v-divider></v-divider>
+            <div class="flex-grow-1" style="min-height:0;">
+                <git-diff-view
+                    :patch="gitStore.diffResult?.patch || ''"
+                    :binary="gitStore.diffResult?.binary || false"
+                    :loading="gitStore.loading.diff">
+                </git-diff-view>
+            </div>
+        </template>
+        <template v-else-if="mode === 'commit-detail'">
+            <div class="git-diff-panel-header px-3 py-2 d-flex align-center">
+                <v-icon size="small" class="mr-2">mdi-source-commit</v-icon>
+                <span class="text-body-2" style="font-family:monospace;">{{ shortHash }}</span>
+                <span class="text-caption text-grey ml-2">
+                    {{ $t('workspace.git.filesCount', { count: gitStore.showResult?.files.length || 0 }) }}
+                </span>
+                <v-spacer></v-spacer>
+                <v-btn icon size="x-small" variant="text"
+                    @click="closeCommitDetail"
+                    :title="$t('workspace.git.close')">
+                    <v-icon>mdi-close</v-icon>
+                </v-btn>
+            </div>
+            <div v-if="gitStore.showResult && gitStore.showResult.files.length" class="git-diff-panel-files px-3 py-1">
+                <div v-for="f in gitStore.showResult.files" :key="f.file" class="text-body-2 d-flex align-center py-1">
+                    <v-icon size="small" class="mr-2" :color="fileStatusColor(f.status)">{{ fileStatusIcon(f.status) }}</v-icon>
+                    <span class="text-truncate">{{ f.file }}</span>
+                </div>
+            </div>
+            <v-divider v-if="gitStore.showResult && gitStore.showResult.files.length"></v-divider>
+            <div class="flex-grow-1" style="min-height:0;">
+                <div v-if="gitStore.loading.show" class="d-flex align-center justify-center fill-height">
+                    <v-progress-circular indeterminate size="32"></v-progress-circular>
+                </div>
+                <git-diff-view v-else-if="gitStore.showResult" :patch="gitStore.showResult.patch"></git-diff-view>
+                <div v-else class="d-flex align-center justify-center fill-height pa-4">
+                    <span class="text-body-2 text-grey">{{ $t('workspace.git.commitDetailLoadFailed') }}</span>
+                </div>
+            </div>
+        </template>
+        <template v-else>
+            <div class="d-flex flex-column align-center justify-center fill-height pa-4 text-center">
+                <v-icon size="48" class="mb-3" style="opacity:0.4;">mdi-file-compare</v-icon>
+                <span class="text-body-2 text-grey">{{ $t('workspace.git.diffEmptyHint') }}</span>
+            </div>
+        </template>
+    </div>
+    `,
+    components: {
+        'git-diff-view': GitDiffView,
+    },
+    setup() {
+        const gitStore = useGitStore();
+
+        const mode = computed(() => {
+            if (gitStore.view === 'timeline' && gitStore.selectedCommit) return 'commit-detail';
+            if (gitStore.view === 'changes' && gitStore.selectedFile) return 'file-diff';
+            return 'empty';
+        });
+
+        const shortHash = computed(() => gitStore.selectedCommit ? gitStore.selectedCommit.substring(0, 7) : '');
+
+        function closeFileDiff() {
+            gitStore.selectedFile = null;
+            gitStore.diffResult = null;
+        }
+
+        function closeCommitDetail() {
+            gitStore.selectedCommit = null;
+            gitStore.showResult = null;
+        }
+
+        function fileStatusIcon(status) {
+            if (status === 'A') return 'mdi-file-plus';
+            if (status === 'D') return 'mdi-file-minus';
+            return 'mdi-file-edit';
+        }
+
+        function fileStatusColor(status) {
+            if (status === 'A') return 'success';
+            if (status === 'D') return 'error';
+            return 'warning';
+        }
+
+        return { gitStore, mode, shortHash, closeFileDiff, closeCommitDetail, fileStatusIcon, fileStatusColor };
+    },
+});
+
+// ==========================================================================
+// GitPage - Git 页面（双区域布局编排：操作面板 + 差异面板，唯一入口）
+// ==========================================================================
+const GitPage = defineComponent({
+    name: 'GitPage',
+    template: `
+    <template v-if="opsLeft">
+        <v-col :cols="settingStore.functionPanelCols">
+            <div class="function-panel" :class="{ 'sidebar-left': true }">
+                <workspace-sidebar></workspace-sidebar>
+                <git-ops-panel></git-ops-panel>
+            </div>
+        </v-col>
+        <v-col class="git-page-diff-col" :cols="settingStore.chatPanelCols">
+            <git-diff-panel></git-diff-panel>
+        </v-col>
+    </template>
+    <template v-else>
+        <v-col class="git-page-diff-col" :cols="settingStore.chatPanelCols">
+            <git-diff-panel></git-diff-panel>
+        </v-col>
+        <v-col :cols="settingStore.functionPanelCols">
+            <div class="function-panel" :class="{ 'sidebar-right': true }">
+                <workspace-sidebar></workspace-sidebar>
+                <git-ops-panel></git-ops-panel>
+            </div>
+        </v-col>
+    </template>
+    `,
+    components: {
+        'git-ops-panel': GitOpsPanel,
+        'git-diff-panel': GitDiffPanel,
+        'workspace-sidebar': WorkspaceSidebar,
+    },
+    setup() {
+        const gitStore = useGitStore();
+        const settingStore = useSettingStore();
+
+        const opsLeft = computed(() => settingStore.activePanel !== 'chat');
 
         onMounted(() => {
             gitStore.refresh();
         });
 
-        return { gitStore, activeWorkspace };
+        return { gitStore, settingStore, opsLeft };
     },
 });

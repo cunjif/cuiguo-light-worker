@@ -42,9 +42,12 @@
          ====================================================================== -->
     <div id="app" v-cloak>
         <v-app>
+            <title-bar></title-bar>
             <init-workspace-dialog v-model="showInitWorkspaceDialog"></init-workspace-dialog>
             <v-container fluid class="main-layout pa-0">
                 <v-row no-gutters class="main-row">
+                    <git-page v-if="settingStore.functionTab === 'git'"></git-page>
+                    <template v-else>
                     <v-col :cols="settingStore.leftColValue"
                         :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
@@ -80,27 +83,15 @@
                             <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-left': settingStore.activePanel !== 'chat', 'sidebar-right': settingStore.activePanel === 'chat' }">
                                 <workspace-sidebar></workspace-sidebar>
                                 <workspace-explorer v-if="settingStore.functionTab === 'workspace'" @file-select="onFileSelect"></workspace-explorer>
-                                <git-panel v-if="settingStore.functionTab === 'git'"></git-panel>
-                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
-                                    :class="{ 'drag-over-panel': isDragging }" v-if="settingStore.functionTab !== 'git'">
-                                    <div class="d-flex align-center flex-grow-1" style="min-width:0;">
-                                        <v-btn icon size="small" variant="text"
-                                            :disabled="messageStore.attachments.some(a => a.status === 'processing')"
-                                            @click="triggerFilePicker('left')"
-                                            data-component-id="chat-mcp.chat.file-upload">
-                                            <v-icon>mdi-paperclip</v-icon>
-                                            <v-tooltip activator="parent" location="bottom">{{
-                                                $t('$vuetify.dataIterator.attachment.addTooltip') }}
-                                                (Ctrl+Alt+A)</v-tooltip>
-                                        </v-btn>
-                                        <input ref="filePickerRefLeft" type="file" multiple :accept="attachmentAccept"
-                                            style="display:none" @change="onFilePickerChange($event, 'left')" />
 
-                                    </div>
+                                <div class="panel-header d-flex align-center justify-end ga-1 px-3 py-2"
+                                    :class="{ 'drag-over-panel': isDragging }" v-if="settingStore.functionTab !== 'git'">
                                     <v-btn size="small" variant="text" icon
                                         @click="!settingStore.panelTransitioning && settingStore.switchPanel()"
                                         data-component-id="chat-mcp.chat.switch-panel-button">
                                         <v-icon>mdi-swap-horizontal</v-icon>
+                                        <v-tooltip activator="parent" location="bottom">{{
+                                            $t('$vuetify.dataIterator.q.title') }}</v-tooltip>
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
@@ -126,29 +117,41 @@
                                         <span class="text-caption text-grey">{{
                                             $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
                                     </div>
-                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo"
-                                        counter clearable @keydown="messageStore.handleKeydown"
-                                        v-model="messageStore.userMessage"
-                                        @input="skillStore.matchAndSuggest(messageStore.userMessage)"
-                                        label=""
-                                        @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
-                                        :rows="settingStore.inputRow" auto-grow max-rows="15"
-                                        data-component-id="chat-mcp.chat.input-textarea">
-                                        <template v-slot:append-inner>
-                                            <div class="d-flex flex-column ga-1 mr-1 mb-4">
-                                                <v-btn v-if="messageStore.generating" size="small" color="primary"
-                                                    variant="elevated" @click="messageStore.stop" icon="mdi-stop"
-                                                    data-component-id="chat-mcp.chat.stop-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
-                                                    color="grey" variant="elevated" disabled icon="mdi-arrow-up"
-                                                    v-tooltip:start="'Files processing...'"></v-btn>
-                                                <v-btn v-else-if="(messageStore.userMessage || messageStore.attachments.length > 0) && !messageStore.generating"
-                                                    size="small" color="primary" variant="elevated"
-                                                    @click="messageStore.sendMessage" icon="mdi-arrow-up"
-                                                    data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                            </div>
-                                        </template>
-                                    </v-textarea>
+                                    <div class="input-composer">
+                                        <v-textarea class="input-box" color="primary" type="text" variant="plain"
+                                            hide-details @keydown="messageStore.handleKeydown"
+                                            v-model="messageStore.userMessage"
+                                            @input="skillStore.matchAndSuggest(messageStore.userMessage)"
+                                            @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                            :rows="settingStore.inputRow" auto-grow max-rows="15"
+                                            data-component-id="chat-mcp.chat.input-textarea"></v-textarea>
+                                        <div class="composer-toolbar d-flex align-center ga-1 px-2 pb-1">
+                                            <v-btn icon size="small" variant="text"
+                                                :disabled="messageStore.attachments.some(a => a.status === 'processing')"
+                                                @click="triggerFilePicker('left')"
+                                                data-component-id="chat-mcp.chat.file-upload">
+                                                <v-icon>mdi-paperclip</v-icon>
+                                                <v-tooltip activator="parent" location="bottom">{{
+                                                    $t('$vuetify.dataIterator.attachment.addTooltip') }}
+                                                    (Ctrl+Alt+A)</v-tooltip>
+                                            </v-btn>
+                                            <input ref="filePickerRefLeft" type="file" multiple :accept="attachmentAccept"
+                                                style="display:none" @change="onFilePickerChange($event, 'left')" />
+                                            <model-selector class="composer-model"
+                                                @update:model="chatbotStore.updateActiveModel"></model-selector>
+                                            <v-spacer></v-spacer>
+                                            <v-btn v-if="messageStore.generating" size="small" color="primary"
+                                                variant="elevated" @click="messageStore.stop" icon="mdi-stop"
+                                                data-component-id="chat-mcp.chat.stop-button"></v-btn>
+                                            <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
+                                                color="grey" variant="elevated" disabled icon="mdi-arrow-up"
+                                                v-tooltip:start="'Files processing...'"></v-btn>
+                                            <v-btn v-else-if="(messageStore.userMessage || messageStore.attachments.length > 0) && !messageStore.generating"
+                                                size="small" color="primary" variant="elevated"
+                                                @click="messageStore.sendMessage" icon="mdi-arrow-up"
+                                                data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                        </div>
+                                    </div>
                                 </div>
                                 <v-divider></v-divider>
                                 <div v-if="messageStore.attachments.length > 0"
@@ -235,27 +238,27 @@
                                     <div class="history-list-scrollable">
                                         <transition-group name="fade">
                                             <v-card v-for="(item, index) in historyStore.conversation" variant="plain"
-                                                :key="item.id" class="mb-1">
+                                                :key="item.id" class="mb-1 history-item"
+                                                @click="historyStore.select(index)" ripple>
                                                 <v-card-item>
-                                                    <template v-slot:prepend>
-                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon
-                                                            size="x-small" @click="historyStore.select(index)"
-                                                            density="compact">
-                                                            <b>{{item.history.length}}</b>
-                                                        </v-btn>
-                                                    </template>
-                                                    <v-card-subtitle class="font-weight-bold text-truncate"
-                                                        style="max-width: 200px;">
-                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content
-                                                        || "NA" }}
-                                                    </v-card-subtitle>
+                                                    <div class="history-item-main" style="min-width:0;">
+                                                        <v-card-subtitle class="font-weight-bold text-truncate"
+                                                            style="max-width: 200px;">
+                                                            {{ item.history[0]?.content[1]?.text || item.history[0]?.content
+                                                            || "NA" }}
+                                                        </v-card-subtitle>
+                                                        <div class="history-item-time text-caption text-grey d-flex align-center">
+                                                            <v-icon size="x-small" class="mr-1">mdi-clock-outline</v-icon>
+                                                            <span class="text-truncate">{{ item.id }}</span>
+                                                        </div>
+                                                    </div>
                                                     <template v-slot:append>
                                                         <div class="d-flex" style="gap: 20px;">
                                                             <v-btn size="x-small" color="primary" icon="mdi-download"
-                                                                variant="text" @click="historyStore.downloadById(index)"
+                                                                variant="text" @click.stop="historyStore.downloadById(index)"
                                                                 density="compact"></v-btn>
                                                             <v-btn size="x-small" icon="mdi-delete-outline"
-                                                                variant="text" @click="historyStore.deleteById(index)"
+                                                                variant="text" @click.stop="historyStore.deleteById(index)"
                                                                 density="compact"></v-btn>
                                                         </div>
                                                     </template>
@@ -264,7 +267,7 @@
                                         </transition-group>
                                         <div v-if="historyStore.conversation.length === 0"
                                             class="text-center text-disabled py-4 text-caption">
-                                            No history
+                                            {{ $t('$vuetify.dataIterator.q.empty') }}
                                         </div>
                                     </div>
                                 </div>
@@ -275,27 +278,15 @@
                         :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-right': settingStore.activePanel === 'chat', 'sidebar-left': settingStore.activePanel !== 'chat' }">
-                                <git-panel v-if="settingStore.functionTab === 'git'"></git-panel>
-                                <div class="panel-header d-flex align-center justify-space-between px-3 py-2"
-                                    :class="{ 'drag-over-panel': isDragging }" v-if="settingStore.functionTab !== 'git'">
-                                    <div class="d-flex align-center flex-grow-1" style="min-width:0;">
-                                        <v-btn icon size="small" variant="text"
-                                            :disabled="messageStore.attachments.some(a => a.status === 'processing')"
-                                            @click="triggerFilePicker('right')"
-                                            data-component-id="chat-mcp.chat.file-upload">
-                                            <v-icon>mdi-paperclip</v-icon>
-                                            <v-tooltip activator="parent" location="bottom">{{
-                                                $t('$vuetify.dataIterator.attachment.addTooltip') }}
-                                                (Ctrl+Alt+A)</v-tooltip>
-                                        </v-btn>
-                                        <input ref="filePickerRefRight" type="file" multiple :accept="attachmentAccept"
-                                            style="display:none" @change="onFilePickerChange($event, 'right')" />
 
-                                    </div>
+                                <div class="panel-header d-flex align-center justify-end ga-1 px-3 py-2"
+                                    :class="{ 'drag-over-panel': isDragging }" v-if="settingStore.functionTab !== 'git'">
                                     <v-btn size="small" variant="text" icon
                                         @click="!settingStore.panelTransitioning && settingStore.switchPanel()"
                                         data-component-id="chat-mcp.chat.switch-panel-button">
                                         <v-icon>mdi-swap-horizontal</v-icon>
+                                        <v-tooltip activator="parent" location="bottom">{{
+                                            $t('$vuetify.dataIterator.q.title') }}</v-tooltip>
                                     </v-btn>
                                 </div>
                                 <v-divider></v-divider>
@@ -321,29 +312,41 @@
                                         <span class="text-caption text-grey">{{
                                             $t('$vuetify.dataIterator.skill.clickToActivate') }}</span>
                                     </div>
-                                    <v-textarea class="input-box" dirty color="primary" type="text" variant="solo"
-                                        counter clearable @keydown="messageStore.handleKeydown"
-                                        v-model="messageStore.userMessage"
-                                        @input="skillStore.matchAndSuggest(messageStore.userMessage)"
-                                        label=""
-                                        @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
-                                        :rows="settingStore.inputRow" auto-grow max-rows="15"
-                                        data-component-id="chat-mcp.chat.input-textarea">
-                                        <template v-slot:append-inner>
-                                            <div class="d-flex flex-column ga-1 mr-1 mb-4">
-                                                <v-btn v-if="messageStore.generating" size="small" color="primary"
-                                                    variant="elevated" @click="messageStore.stop" icon="mdi-stop"
-                                                    data-component-id="chat-mcp.chat.stop-button"></v-btn>
-                                                <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
-                                                    color="grey" variant="elevated" disabled icon="mdi-arrow-up"
-                                                    v-tooltip:start="'Files processing...'"></v-btn>
-                                                <v-btn v-else-if="(messageStore.userMessage || messageStore.attachments.length > 0) && !messageStore.generating"
-                                                    size="small" color="primary" variant="elevated"
-                                                    @click="messageStore.sendMessage" icon="mdi-arrow-up"
-                                                    data-component-id="chat-mcp.chat.send-button"></v-btn>
-                                            </div>
-                                        </template>
-                                    </v-textarea>
+                                    <div class="input-composer">
+                                        <v-textarea class="input-box" color="primary" type="text" variant="plain"
+                                            hide-details @keydown="messageStore.handleKeydown"
+                                            v-model="messageStore.userMessage"
+                                            @input="skillStore.matchAndSuggest(messageStore.userMessage)"
+                                            @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                            :rows="settingStore.inputRow" auto-grow max-rows="15"
+                                            data-component-id="chat-mcp.chat.input-textarea"></v-textarea>
+                                        <div class="composer-toolbar d-flex align-center ga-1 px-2 pb-1">
+                                            <v-btn icon size="small" variant="text"
+                                                :disabled="messageStore.attachments.some(a => a.status === 'processing')"
+                                                @click="triggerFilePicker('right')"
+                                                data-component-id="chat-mcp.chat.file-upload">
+                                                <v-icon>mdi-paperclip</v-icon>
+                                                <v-tooltip activator="parent" location="bottom">{{
+                                                    $t('$vuetify.dataIterator.attachment.addTooltip') }}
+                                                    (Ctrl+Alt+A)</v-tooltip>
+                                            </v-btn>
+                                            <input ref="filePickerRefRight" type="file" multiple :accept="attachmentAccept"
+                                                style="display:none" @change="onFilePickerChange($event, 'right')" />
+                                            <model-selector class="composer-model"
+                                                @update:model="chatbotStore.updateActiveModel"></model-selector>
+                                            <v-spacer></v-spacer>
+                                            <v-btn v-if="messageStore.generating" size="small" color="primary"
+                                                variant="elevated" @click="messageStore.stop" icon="mdi-stop"
+                                                data-component-id="chat-mcp.chat.stop-button"></v-btn>
+                                            <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
+                                                color="grey" variant="elevated" disabled icon="mdi-arrow-up"
+                                                v-tooltip:start="'Files processing...'"></v-btn>
+                                            <v-btn v-else-if="(messageStore.userMessage || messageStore.attachments.length > 0) && !messageStore.generating"
+                                                size="small" color="primary" variant="elevated"
+                                                @click="messageStore.sendMessage" icon="mdi-arrow-up"
+                                                data-component-id="chat-mcp.chat.send-button"></v-btn>
+                                        </div>
+                                    </div>
                                 </div>
                                 <v-divider></v-divider>
                                 <div v-if="messageStore.attachments.length > 0"
@@ -430,27 +433,27 @@
                                     <div class="history-list-scrollable">
                                         <transition-group name="fade">
                                             <v-card v-for="(item, index) in historyStore.conversation" variant="plain"
-                                                :key="item.id" class="mb-1">
+                                                :key="item.id" class="mb-1 history-item"
+                                                @click="historyStore.select(index)" ripple>
                                                 <v-card-item>
-                                                    <template v-slot:prepend>
-                                                        <v-btn :color="historyStore.getColor(index)" class="mr-2" icon
-                                                            size="x-small" @click="historyStore.select(index)"
-                                                            density="compact">
-                                                            <b>{{item.history.length}}</b>
-                                                        </v-btn>
-                                                    </template>
-                                                    <v-card-subtitle class="font-weight-bold text-truncate"
-                                                        style="max-width: 200px;">
-                                                        {{ item.history[0]?.content[1]?.text || item.history[0]?.content
-                                                        || "NA" }}
-                                                    </v-card-subtitle>
+                                                    <div class="history-item-main" style="min-width:0;">
+                                                        <v-card-subtitle class="font-weight-bold text-truncate"
+                                                            style="max-width: 200px;">
+                                                            {{ item.history[0]?.content[1]?.text || item.history[0]?.content
+                                                            || "NA" }}
+                                                        </v-card-subtitle>
+                                                        <div class="history-item-time text-caption text-grey d-flex align-center">
+                                                            <v-icon size="x-small" class="mr-1">mdi-clock-outline</v-icon>
+                                                            <span class="text-truncate">{{ item.id }}</span>
+                                                        </div>
+                                                    </div>
                                                     <template v-slot:append>
                                                         <div class="d-flex" style="gap: 20px;">
                                                             <v-btn size="x-small" color="primary" icon="mdi-download"
-                                                                variant="text" @click="historyStore.downloadById(index)"
+                                                                variant="text" @click.stop="historyStore.downloadById(index)"
                                                                 density="compact"></v-btn>
                                                             <v-btn size="x-small" icon="mdi-delete-outline"
-                                                                variant="text" @click="historyStore.deleteById(index)"
+                                                                variant="text" @click.stop="historyStore.deleteById(index)"
                                                                 density="compact"></v-btn>
                                                         </div>
                                                     </template>
@@ -459,12 +462,12 @@
                                         </transition-group>
                                         <div v-if="historyStore.conversation.length === 0"
                                             class="text-center text-disabled py-4 text-caption">
-                                            No history
+                                            {{ $t('$vuetify.dataIterator.q.empty') }}
                                         </div>
                                     </div>
                                 </div>
                                 <workspace-explorer v-if="settingStore.functionTab === 'workspace'" @file-select="onFileSelect"></workspace-explorer>
-                                <git-panel v-if="settingStore.functionTab === 'git'"></git-panel>
+
                                 <workspace-sidebar></workspace-sidebar>
                             </div>
                         </template>
@@ -497,6 +500,7 @@
                             </v-container>
                         </template>
                     </v-col>
+                    </template>
                 </v-row>
             </v-container>
 
@@ -2253,6 +2257,8 @@
     <script src="js/model-role-dispatcher.js"></script>
     <!-- 2. Pinia 状态管理 Store -->
     <script src="js/stores.js"></script>
+    <!-- 2.0.1 设计令牌常量 -->
+    <script src="js/design-tokens.js"></script>
     <!-- 2.1 Workspace Store -->
     <script src="js/workspace-store.js"></script>
     <!-- 2.1.1 Git Store -->
@@ -2263,6 +2269,10 @@
     <script src="js/components.js"></script>
     <!-- 3.1 Workspace 组件定义 -->
     <script src="js/workspace-components.js"></script>
+    <!-- 3.1.0.1 TitleBar 顶部标题栏组件 -->
+    <script src="js/title-bar.js"></script>
+    <!-- 3.1.0.2 ModelSelector 模型选择输入框组件 -->
+    <script src="js/model-selector.js"></script>
     <!-- 3.1.0 Git AI Commit Generator -->
     <script src="js/git-ai-commit.js"></script>
     <!-- 3.1.2 Git 组件定义 -->

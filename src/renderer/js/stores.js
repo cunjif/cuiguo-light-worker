@@ -3728,6 +3728,19 @@ const useChatbotStore = defineStore("chatbotStore", {
         },
 
         /**
+         * 更新当前活动 Provider 的模型名称
+         * @param {string} model - 新的模型标识
+         */
+        updateActiveModel(model) {
+            if (!this.activeProvider) {
+                console.warn('updateActiveModel: no activeProvider, ignoring.');
+                return;
+            }
+            this.activeProvider.model = model;
+            this.model = model;
+        },
+
+        /**
          * 添加 Provider 实例
          * @param {Object} instance - Provider 实例
          * @returns {string} 新实例 ID

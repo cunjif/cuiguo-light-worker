@@ -235,7 +235,7 @@ export async function gitLog(
   const args = [
     'log',
     `--skip=${skip}`,
-    `-n=${limit}`,
+    `--max-count=${limit}`,
     "--pretty=format:%H|%an|%aI|%s",
   ];
   const { stdout } = await runGit(dir, 'log', args);

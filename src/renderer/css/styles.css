@@ -1,4 +1,35 @@
 /* ==========================================================================
+ * 设计令牌（Design Tokens）- 集中定义颜色、间距、尺寸等视觉参数
+ * ========================================================================== */
+:root {
+    /* 颜色令牌 */
+    --panel-bg: #FFFFFF;
+    --titlebar-bg: #1A1A2E;
+    --btn-bg-default: #F5F5F5;
+    --btn-bg-hover: #E0E0E0;
+    --text-primary: #333333;
+    --text-on-titlebar: #FFFFFF;
+    --icon-link-color: #1976D2;
+    --border-color: #DDDDDD;
+
+    /* 间距令牌 */
+    --panel-component-gap-y: 12px;
+    --main-edge-gap: 20px;
+    --nav-btn-gap: 8px;
+    --input-padding-y: 8px;
+    --input-padding-x: 12px;
+    --history-item-height: 40px;
+    --history-item-padding-x: 16px;
+
+    /* 尺寸令牌 */
+    --main-max-width: 1200px;
+    --titlebar-height: 40px;
+
+    /* 动画令牌 */
+    --panel-switch-duration: 300ms;
+}
+
+/* ==========================================================================
  * 全局滚动条样式 - 隐藏默认滚动条
  * ========================================================================== */
 ::-webkit-scrollbar {
@@ -124,6 +155,9 @@
 .main-layout {
     height: 100vh;
     overflow: hidden;
+    max-width: var(--main-max-width);
+    margin: 0 auto;
+    padding: 0 var(--main-edge-gap);
 }
 
 .main-row {
@@ -153,19 +187,19 @@
 
 .panel-header {
     flex-shrink: 0;
-    background-color: white;
+    background-color: var(--panel-bg);
     min-height: 40px;
 }
 
 .input-section {
     flex-shrink: 0;
-    background-color: white;
+    background-color: var(--panel-bg);
 }
 
 .nav-section,
 .bottom-toolbar {
     flex-shrink: 0;
-    background-color: white;
+    background-color: var(--panel-bg);
     flex-wrap: wrap;
 }
 
@@ -173,7 +207,7 @@
     max-height: 120px;
     overflow-y: auto;
     flex-shrink: 0;
-    background-color: white;
+    background-color: var(--panel-bg);
 }
 
 .history-section {
@@ -181,7 +215,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background-color: white;
+    background-color: var(--panel-bg);
 }
 
 .history-list-scrollable {
@@ -195,7 +229,7 @@
  * ========================================================================== */
 .panel-slide-enter-active,
 .panel-slide-leave-active {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all var(--panel-switch-duration) cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .panel-slide-enter-from {
@@ -478,6 +512,7 @@
     border-right: 1px solid rgba(var(--v-theme-on-surface), 0.08);
 }
 
+
 .workspace-explorer {
     position: absolute;
     top: 0;
@@ -609,3 +644,171 @@
     font-style: italic;
 }
 
+/* ==========================================================================
+ * Git 页面 - diff 行着色与双区域布局
+ * ========================================================================== */
+
+.git-diff-line--add {
+    background-color: rgba(76, 175, 80, 0.16);
+}
+
+.git-diff-line--del {
+    background-color: rgba(244, 67, 54, 0.14);
+}
+
+.git-diff-line--hunk {
+    background-color: rgba(var(--v-theme-on-surface), 0.06);
+    color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.git-diff-line--meta {
+    color: rgba(var(--v-theme-on-surface), 0.55);
+}
+
+.git-page-diff-col {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.git-diff-panel-header {
+    flex-shrink: 0;
+    min-height: 40px;
+    background-color: rgba(var(--v-theme-surface-variant), 0.15);
+}
+
+.git-diff-panel-files {
+    max-height: 160px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+ * TitleBar 顶部标题栏样式
+ * ========================================================================== */
+.title-bar {
+    height: var(--titlebar-height);
+    background-color: var(--titlebar-bg);
+    color: var(--text-on-titlebar);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+    z-index: 100;
+}
+
+.title-bar__title {
+    font-size: 14px;
+    font-weight: 600;
+    padding-left: 12px;
+    user-select: none;
+}
+
+.title-bar__controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    -webkit-app-region: no-drag;
+}
+
+.title-bar__controls .v-btn {
+    color: var(--text-on-titlebar) !important;
+}
+
+.title-bar__controls .v-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================================================
+ * ModelSelector 模型选择下拉样式
+ * ========================================================================== */
+.model-selector__input .v-field {
+    padding: var(--input-padding-y) var(--input-padding-x);
+}
+
+/* ==========================================================================
+ * 导航按钮样式令牌化
+ * ========================================================================== */
+.bottom-toolbar .v-btn.v-btn--variant-tonal {
+    background-color: var(--btn-bg-default);
+    gap: var(--nav-btn-gap);
+}
+
+.bottom-toolbar .v-btn.v-btn--variant-tonal:hover {
+    background-color: var(--btn-bg-hover);
+}
+
+.bottom-toolbar {
+    gap: var(--nav-btn-gap);
+}
+
+/* ==========================================================================
+ * 历史记录项样式
+ * ========================================================================== */
+.history-item {
+    min-height: var(--history-item-height);
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 0 var(--history-item-padding-x);
+}
+
+.history-item:hover {
+    background-color: var(--btn-bg-default);
+}
+
+.history-item .v-card-item {
+    padding: 8px var(--history-item-padding-x);
+}
+/* ==========================================================================
+ * 历史记录项时间戳
+ * ========================================================================== */
+.history-item-time {
+    max-width: 200px;
+    line-height: 1.3;
+    opacity: 0.85;
+}
+
+/* ==========================================================================
+ * 输入组合卡片（输入框 + 底部工具行）
+ * ========================================================================== */
+.input-composer {
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color, #DDDDDD);
+    border-radius: 16px;
+    padding-top: 4px;
+}
+
+.input-composer:focus-within {
+    border-color: #1976D2;
+}
+
+.input-composer .input-box .v-field {
+    background-color: transparent;
+    padding: var(--input-padding-y) var(--input-padding-x) 0;
+}
+
+.composer-toolbar {
+    min-height: 36px;
+}
+
+.composer-model {
+    max-width: 240px;
+    min-width: 120px;
+}
+
+.composer-model .v-field {
+    min-height: 32px;
+    padding: 0 4px;
+}
+
+.composer-model .v-field__input {
+    font-size: 0.8rem;
+    color: var(--text-primary, #333333);
+    padding: 4px 6px;
+    min-height: 32px;
+}
+
+.composer-model .v-field__append-inner {
+    padding: 0 2px;
+}

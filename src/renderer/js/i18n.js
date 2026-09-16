@@ -13,9 +13,14 @@ const messages = {
     en: {
         $vuetify: {
             ...en,
+            window: {
+                minimize: 'Minimize',
+                maximize: 'Maximize',
+                close: 'Close',
+            },
             dataIterator: {
                 title: 'CUIGUO Workstattion',
-                q: { title: 'Query History' },
+                q: { title: 'Query History', empty: 'No history' },
                 l: { title: 'Language' },
                 r: { title: 'Resources' },
                 ag: { title: 'Agent' },
@@ -262,6 +267,13 @@ const messages = {
                 pushConfirmText: 'Are you sure you want to push to the remote repository?',
                 cancel: 'Cancel',
                 confirm: 'Confirm',
+                diffEmptyHint: 'Select a changed file to view its diff, or a commit in the timeline to view its details',
+                diffLoadFailed: 'Failed to load diff',
+                commitDetailLoadFailed: 'Failed to load commit detail',
+                commitDetail: 'Commit Detail',
+                filesCount: '{count} files',
+                switchPanelPosition: 'Switch panel position',
+                close: 'Close',
             },
             editor: {
                 save: 'Save',
@@ -294,9 +306,14 @@ const messages = {
     zhHans: {
         $vuetify: {
             ...zhHans,
+            window: {
+                minimize: '最小化',
+                maximize: '最大化',
+                close: '关闭',
+            },
             dataIterator: {
                 title: '脆果办公桌',
-                q: { title: '历史记录' },
+                q: { title: '历史记录', empty: '暂无历史' },
                 l: { title: '语言设置' },
                 r: { title: '资源' },
                 ag: { title: 'Agent' },
@@ -542,6 +559,13 @@ const messages = {
                 pushConfirmText: '确认推送到远程仓库？',
                 cancel: '取消',
                 confirm: '确认',
+                diffEmptyHint: '选择变更文件查看差异，或在时间线中选择提交查看详情',
+                diffLoadFailed: '无法获取差异',
+                commitDetailLoadFailed: '无法获取提交详情',
+                commitDetail: '提交详情',
+                filesCount: '{count} 个文件',
+                switchPanelPosition: '切换面板位置',
+                close: '关闭',
             },
             editor: {
                 save: '保存',

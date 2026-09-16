@@ -199,6 +199,7 @@ async function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
+    frame: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -224,6 +225,31 @@ async function createWindow() {
 
   // You can uncomment the following line to enable DevTools permanently.
   // mainWindow.webContents.openDevTools();
+}
+
+// ==========================================================================
+// 窗口控制 IPC 通道注册
+// ==========================================================================
+function registerWindowControlHandlers() {
+  ipcMain.handle('window:minimize', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) win.minimize();
+  });
+
+  ipcMain.handle('window:maximize', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) return;
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  });
+
+  ipcMain.handle('window:close', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) win.close();
+  });
 }
 
 // 创建 内部npm仓库管理器 窗口
@@ -469,6 +495,8 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
+
+  registerWindowControlHandlers();
 
   bootstrapClientsFromConfig().catch(err => {
     console.error('Deferred MCP client initialization failed:', err?.message);

@@ -111,19 +111,20 @@ const InitWorkspaceDialog = defineComponent({
 });
 
 // ==========================================================================
-// WorkspaceSidebar - 导航侧边栏
+// WorkspaceSidebar - 导航侧边栏（功能面板 / 工作区 / Git 三按钮切换）
 // ==========================================================================
 const WorkspaceSidebar = defineComponent({
     name: 'WorkspaceSidebar',
     template: `
-    <div class="workspace-sidebar" :class="sidebarClass">
+    <div class="workspace-sidebar" :class="sidebarClass" data-component-id="chat-mcp.edge-toolbar">
         <v-btn
             :icon="true"
             :variant="settingStore.functionTab === 'function' ? 'flat' : 'text'"
             :color="settingStore.functionTab === 'function' ? 'primary' : 'default'"
             size="small"
             @click="settingStore.setFunctionTab('function')"
-            :title="$t('workspace.sidebar.functionTab')">
+            :title="$t('workspace.sidebar.functionTab')"
+            data-component-id="chat-mcp.edge-toolbar.function">
             <v-icon>mdi-view-dashboard</v-icon>
         </v-btn>
         <v-btn
@@ -132,7 +133,8 @@ const WorkspaceSidebar = defineComponent({
             :color="settingStore.functionTab === 'workspace' ? 'primary' : 'default'"
             size="small"
             @click="settingStore.setFunctionTab('workspace')"
-            :title="$t('workspace.sidebar.workspaceTab')">
+            :title="$t('workspace.sidebar.workspaceTab')"
+            data-component-id="chat-mcp.edge-toolbar.file-manager">
             <v-icon>mdi-folder</v-icon>
         </v-btn>
         <v-btn
@@ -141,7 +143,8 @@ const WorkspaceSidebar = defineComponent({
             :color="settingStore.functionTab === 'git' ? 'primary' : 'default'"
             size="small"
             @click="settingStore.setFunctionTab('git')"
-            :title="$t('workspace.sidebar.gitTab')">
+            :title="$t('workspace.sidebar.gitTab')"
+            data-component-id="chat-mcp.edge-toolbar.git">
             <v-icon>mdi-git</v-icon>
         </v-btn>
     </div>
@@ -161,6 +164,7 @@ const WorkspaceSidebar = defineComponent({
         return { settingStore, sidebarClass };
     },
 });
+
 
 // ==========================================================================
 // WorkspaceExplorer - 工作目录文件树浏览器
