@@ -99,6 +99,7 @@ out
 dist/*
 deps.txt
 deps*
+release/*
 
 # Gatsby files
 .cache/
