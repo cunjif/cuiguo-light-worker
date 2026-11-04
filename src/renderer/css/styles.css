@@ -36,6 +36,25 @@
     display: none;
 }
 
+/* 内部滚动容器恢复可见滚动条（历史列表、附件行、Git变更列表、文件树、diff文件列表） */
+.history-list-scrollable::-webkit-scrollbar,
+.attachment-row::-webkit-scrollbar,
+.git-changes-list::-webkit-scrollbar,
+.workspace-explorer-tree::-webkit-scrollbar,
+.git-diff-panel-files::-webkit-scrollbar {
+    display: block;
+    width: 6px;
+}
+
+.history-list-scrollable::-webkit-scrollbar-thumb,
+.attachment-row::-webkit-scrollbar-thumb,
+.git-changes-list::-webkit-scrollbar-thumb,
+.workspace-explorer-tree::-webkit-scrollbar-thumb,
+.git-diff-panel-files::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 3px;
+}
+
 /* ==========================================================================
  * 加载动画 - 页面初始化时的旋转加载圈
  * ========================================================================== */
@@ -153,7 +172,7 @@
  * 主布局 - 左右面板
  * ========================================================================== */
 .main-layout {
-    height: 100vh;
+    height: calc(100vh - var(--titlebar-height));
     overflow: hidden;
     max-width: var(--main-max-width);
     margin: 0 auto;
@@ -165,13 +184,13 @@
 }
 
 .left-panel {
-    height: 100vh;
+    height: 100%;
     overflow-y: auto;
     border-right: 1px solid #e5e7eb;
 }
 
 .right-panel {
-    height: 100vh;
+    height: 100%;
     overflow-y: auto;
     background-color: #fafafa;
 }
@@ -180,7 +199,7 @@
  * 功能面板 - 垂直弹性布局
  * ========================================================================== */
 .function-panel {
-    height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
 }
@@ -666,7 +685,7 @@
 }
 
 .git-page-diff-col {
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
 }
 
@@ -800,6 +819,18 @@
 .composer-model .v-field {
     min-height: 32px;
     padding: 0 4px;
+    border: 1px solid var(--border-color, #DDDDDD);
+    border-radius: 8px;
+    background-color: var(--btn-bg-default, #F5F5F5);
+    transition: border-color 0.2s;
+}
+
+.composer-model .v-field:hover {
+    border-color: var(--btn-bg-hover, #E0E0E0);
+}
+
+.composer-model .v-field:focus-within {
+    border-color: #1976D2;
 }
 
 .composer-model .v-field__input {

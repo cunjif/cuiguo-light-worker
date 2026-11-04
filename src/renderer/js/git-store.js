@@ -471,9 +471,17 @@ const useGitStore = defineStore("gitStore", {
                 this.commitMessage = '';
                 this.commitSource = 'ai';
                 const chatbotStore = useChatbotStore();
+                // 首个有效内容到达前跳过前导空白，避免消息开头出现多余空行
+                let streamStarted = false;
                 for await (const delta of generateCommitMessage(diffResult.patch, chatbotStore, signal)) {
                     if (delta?.content) {
-                        this.commitMessage += delta.content;
+                        let content = delta.content;
+                        if (!streamStarted) {
+                            content = content.replace(/^\s+/, '');
+                            if (!content) continue;
+                            streamStarted = true;
+                        }
+                        this.commitMessage += content;
                     }
                 }
             } catch (err) {
@@ -491,6 +499,8 @@ const useGitStore = defineStore("gitStore", {
                 }
                 this.loading.aiGenerate = false;
                 this.abortController = null;
+                // 完成或中止后统一清理：去首尾空行、剥代码围栏、压缩多余空行
+                this.commitMessage = sanitizeCommitMessage(this.commitMessage);
             }
         },
 

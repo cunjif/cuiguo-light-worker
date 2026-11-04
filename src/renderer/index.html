@@ -137,17 +137,16 @@
                                             </v-btn>
                                             <input ref="filePickerRefLeft" type="file" multiple :accept="attachmentAccept"
                                                 style="display:none" @change="onFilePickerChange($event, 'left')" />
+                                            <v-spacer></v-spacer>
                                             <model-selector class="composer-model"
                                                 @update:model="chatbotStore.updateActiveModel"></model-selector>
-                                            <v-spacer></v-spacer>
                                             <v-btn v-if="messageStore.generating" size="small" color="primary"
-                                                variant="elevated" @click="messageStore.stop" icon="mdi-stop"
+                                                rounded="lg" variant="flat" @click="messageStore.stop" icon="mdi-stop"
                                                 data-component-id="chat-mcp.chat.stop-button"></v-btn>
                                             <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
-                                                color="grey" variant="elevated" disabled icon="mdi-arrow-up"
+                                                color="grey" rounded="lg" variant="flat" disabled icon="mdi-arrow-up"
                                                 v-tooltip:start="'Files processing...'"></v-btn>
-                                            <v-btn v-else-if="(messageStore.userMessage || messageStore.attachments.length > 0) && !messageStore.generating"
-                                                size="small" color="primary" variant="elevated"
+                                            <v-btn v-else size="small" color="primary" rounded="lg" variant="flat"
                                                 @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                 data-component-id="chat-mcp.chat.send-button"></v-btn>
                                         </div>
@@ -332,17 +331,16 @@
                                             </v-btn>
                                             <input ref="filePickerRefRight" type="file" multiple :accept="attachmentAccept"
                                                 style="display:none" @change="onFilePickerChange($event, 'right')" />
+                                            <v-spacer></v-spacer>
                                             <model-selector class="composer-model"
                                                 @update:model="chatbotStore.updateActiveModel"></model-selector>
-                                            <v-spacer></v-spacer>
                                             <v-btn v-if="messageStore.generating" size="small" color="primary"
-                                                variant="elevated" @click="messageStore.stop" icon="mdi-stop"
+                                                rounded="lg" variant="flat" @click="messageStore.stop" icon="mdi-stop"
                                                 data-component-id="chat-mcp.chat.stop-button"></v-btn>
                                             <v-btn v-else-if="messageStore.attachments.some(a => a.status === 'processing')" size="small"
-                                                color="grey" variant="elevated" disabled icon="mdi-arrow-up"
+                                                color="grey" rounded="lg" variant="flat" disabled icon="mdi-arrow-up"
                                                 v-tooltip:start="'Files processing...'"></v-btn>
-                                            <v-btn v-else-if="(messageStore.userMessage || messageStore.attachments.length > 0) && !messageStore.generating"
-                                                size="small" color="primary" variant="elevated"
+                                            <v-btn v-else size="small" color="primary" rounded="lg" variant="flat"
                                                 @click="messageStore.sendMessage" icon="mdi-arrow-up"
                                                 data-component-id="chat-mcp.chat.send-button"></v-btn>
                                         </div>

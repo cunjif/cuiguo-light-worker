@@ -36,7 +36,8 @@ function buildCommitMessages(diff) {
         'Type must be one of: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert.',
         'Keep the subject line under 72 characters. Use imperative mood.',
         'If needed, add a blank line followed by a body explaining what and why (not how).',
-        'Output ONLY the commit message, no code fences, no explanations, no preamble.',
+        'The first line of your output MUST be the subject line, starting directly with the type keyword (e.g. "feat: ...").',
+        'Do NOT output any leading blank lines or whitespace, quotes, markdown code fences, bullet lists, or any text before or after the commit message.',
     ].join(' ');
 
     // diff 可能过长，截断保护
@@ -49,6 +50,25 @@ function buildCommitMessages(diff) {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Generate a commit message for the following staged diff:\n\n${truncatedDiff}` },
     ];
+}
+
+/**
+ * 清理 AI 生成的提交消息
+ * - 去除首尾空白与换行（修复消息开头/结尾的多余空行）
+ * - 剥离误包裹的 Markdown 代码围栏
+ * - 将 3 个以上连续换行压缩为 2 个（保留标题与正文间的一个空行）
+ * @param {string} raw - 原始生成文本
+ * @returns {string} 清理后的提交消息
+ */
+function sanitizeCommitMessage(raw) {
+    let msg = typeof raw === 'string' ? raw : '';
+    msg = msg.trim();
+    const fenceMatch = msg.match(/^```[a-zA-Z]*\r?\n([\s\S]*?)\r?\n?```$/);
+    if (fenceMatch) {
+        msg = fenceMatch[1].trim();
+    }
+    msg = msg.replace(/\n{3,}/g, '\n\n');
+    return msg;
 }
 
 /**
