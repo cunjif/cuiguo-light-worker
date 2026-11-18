@@ -247,6 +247,16 @@ const SHORTCUT_DEFINITIONS = [
         action: 'toggleSoftWrap',
         context: ['editViewFocused'],
     },
+
+    // ----------------------------------------------------------------------
+    // 面板收起/展开
+    // ----------------------------------------------------------------------
+    {
+        id: 'toggle-panel',
+        keyCombo: { mainKey: 'b', modifiers: ['CtrlOrCmd'] },
+        action: 'togglePanelCollapsed',
+        context: ['noModalDialog'],
+    },
 ];
 
 if (typeof window !== 'undefined') {

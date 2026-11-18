@@ -48,12 +48,15 @@
                 <v-row no-gutters class="main-row">
                     <git-page v-if="settingStore.functionTab === 'git'"></git-page>
                     <template v-else>
-                    <v-col :cols="settingStore.leftColValue"
+                    <div class="panel-split-container" :style="{ 'flex-direction': settingStore.activePanel === 'chat' ? 'row' : 'row-reverse' }">
+                    <div class="panel-split-left"
+                        :style="{ width: settingStore.isPanelCollapsed(settingStore.functionTab) ? '0%' : (settingStore.getPanelRatio(settingStore.functionTab) + '%') }"
                         :class="settingStore.activePanel === 'chat' ? 'left-panel' : 'right-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <editor-shortcuts v-if="settingStore.functionTab === 'workspace'">
                                 <div class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
                                     <editor-tab-bar></editor-tab-bar>
+                                    <editor-status-bar></editor-status-bar>
                                     <file-editor class="flex-grow-1"></file-editor>
                                 </div>
                             </editor-shortcuts>
@@ -67,6 +70,7 @@
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
+                                    @edit-resend="(index, content) => messageStore.editAndResend(index, content)"
                                     data-component-id="chat-mcp.chat.message-area"></tuui-chat-box>
                                 <div class="fill-area"></div>
                                 <v-btn v-show="!isAtBottom" icon variant="elevated" size="small"
@@ -272,8 +276,15 @@
                                 </div>
                             </div>
                         </template>
-                    </v-col>
-                    <v-col :cols="settingStore.rightColValue"
+                    </div>
+                    <panel-splitter v-if="!settingStore.isPanelCollapsed(settingStore.functionTab)"
+                        :ratio="settingStore.getPanelRatio(settingStore.functionTab)"
+                        :disabled="settingStore.panelTransitioning"
+                        @update:ratio="(r) => settingStore.setPanelRatio(settingStore.functionTab, r)"
+                        @drag-end="settingStore.persistPanelConfig && settingStore.persistPanelConfig()">
+                    </panel-splitter>
+                    <div class="panel-split-right"
+                        :style="{ width: settingStore.isPanelCollapsed(settingStore.functionTab) ? '100%' : ((100 - settingStore.getPanelRatio(settingStore.functionTab)) + '%') }"
                         :class="settingStore.activePanel === 'chat' ? 'right-panel' : 'left-panel'">
                         <template v-if="settingStore.activePanel === 'chat'">
                             <div class="function-panel" :class="{ 'workspace-mode': settingStore.functionTab === 'workspace', 'sidebar-right': settingStore.activePanel === 'chat', 'sidebar-left': settingStore.activePanel !== 'chat' }">
@@ -473,6 +484,7 @@
                             <editor-shortcuts v-if="settingStore.functionTab === 'workspace'">
                                 <div class="d-flex flex-column chat-panel-file-editor" style="height:100%;">
                                     <editor-tab-bar></editor-tab-bar>
+                                    <editor-status-bar></editor-status-bar>
                                     <file-editor class="flex-grow-1"></file-editor>
                                 </div>
                             </editor-shortcuts>
@@ -486,6 +498,7 @@
                                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                                     :language="languageStore.getLocale" :generating="messageStore.generating"
                                     @regenerate="messageStore.regenerateFromIndex($event)"
+                                    @edit-resend="(index, content) => messageStore.editAndResend(index, content)"
                                     data-component-id="chat-mcp.chat.message-area-alt"></tuui-chat-box>
                                 <v-btn v-show="!isAtBottom" icon variant="elevated" size="small"
                                     class="scroll-to-bottom-btn"
@@ -497,7 +510,8 @@
                                 </v-btn>
                             </v-container>
                         </template>
-                    </v-col>
+                    </div>
+                    </div>
                     </template>
                 </v-row>
             </v-container>
@@ -1428,6 +1442,87 @@
             </v-dialog>
 
             <!-- ================================================================
+                 LSP 语言服务器配置对话框
+                 ================================================================ -->
+            <v-dialog v-model="settingStore.lspConfigDialog" max-width="720" class="dialog-card" persistent
+                data-component-id="chat-mcp.dialog.lsp-config">
+                <v-card style="max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
+                    <v-card-title class="pa-4 d-flex align-center flex-shrink-0">
+                        <v-icon start size="small" class="mr-2">mdi-code-braces</v-icon>
+                        <span class="flex-fill">语言服务器配置</span>
+                        <v-btn variant="text" rounded icon="mdi-close" size="small" color="primary"
+                            @click="settingStore.lspConfigDialog = false">
+                        </v-btn>
+                    </v-card-title>
+                    <v-divider class="flex-shrink-0"></v-divider>
+                    <v-card-text class="pa-4" style="overflow-y: auto; flex: 1 1 auto; min-height: 0;">
+                        <div v-if="!settingStore.lspConfigData" class="text-center text-grey pa-4">
+                            加载配置中...
+                        </div>
+                        <div v-else>
+                            <!-- Python 语言服务器 -->
+                            <v-card variant="outlined" class="mb-4">
+                                <v-card-title class="text-subtitle-1 pa-3">
+                                    <v-icon start size="small" :color="settingStore.getLspStatus('python') === 'ready' ? 'green' : (settingStore.getLspStatus('python') === 'starting' ? 'orange' : (settingStore.getLspStatus('python') === 'error' ? 'red' : 'grey'))">
+                                        {{ settingStore.getLspStatus('python') === 'starting' ? 'mdi-loading mdi-spin' : 'mdi-language-python' }}
+                                    </v-icon>
+                                    Python
+                                    <v-chip size="x-small" class="ml-2"
+                                        :color="settingStore.getLspStatus('python') === 'ready' ? 'green' : (settingStore.getLspStatus('python') === 'starting' ? 'orange' : (settingStore.getLspStatus('python') === 'error' ? 'red' : 'grey'))">
+                                        {{ settingStore.getLspStatus('python') === 'ready' ? '就绪' : (settingStore.getLspStatus('python') === 'starting' ? '启动中' : (settingStore.getLspStatus('python') === 'error' ? '异常' : '未启动')) }}
+                                    </v-chip>
+                                </v-card-title>
+                                <v-card-text class="pa-3 pt-0">
+                                    <v-switch v-model="settingStore.lspConfigData.python.enabled" label="启用" density="compact" color="primary"
+                                        @update:model-value="settingStore.saveLspConfig(settingStore.lspConfigData)"></v-switch>
+                                    <v-text-field v-model="settingStore.lspConfigData.python.command" label="可执行文件路径" density="compact" variant="outlined" class="mt-2"
+                                        hint="如 pyright-langserver"></v-text-field>
+                                    <v-text-field :model-value="settingStore.lspConfigData.python.args.join(' ')" @update:model-value="settingStore.lspConfigData.python.args = $event.split(' ').filter(a => a.trim())" label="启动参数" density="compact" variant="outlined" class="mt-2"
+                                        hint="如 pyright-langserver --stdio"></v-text-field>
+                                    <div class="d-flex mt-3">
+                                        <v-btn size="small" variant="outlined" color="primary" @click="settingStore.startLspServer('python')">启动</v-btn>
+                                        <v-btn size="small" variant="outlined" class="ml-2" @click="settingStore.stopLspServer('python')">停止</v-btn>
+                                    </div>
+                                </v-card-text>
+                            </v-card>
+
+                            <!-- Java 语言服务器 -->
+                            <v-card variant="outlined" class="mb-4">
+                                <v-card-title class="text-subtitle-1 pa-3">
+                                    <v-icon start size="small" :color="settingStore.getLspStatus('java') === 'ready' ? 'green' : (settingStore.getLspStatus('java') === 'starting' ? 'orange' : (settingStore.getLspStatus('java') === 'error' ? 'red' : 'grey'))">
+                                        {{ settingStore.getLspStatus('java') === 'starting' ? 'mdi-loading mdi-spin' : 'mdi-language-java' }}
+                                    </v-icon>
+                                    Java
+                                    <v-chip size="x-small" class="ml-2"
+                                        :color="settingStore.getLspStatus('java') === 'ready' ? 'green' : (settingStore.getLspStatus('java') === 'starting' ? 'orange' : (settingStore.getLspStatus('java') === 'error' ? 'red' : 'grey'))">
+                                        {{ settingStore.getLspStatus('java') === 'ready' ? '就绪' : (settingStore.getLspStatus('java') === 'starting' ? '启动中' : (settingStore.getLspStatus('java') === 'error' ? '异常' : '未启动')) }}
+                                    </v-chip>
+                                </v-card-title>
+                                <v-card-text class="pa-3 pt-0">
+                                    <v-switch v-model="settingStore.lspConfigData.java.enabled" label="启用" density="compact" color="primary"
+                                        @update:model-value="settingStore.saveLspConfig(settingStore.lspConfigData)"></v-switch>
+                                    <v-text-field v-model="settingStore.lspConfigData.java.command" label="可执行文件路径" density="compact" variant="outlined" class="mt-2"
+                                        hint="如 jdtls"></v-text-field>
+                                    <v-text-field :model-value="settingStore.lspConfigData.java.args.join(' ')" @update:model-value="settingStore.lspConfigData.java.args = $event.split(' ').filter(a => a.trim())" label="启动参数" density="compact" variant="outlined" class="mt-2"
+                                        hint="如 --stdio"></v-text-field>
+                                    <div class="d-flex mt-3">
+                                        <v-btn size="small" variant="outlined" color="primary" @click="settingStore.startLspServer('java')">启动</v-btn>
+                                        <v-btn size="small" variant="outlined" class="ml-2" @click="settingStore.stopLspServer('java')">停止</v-btn>
+                                    </div>
+                                </v-card-text>
+                            </v-card>
+                        </div>
+                    </v-card-text>
+                    <v-divider class="flex-shrink-0"></v-divider>
+                    <v-card-actions class="pa-3 flex-shrink-0">
+                        <v-spacer></v-spacer>
+                        <v-btn variant="outlined" @click="settingStore.lspConfigDialog = false">关闭</v-btn>
+                        <v-btn variant="flat" color="primary" @click="settingStore.saveLspConfig(settingStore.lspConfigData)">保存配置</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- ================================================================
                  Skill Management 对话框
                  ================================================================ -->
             <v-dialog v-model="settingStore.skillDialog" max-width="900" class="dialog-card" persistent
@@ -1898,7 +1993,7 @@
                         <v-avatar :size=size class="mt-3 mr-3 mr-lg-6" color="primary" icon="mdi-account-circle">
                         </v-avatar>
                         <tuui-chat-card class="gradient text-pre-wrap" :index="group.index" :messages="messages"
-                            :show-modify="true">
+                            :show-modify="true" @edit-resend="(...args) => $emit('edit-resend', ...args)">
                             <template v-slot:default="{ showmodify }">
                                 <v-card-text v-if="Array.isArray(group.message.content)" class="md-preview">
                                     <div v-for="(item, index) in group.message.content" :key="index">
@@ -2032,33 +2127,30 @@
     <template id="tuui-chat-card-template">
         <v-hover open-delay="100">
             <template v-slot:default="{ isHovering, props }">
-                <v-card v-bind="props" :elevation="isHovering ? 4 : 2" width="100vw" max-width="100%">
+                <v-card v-bind="props" :elevation="isHovering ? 4 : 2" width="100vw" max-width="100%"
+                    @keydown="onEditKeydown">
                     <slot :showcontent="showcontent" :showmodify="showmodify"></slot>
-                    <v-expand-transition>
-                        <div v-if="isHovering">
-                            <v-divider></v-divider>
-                            <v-card-actions data-component-id="chat-mcp.chat.message-actions">
-                                <v-btn v-if="showRegenerate" color="primary" icon="mdi-autorenew" size="x-small"
-                                    variant="plain" :disabled="generating"
-                                    v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
-                                    @click="regenerateFromIndex(index)"
-                                    data-component-id="chat-mcp.chat.regenerate-button"></v-btn>
-                                <v-btn v-if="showCopy" color="primary" icon="mdi-content-copy" size="x-small"
-                                    variant="plain" @click="copyToClipboard(messages[index])"></v-btn>
-                                <v-btn v-if="showModify" color="primary"
-                                    :icon=" showmodify ? 'mdi-check-bold' : 'mdi-lead-pencil'" size="x-small"
-                                    variant="plain" @click="showmodify = !showmodify" v-bind="showmodify"></v-btn>
-                                <v-btn v-if="showContent" color="primary"
-                                    :icon=" showcontent ? 'mdi-eye-remove' : 'mdi-eye'" size="x-small" variant="plain"
-                                    @click="showcontent = !showcontent" v-bind="showcontent"></v-btn>
-                                <v-spacer></v-spacer>
-                                <v-btn v-if="showReduce && index > 0" color="error" icon="mdi-format-align-top"
-                                    size="x-small" variant="plain" @click="messages.splice(0, index)"></v-btn>
-                                <v-btn v-if="showDelete" color="error" icon="mdi-delete-off-outline" size="x-small"
-                                    variant="plain" @click="messages.splice(index, range)"></v-btn>
-                            </v-card-actions>
-                        </div>
-                    </v-expand-transition>
+                    <v-divider></v-divider>
+                    <v-card-actions data-component-id="chat-mcp.chat.message-actions">
+                        <v-btn v-if="showRegenerate" color="primary" icon="mdi-autorenew" size="x-small"
+                            variant="plain" :disabled="generating"
+                            v-tooltip:start="$t('$vuetify.dataIterator.g.reg')"
+                            @click="regenerateFromIndex(index)"
+                            data-component-id="chat-mcp.chat.regenerate-button"></v-btn>
+                        <v-btn v-if="showCopy" color="primary" icon="mdi-content-copy" size="x-small"
+                            variant="plain" @click="copyToClipboard(messages[index])"></v-btn>
+                        <v-btn v-if="showModify" color="primary"
+                            :icon=" showmodify ? 'mdi-send' : 'mdi-lead-pencil'" size="x-small"
+                            variant="plain" @click="onModifyClick"></v-btn>
+                        <v-btn v-if="showContent" color="primary"
+                            :icon=" showcontent ? 'mdi-eye-remove' : 'mdi-eye'" size="x-small" variant="plain"
+                            @click="showcontent = !showcontent" v-bind="showcontent"></v-btn>
+                        <v-spacer></v-spacer>
+                        <v-btn v-if="showReduce && index > 0" color="error" icon="mdi-format-align-top"
+                            size="x-small" variant="plain" @click="messages.splice(0, index)"></v-btn>
+                        <v-btn v-if="showDelete" color="error" icon="mdi-delete-off-outline" size="x-small"
+                            variant="plain" @click="messages.splice(index, range)"></v-btn>
+                    </v-card-actions>
                 </v-card>
             </template>
         </v-hover>
@@ -2273,8 +2365,26 @@
     <script src="js/model-selector.js"></script>
     <!-- 3.1.0 Git AI Commit Generator -->
     <script src="js/git-ai-commit.js"></script>
+    <!-- 3.1.2.1 Panel 分隔条组件（须在 git-components 之前加载） -->
+    <script src="js/panel-components.js"></script>
     <!-- 3.1.2 Git 组件定义 -->
     <script src="js/git-components.js"></script>
+    <!-- 3.1.2.2 语言映射与导航配置 -->
+    <script src="js/language-config.js"></script>
+    <!-- 3.1.2.2a 代码导航核心模块 -->
+    <script src="js/code-navigation/navigation-level-resolver.js"></script>
+    <script src="js/code-navigation/hover-provider-registry.js"></script>
+    <script src="js/code-navigation/definition-provider-registry.js"></script>
+    <script src="js/code-navigation/go-to-definition-action.js"></script>
+    <script src="js/code-navigation/code-navigation-manager.js"></script>
+    <!-- 3.1.2.2b LSP 桥接层模块 -->
+    <script src="js/lsp/lsp-server-status-manager.js"></script>
+    <script src="js/lsp/lsp-config-manager.js"></script>
+    <script src="js/lsp/lsp-bridge.js"></script>
+    <script src="js/lsp/lsp-document-sync-manager.js"></script>
+    <script src="js/lsp/lsp-completion-provider-registry.js"></script>
+    <!-- 3.1.2.3 Markdown 富渲染管道 -->
+    <script src="js/markdown-render.js"></script>
     <!-- 3.1.1 Editor 快捷键模块 -->
     <script src="js/editor-shortcuts/platform.js"></script>
     <script src="js/editor-shortcuts/shortcut-definitions.js"></script>
@@ -2289,6 +2399,45 @@
         if (window.require) {
             window.require.config({ paths: { vs: 'lib/monaco/vs' } });
         }
+    </script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.require) {
+                window.require(['vs/editor/editor.main'], () => {
+                    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                        target: monaco.languages.typescript.ScriptTarget.ESNext,
+                        module: monaco.languages.typescript.ModuleKind.ESNext,
+                        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                        allowNonTsExtensions: true,
+                        allowJs: true,
+                        jsx: monaco.languages.typescript.JsxEmit.React,
+                        esModuleInterop: true,
+                        allowSyntheticDefaultImports: true,
+                        noEmit: true,
+                        skipLibCheck: true,
+                    });
+                    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                        target: monaco.languages.typescript.ScriptTarget.ESNext,
+                        module: monaco.languages.typescript.ModuleKind.ESNext,
+                        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                        allowNonTsExtensions: true,
+                        allowJs: true,
+                        esModuleInterop: true,
+                        allowSyntheticDefaultImports: true,
+                        noEmit: true,
+                        skipLibCheck: true,
+                    });
+                    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+                        noSemanticValidation: false,
+                        noSyntaxValidation: false,
+                    });
+                    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+                        noSemanticValidation: false,
+                        noSyntaxValidation: false,
+                    });
+                });
+            }
+        });
     </script>
     <!-- 4. 国际化消息 -->
     <script src="js/i18n.js"></script>

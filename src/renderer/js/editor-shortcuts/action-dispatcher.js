@@ -40,6 +40,10 @@ function dispatchAction(definition, store) {
             return store.zoomReset();
         case 'toggleSoftWrap':
             return store.toggleSoftWrap();
+        case 'togglePanelCollapsed': {
+            const settingStore = useSettingStore();
+            return settingStore.togglePanelCollapsed();
+        }
         case 'delegateMonaco': {
             const editor = store.activeEditor;
             if (!editor) return;

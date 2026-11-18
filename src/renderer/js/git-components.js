@@ -536,33 +536,31 @@ const GitDiffPanel = defineComponent({
 const GitPage = defineComponent({
     name: 'GitPage',
     template: `
-    <template v-if="opsLeft">
-        <v-col :cols="settingStore.functionPanelCols">
-            <div class="function-panel" :class="{ 'sidebar-left': true }">
+    <div class="panel-split-container" :style="{ 'flex-direction': opsLeft ? 'row' : 'row-reverse' }">
+        <div class="panel-split-left"
+            :style="{ width: settingStore.isPanelCollapsed('git') ? '0%' : (settingStore.getPanelRatio('git') + '%') }">
+            <div class="function-panel" :class="{ 'sidebar-left': opsLeft, 'sidebar-right': !opsLeft }">
                 <workspace-sidebar></workspace-sidebar>
                 <git-ops-panel></git-ops-panel>
             </div>
-        </v-col>
-        <v-col class="git-page-diff-col" :cols="settingStore.chatPanelCols">
+        </div>
+        <panel-splitter v-if="!settingStore.isPanelCollapsed('git')"
+            :ratio="settingStore.getPanelRatio('git')"
+            :disabled="settingStore.panelTransitioning"
+            @update:ratio="(r) => settingStore.setPanelRatio('git', r)"
+            @drag-end="settingStore.persistPanelConfig && settingStore.persistPanelConfig()">
+        </panel-splitter>
+        <div class="panel-split-right git-page-diff-col"
+            :style="{ width: settingStore.isPanelCollapsed('git') ? '100%' : ((100 - settingStore.getPanelRatio('git')) + '%') }">
             <git-diff-panel></git-diff-panel>
-        </v-col>
-    </template>
-    <template v-else>
-        <v-col class="git-page-diff-col" :cols="settingStore.chatPanelCols">
-            <git-diff-panel></git-diff-panel>
-        </v-col>
-        <v-col :cols="settingStore.functionPanelCols">
-            <div class="function-panel" :class="{ 'sidebar-right': true }">
-                <workspace-sidebar></workspace-sidebar>
-                <git-ops-panel></git-ops-panel>
-            </div>
-        </v-col>
-    </template>
+        </div>
+    </div>
     `,
     components: {
         'git-ops-panel': GitOpsPanel,
         'git-diff-panel': GitDiffPanel,
         'workspace-sidebar': WorkspaceSidebar,
+        'panel-splitter': PanelSplitter,
     },
     setup() {
         const gitStore = useGitStore();

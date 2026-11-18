@@ -831,6 +831,10 @@ const useAgentStore = defineStore("agentStore", {
  * Setting Store
  * 管理 UI 设置、MCP 服务器配置、技能管理、Registry 状态等
  */
+const MIN_PANEL_RATIO = 20;
+const MAX_PANEL_RATIO = 80;
+const DEFAULT_PANEL_RATIO = 58;
+
 const useSettingStore = defineStore("settingStore", {
     state: () => ({
         /** @type {number} 输入框行数 */
@@ -964,33 +968,66 @@ const useSettingStore = defineStore("settingStore", {
         activePanel: 'chat',
         /** @type {boolean} 面板切换中 */
         panelTransitioning: false,
-        /** @type {number} 聊天面板列数 */
+        /** @type {number} 聊天面板列数（兼容字段，从 panelRatio 反算） */
         chatPanelCols: 7,
-        /** @type {number} 功能面板列数 */
+        /** @type {number} 功能面板列数（兼容字段，从 panelRatio 反算） */
         functionPanelCols: 5,
 
         /** @type {string} 功能面板内当前 tab: 'function' | 'workspace' | 'git' */
         functionTab: 'function',
         /** @type {boolean} 工作目录侧边栏是否折叠 */
         sidebarCollapsed: false,
+
+        /** @type {Object<string, number>} 各页签左侧面板占比百分比，按 'function'/'workspace'/'git' 独立管理 */
+        panelRatio: { function: 58, workspace: 58, git: 58 },
+        /** @type {Object<string, boolean>} 各页签面板收起状态 */
+        panelCollapsed: { function: false, workspace: false, git: false },
+        /** @type {Object<string, number>} 各页签收起前的比例记忆 */
+        panelRatioMemory: { function: 58, workspace: 58, git: 58 },
+
+        // LSP 语言服务器配置
+        /** @type {boolean} LSP 配置对话框 */
+        lspConfigDialog: false,
+        /** @type {Object} LSP 配置数据 */
+        lspConfigData: null,
+        /** @type {Object<string, string>} LSP 服务器状态映射 */
+        lspServerStatus: {},
     }),
 
     getters: {
         /**
-         * 左侧列值 - 根据活动面板动态计算
+         * 左侧列值 - 根据活动面板动态计算（兼容字段，从 panelRatio 反算）
          */
         leftColValue(state) {
-            return state.activePanel === 'chat'
-                ? state.chatPanelCols
-                : state.functionPanelCols;
+            const tab = state.functionTab;
+            const ratio = state.panelCollapsed[tab] ? 0 : state.panelRatio[tab];
+            return Math.round(ratio / 100 * 12);
         },
         /**
-         * 右侧列值 - 根据活动面板动态计算
+         * 右侧列值 - 根据活动面板动态计算（兼容字段，从 panelRatio 反算）
          */
         rightColValue(state) {
-            return state.activePanel === 'chat'
-                ? state.functionPanelCols
-                : state.chatPanelCols;
+            const tab = state.functionTab;
+            const ratio = state.panelCollapsed[tab] ? 100 : (100 - state.panelRatio[tab]);
+            return Math.round(ratio / 100 * 12);
+        },
+        /**
+         * 获取指定页签的左侧面板占比百分比
+         */
+        getPanelRatio(state) {
+            return (tab) => {
+                const t = tab || state.functionTab;
+                return state.panelCollapsed[t] ? 0 : state.panelRatio[t];
+            };
+        },
+        /**
+         * 获取指定页签的面板收起状态
+         */
+        isPanelCollapsed(state) {
+            return (tab) => {
+                const t = tab || state.functionTab;
+                return state.panelCollapsed[t];
+            };
         },
         filteredMcpServers(state) {
             let list = state.mcpServersList;
@@ -1039,6 +1076,111 @@ const useSettingStore = defineStore("settingStore", {
          */
         toggleSidebar() {
             this.sidebarCollapsed = !this.sidebarCollapsed;
+        },
+
+        /**
+         * 设置指定页签的面板比例
+         */
+        setPanelRatio(tab, ratio) {
+            const t = tab || this.functionTab;
+            const clamped = Math.max(MIN_PANEL_RATIO, Math.min(MAX_PANEL_RATIO, ratio));
+            this.panelRatio[t] = clamped;
+        },
+
+        /**
+         * 切换面板收起/展开（Ctrl+B）
+         */
+        togglePanelCollapsed(tab) {
+            const t = tab || this.functionTab;
+            if (this.panelCollapsed[t]) {
+                const restored = this.panelRatioMemory[t] || DEFAULT_PANEL_RATIO;
+                this.panelRatio[t] = restored;
+                this.panelCollapsed[t] = false;
+            } else {
+                this.panelRatioMemory[t] = this.panelRatio[t];
+                this.panelCollapsed[t] = true;
+            }
+        },
+
+        /**
+         * 持久化面板配置到主进程
+         */
+        persistPanelConfig() {
+            if (!window.panelConfigAPI?.save) return;
+            const snapshot = {
+                panelRatio: { ...this.panelRatio },
+                panelCollapsed: { ...this.panelCollapsed },
+                panelRatioMemory: { ...this.panelRatioMemory },
+            };
+            window.panelConfigAPI.save(snapshot).catch(() => {});
+        },
+
+        async loadLspConfig() {
+            try {
+                if (!window.LSPConfigManager) return;
+                this.lspConfigData = await window.LSPConfigManager.loadConfig();
+            } catch (e) {
+                console.error('Failed to load LSP config:', e);
+            }
+        },
+
+        async saveLspConfig(config) {
+            try {
+                if (!window.LSPConfigManager) return { success: false };
+                const result = await window.LSPConfigManager.saveConfig(config);
+                if (result && result.success) {
+                    this.lspConfigData = config;
+                }
+                return result;
+            } catch (e) {
+                return { success: false, error: String(e) };
+            }
+        },
+
+        getLspStatus(language) {
+            if (!window.LSPServerStatusManager) return 'stopped';
+            return window.LSPServerStatusManager.getStatus(language);
+        },
+
+        async startLspServer(language) {
+            if (!window.LSPServerStatusManager) return false;
+            return await window.LSPServerStatusManager.startServer(language);
+        },
+
+        async stopLspServer(language) {
+            if (!window.LSPServerStatusManager) return false;
+            return await window.LSPServerStatusManager.stopServer(language);
+        },
+
+        async loadPanelConfig() {
+            try {
+                if (!window.panelConfigAPI?.load) return;
+                const data = await window.panelConfigAPI.load();
+                if (data) {
+                    if (data.panelRatio) this.panelRatio = { ...this.panelRatio, ...data.panelRatio };
+                    if (data.panelCollapsed) this.panelCollapsed = { ...this.panelCollapsed, ...data.panelCollapsed };
+                    if (data.panelRatioMemory) this.panelRatioMemory = { ...this.panelRatioMemory, ...data.panelRatioMemory };
+                }
+            } catch (e) {
+                console.error('Failed to load panel config:', e);
+            }
+        },
+
+        /**
+         * 从主进程加载面板配置
+         */
+        async loadPanelConfig() {
+            try {
+                if (!window.electronAPI?.invoke) return;
+                const data = await window.electronAPI.invoke('panel-config:load');
+                if (data) {
+                    if (data.panelRatio) this.panelRatio = { ...this.panelRatio, ...data.panelRatio };
+                    if (data.panelCollapsed) this.panelCollapsed = { ...this.panelCollapsed, ...data.panelCollapsed };
+                    if (data.panelRatioMemory) this.panelRatioMemory = { ...this.panelRatioMemory, ...data.panelRatioMemory };
+                }
+            } catch (e) {
+                console.error('Failed to load panel config:', e);
+            }
         },
 
         /**
@@ -2504,6 +2646,68 @@ const useSnackbarStore = defineStore("snackbarStore", {
 });
 
 // ==========================================================================
+// Clipboard Store - 文件操作剪贴板状态管理
+// ==========================================================================
+const useClipboardStore = defineStore("clipboardStore", {
+    state: () => ({
+        /** @type {string[]} 源路径列表（绝对路径） */
+        items: [],
+        /** @type {'copy'|'cut'|null} 操作类型 */
+        opType: null,
+        /** @type {number} 写入时间戳 */
+        createdAt: 0,
+        /** @type {string[]} 剪切态视觉指示路径列表 */
+        cutIndicators: [],
+    }),
+
+    getters: {
+        isEmpty(state) {
+            return state.items.length === 0;
+        },
+        hasCut(state) {
+            return state.opType === 'cut';
+        },
+    },
+
+    actions: {
+        _clearCutIndicators() {
+            this.cutIndicators = [];
+        },
+
+        setCopy(paths) {
+            this._clearCutIndicators();
+            this.items = [...paths];
+            this.opType = 'copy';
+            this.createdAt = Date.now();
+        },
+
+        setCut(paths) {
+            this._clearCutIndicators();
+            this.items = [...paths];
+            this.opType = 'cut';
+            this.createdAt = Date.now();
+            this.cutIndicators = [...paths];
+        },
+
+        clear() {
+            this._clearCutIndicators();
+            this.items = [];
+            this.opType = null;
+            this.createdAt = 0;
+        },
+
+        consume() {
+            if (this.items.length === 0) return null;
+            return {
+                items: [...this.items],
+                opType: this.opType,
+                createdAt: this.createdAt,
+            };
+        },
+    },
+});
+
+// ==========================================================================
 // Message Store - 消息和附件管理
 // ==========================================================================
 
@@ -2870,6 +3074,42 @@ const useMessageStore = defineStore("messageStore", {
                 useSnackbarStore().showWarningMessage('$vuetify.dataIterator.snackbar.regenerateNoUser');
                 return;
             }
+            this.startInference();
+        },
+
+        /**
+         * 编辑重发：对指定 user 消息执行编辑后回退后续消息并重新发送
+         * @param {number} index - 目标 user 消息在 conversation 中的索引
+         * @param {string} content - 编辑后的文本内容
+         */
+        editAndResend: async function (index, content) {
+            if (index < 0 || index >= this.conversation.length) {
+                return;
+            }
+            if (this.conversation[index].role !== 'user') {
+                return;
+            }
+            if (this.generating) {
+                useSnackbarStore().showWarningMessage('正在生成中，请稍后');
+                return;
+            }
+            const trimmed = typeof content === 'string' ? content.trim() : '';
+            if (!trimmed) {
+                useSnackbarStore().showWarningMessage('消息内容不能为空');
+                return;
+            }
+            if (trimmed.startsWith('/')) {
+                this.conversation.splice(index + 1);
+                this.conversation[index].content = trimmed;
+                const handled = await this.handleSlashCommand(trimmed);
+                if (handled) {
+                    return;
+                }
+            }
+            const removedCount = this.conversation.length - (index + 1);
+            this.conversation.splice(index + 1);
+            this.conversation[index].content = trimmed;
+            console.log(`[editAndResend] index=${index}, removedCount=${removedCount}`);
             this.startInference();
         },
 

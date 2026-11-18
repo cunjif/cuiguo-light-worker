@@ -1,5 +1,5 @@
 // main.ts
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, clipboard } from 'electron';
 import {
   Client, McpServersConfig, HttpClient,
   ListToolsResultSchema, CallToolResultSchema,
@@ -18,9 +18,14 @@ import * as workspaceStore from './workspaces/workspace-store.js';
 import { validatePath as validateWorkspacePath, getDefaultPath } from './workspaces/path-validator.js';
 import * as fileService from './workspaces/file-service.js';
 import * as gitService from './workspaces/git-service.js';
+import * as fileOpsService from './workspaces/file-ops-service.js';
 import * as memoryStore from './self-evolution/memory-store.js';
 import { convertDocumentToMarkdown } from './document-converter.js';
 import { initializeMcpServers, getMcpServersDir, BUILTIN_SERVERS } from './mcp-manager.js';
+// @ts-ignore
+import { LSPProcessManager, LSP_SERVER_STATUS } from './lsp/lsp-process-manager.js';
+// @ts-ignore
+import { LSPConfigPersistence } from './lsp/lsp-config-persistence.js';
 
 import path from 'path';
 import os from 'os';
@@ -274,8 +279,10 @@ async function createRegistryWindow() {
 
 let features: any[] = [];
 let mainWindowRef: BrowserWindow | null = null;
-// Track active MCP clients so we can close them gracefully on quit
 const activeClients = new Map<string, Client | HttpClient>();
+
+const lspProcessManager = new LSPProcessManager();
+const lspConfigPersistence = new LSPConfigPersistence();
 
 // Register IPC handlers for a MCP server
 function registerIpcHandlers(
@@ -988,6 +995,76 @@ app.whenReady().then(async () => {
     return fileService.writeFile(filePath, content);
   });
 
+  // File operations IPC handlers (create/rename/delete/copy/move)
+  ipcMain.handle('workspace:create-file', async (event, parentDir: string, name: string) => {
+    if (typeof parentDir !== 'string' || typeof name !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    return fileOpsService.createFile(active.path, parentDir, name);
+  });
+
+  ipcMain.handle('workspace:create-dir', async (event, parentDir: string, name: string) => {
+    if (typeof parentDir !== 'string' || typeof name !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    return fileOpsService.createDir(active.path, parentDir, name);
+  });
+
+  ipcMain.handle('workspace:rename-path', async (event, oldPath: string, newName: string) => {
+    if (typeof oldPath !== 'string' || typeof newName !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    return fileOpsService.rename(active.path, oldPath, newName);
+  });
+
+  ipcMain.handle('workspace:remove-path', async (event, targetPath: string) => {
+    if (typeof targetPath !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    return fileOpsService.remove(active.path, targetPath);
+  });
+
+  ipcMain.handle('workspace:copy-path', async (event, srcPath: string, destDir: string, conflict: string) => {
+    if (typeof srcPath !== 'string' || typeof destDir !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    return fileOpsService.copy(active.path, srcPath, destDir, conflict as any);
+  });
+
+  ipcMain.handle('workspace:move-path', async (event, srcPath: string, destDir: string, conflict: string) => {
+    if (typeof srcPath !== 'string' || typeof destDir !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    return fileOpsService.move(active.path, srcPath, destDir, conflict as any);
+  });
+
+  ipcMain.handle('workspace:copy-path-text', async (event, targetPath: string, absolute: boolean) => {
+    if (typeof targetPath !== 'string') {
+      return { success: false, error: 'invalid args' };
+    }
+    const active = workspaceStore.getActive();
+    if (!active) return { success: false, error: 'workspace missing' };
+    try {
+      const text = absolute ? targetPath : path.relative(active.path, targetPath);
+      clipboard.writeText(text);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: String(err) };
+    }
+  });
+
   // Preview file (PDF/DOCX/PPTX/XLSX) by path → Markdown
   ipcMain.handle('workspace:preview-file', async (event, filePath: string) => {
     try {
@@ -1202,8 +1279,70 @@ app.whenReady().then(async () => {
     return memoryStore.rejectPendingWrite(id);
   });
 
+  // Panel layout config persistence
+  const panelConfigDir = path.join(os.homedir(), '.chat-mcp', 'config');
+  const panelConfigFile = path.join(panelConfigDir, 'panel-layout.json');
+
+  ipcMain.handle('panel-config:load', () => {
+    try {
+      if (fs.existsSync(panelConfigFile)) {
+        const data = fs.readFileSync(panelConfigFile, 'utf-8');
+        return JSON.parse(data);
+      }
+      return null;
+    } catch (e) {
+      console.error('Failed to load panel config:', e);
+      return null;
+    }
+  });
+
+  ipcMain.handle('panel-config:save', (_event, config: any) => {
+    try {
+      fs.mkdirSync(panelConfigDir, { recursive: true });
+      fs.writeFileSync(panelConfigFile, JSON.stringify(config, null, 2), 'utf-8');
+      return { success: true };
+    } catch (e) {
+      console.error('Failed to save panel config:', e);
+      return { success: false, error: String(e) };
+    }
+  });
+
   // Features are already initialized above, no need to re-register handlers
   console.log('Final features:', features);
+
+  // LSP IPC Handlers
+  lspProcessManager.onStatusChanged((language: string, status: string) => {
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('lsp:status-changed', { language, status }));
+  });
+
+  ipcMain.handle('lsp:start', async (_event, language: string, command: string, args: string[], rootUri: string) => {
+    return lspProcessManager.startLanguageServer(language, command, args, rootUri);
+  });
+
+  ipcMain.handle('lsp:stop', async (_event, language: string) => {
+    return lspProcessManager.stopLanguageServer(language);
+  });
+
+  ipcMain.handle('lsp:request', async (_event, language: string, method: string, params: any, timeoutMs?: number) => {
+    return lspProcessManager.sendRequest(language, method, params, timeoutMs || 5000);
+  });
+
+  ipcMain.handle('lsp:notify', (_event, language: string, method: string, params: any) => {
+    lspProcessManager.sendNotification(language, method, params);
+    return { success: true };
+  });
+
+  ipcMain.handle('lsp:status', (_event, language: string) => {
+    return lspProcessManager.getStatus(language);
+  });
+
+  ipcMain.handle('lsp-config:save', (_event, config: any) => {
+    return lspConfigPersistence.save(config);
+  });
+
+  ipcMain.handle('lsp-config:load', () => {
+    return lspConfigPersistence.load();
+  });
 
 });
 
@@ -1260,4 +1399,8 @@ app.on('before-quit', async () => {
   // 关闭工作流数据库
   workflowStore.closeWorkflowDb();
   console.log('✓ 工作流数据库已关闭');
+
+  // 停止所有 LSP 服务器
+  lspProcessManager.stopAllServers();
+  console.log('✓ LSP 服务器已停止');
 });

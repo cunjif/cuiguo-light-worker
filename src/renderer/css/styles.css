@@ -183,6 +183,29 @@
     height: 100%;
 }
 
+.panel-split-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.panel-split-left,
+.panel-split-right {
+    height: 100%;
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: width 0.3s ease;
+}
+
+.panel-split-left {
+    border-right: 1px solid #e5e7eb;
+}
+
+.panel-split-right {
+    background-color: #fafafa;
+}
+
 .left-panel {
     height: 100%;
     overflow-y: auto;
@@ -842,4 +865,158 @@
 
 .composer-model .v-field__append-inner {
     padding: 0 2px;
+}
+/* ==========================================================================
+ * PanelSplitter 分隔条
+ * ========================================================================== */
+.panel-splitter {
+    width: 6px;
+    height: 100%;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background-color: transparent;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.panel-splitter__handle {
+    width: 2px;
+    height: 100%;
+    background-color: #d1d5db;
+    border-radius: 1px;
+    transition: background-color 0.2s;
+}
+
+.panel-splitter:hover .panel-splitter__handle,
+.panel-splitter--dragging .panel-splitter__handle {
+    background-color: #6b7280;
+    width: 3px;
+}
+
+.panel-splitter--disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+/* ==========================================================================
+ * DefinitionNotFoundHint 转到定义未找到提示
+ * ========================================================================== */
+.definition-not-found-hint {
+    position: absolute;
+    z-index: 100;
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0.9;
+    transition: opacity 0.3s;
+}
+
+.chart-placeholder {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.editor-status-bar {
+    height: 24px;
+    flex-shrink: 0;
+    border-top: 1px solid #e5e7eb;
+    background-color: #fafafa;
+    font-size: 11px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+}
+
+.status-bar-separator {
+    color: #ccc;
+    user-select: none;
+    margin: 0 6px;
+}
+
+/* ==========================================================================
+ * MarkdownEditor 双栏编辑预览
+ * ========================================================================== */
+.markdown-editor-source {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.markdown-editor-toolbar {
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    background-color: #fafafa;
+}
+
+.markdown-editor-textarea {
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    background-color: #ffffff;
+    color: #333333;
+    width: 100%;
+    height: 100%;
+}
+
+.markdown-editor-preview {
+    border-left: 1px solid #e5e7eb;
+    background-color: #fafafa;
+}
+
+.markdown-editor-preview img {
+    max-width: 100%;
+    border-radius: 4px;
+}
+
+.markdown-editor-preview table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+}
+
+.markdown-editor-preview th,
+.markdown-editor-preview td {
+    border: 1px solid #d1d5db;
+    padding: 6px 12px;
+    text-align: left;
+}
+
+.markdown-editor-preview th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+}
+
+.mermaid-rendered svg,
+.plantuml-rendered svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px 0;
+}
+
+.render-error {
+    color: #dc2626;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+}
+
+.render-error pre {
+    white-space: pre-wrap;
+    word-break: break-word;
 }

@@ -142,6 +142,43 @@ const useEditorTabStore = defineStore("editorTabStore", {
             return { success: true };
         },
 
+        async openTabReadOnly(path, isExternal) {
+            if (!path) return { success: false, reason: 'readError' };
+            const settingStore = useSettingStore();
+            if (settingStore.functionTab !== 'workspace') return { success: false, reason: 'readError' };
+
+            const existing = this.tabs.find(t => t.path === path);
+            if (existing) {
+                this.activateTab(path);
+                return { success: true };
+            }
+
+            if (this.tabs.length >= this.capacity) {
+                return { success: false, reason: 'capacity' };
+            }
+
+            const name = path.replace(/\\/g, '/').split('/').pop() || path;
+            const displayName = isExternal ? '[外部] ' + name : name;
+
+            this.tabs.push({
+                path: path,
+                name: displayName,
+                viewMode: 'loading',
+                dirty: false,
+                readonly: true,
+                scrollState: null,
+                width: 0,
+            });
+            this.activePath = path;
+            console.log('[EditorTab] openTabReadOnly:', path);
+            return { success: true };
+        },
+
+        isReadonly(path) {
+            const tab = this.tabs.find(t => t.path === path);
+            return tab ? tab.readonly : false;
+        },
+
         activateTab(path) {
             const tab = this.tabs.find(t => t.path === path);
             if (!tab) {
@@ -349,6 +386,60 @@ const useEditorTabStore = defineStore("editorTabStore", {
         _cleanupProviders(path) {
             delete this.contentProviders[path];
             delete this.viewStateProviders[path];
+        },
+
+        onFileRenamed(oldPath, newPath) {
+            const tab = this.tabs.find(t => t.path === oldPath);
+            if (!tab) return;
+            tab.path = newPath;
+            tab.name = newPath.split(/[\\/]/).pop() || newPath;
+            if (this.contentProviders[oldPath]) {
+                this.contentProviders[newPath] = this.contentProviders[oldPath];
+                delete this.contentProviders[oldPath];
+            }
+            if (this.viewStateProviders[oldPath]) {
+                this.viewStateProviders[newPath] = this.viewStateProviders[oldPath];
+                delete this.viewStateProviders[oldPath];
+            }
+            if (this.editorInstances[oldPath]) {
+                this.editorInstances[newPath] = this.editorInstances[oldPath];
+                delete this.editorInstances[oldPath];
+            }
+            if (this.activePath === oldPath) {
+                this.activePath = newPath;
+            }
+            console.log('[EditorTab] onFileRenamed:', oldPath, '->', newPath);
+        },
+
+        async onFileDeleted(deletedPath) {
+            const tab = this.tabs.find(t => t.path === deletedPath);
+            if (!tab) return true;
+            if (tab.dirty) {
+                const choice = await this.requestConfirm({
+                    type: 'saveDiscardCancel',
+                    titleKey: 'workspace.editor.closeConfirmTitle',
+                    messageKey: 'workspace.editor.closeConfirmMessage',
+                    name: tab.name,
+                });
+                if (choice === 'cancel') return false;
+                if (choice === 'save') {
+                    const ok = await this._savePath(deletedPath);
+                    if (!ok) return false;
+                }
+            }
+            const idx = this.tabs.findIndex(t => t.path === deletedPath);
+            if (idx >= 0) {
+                this.tabs.splice(idx, 1);
+                this._cleanupProviders(deletedPath);
+                this._transferActive(idx);
+                this.recalcOverflow();
+            }
+            console.log('[EditorTab] onFileDeleted:', deletedPath);
+            return true;
+        },
+
+        onFileMoved(oldPath, newPath) {
+            this.onFileRenamed(oldPath, newPath);
         },
 
         registerEditorInstance(path, editor) {

@@ -330,7 +330,7 @@ const ChatThumbnailStrip = {
  */
 const TuuiChatCard = {
     template: '#tuui-chat-card-template',
-    emits: ['regenerate'],
+    emits: ['regenerate', 'edit-resend'],
     props: {
         index: { type: Number, required: true },
         range: { type: Number, required: false, default: 1 },
@@ -347,6 +347,44 @@ const TuuiChatCard = {
         const showcontent = ref(false);
         const showmodify = ref(false);
         const snackbarStore = useSnackbarStore();
+        let originalContent = null;
+
+        /**
+         * 提取消息可编辑文本（支持字符串与多模态数组）
+         * @param {Object} message - 消息对象
+         * @returns {string}
+         */
+        const extractText = (message) => {
+            if (!message) return '';
+            if (typeof message.content === 'string') return message.content;
+            if (Array.isArray(message.content)) {
+                for (const item of message.content) {
+                    if (item.type === 'text' && typeof item.text === 'string') {
+                        return item.text;
+                    }
+                }
+            }
+            return '';
+        };
+
+        /**
+         * 恢复消息文本内容（仅回写 text 项，保留图片/文档）
+         * @param {Object} message - 消息对象
+         * @param {string|null} original - 原始文本
+         */
+        const restoreContent = (message, original) => {
+            if (!message || original === null) return;
+            if (typeof message.content === 'string') {
+                message.content = original;
+            } else if (Array.isArray(message.content)) {
+                for (const item of message.content) {
+                    if (item.type === 'text') {
+                        item.text = original;
+                        break;
+                    }
+                }
+            }
+        };
 
         /**
          * 复制消息内容到剪贴板
@@ -379,11 +417,55 @@ const TuuiChatCard = {
             emit('regenerate', index);
         };
 
+        /**
+         * 编辑按钮点击：非编辑态进入编辑并缓存原内容；编辑态校验后上抛 edit-resend
+         */
+        const onModifyClick = () => {
+            if (!showmodify.value) {
+                originalContent = extractText(props.messages[props.index]);
+                showmodify.value = true;
+            } else {
+                const newContent = extractText(props.messages[props.index]);
+                if (!newContent || !newContent.trim()) {
+                    snackbarStore.showWarningMessage('内容不能为空');
+                    return;
+                }
+                if (props.generating) {
+                    snackbarStore.showWarningMessage('正在生成中，请稍后');
+                    return;
+                }
+                emit('edit-resend', props.index, newContent);
+                showmodify.value = false;
+            }
+        };
+
+        /**
+         * 放弃编辑：恢复原始内容并退出编辑态
+         */
+        const onCancelEdit = () => {
+            if (showmodify.value) {
+                restoreContent(props.messages[props.index], originalContent);
+                showmodify.value = false;
+            }
+        };
+
+        /**
+         * 卡片容器级按键委托：仅 Esc 触发取消编辑，其余按键不拦截
+         * @param {KeyboardEvent} event - 键盘事件
+         */
+        const onEditKeydown = (event) => {
+            if (event.key === 'Escape') {
+                onCancelEdit();
+            }
+        };
+
         return {
             copyToClipboard,
             showcontent,
             showmodify,
             regenerateFromIndex,
+            onModifyClick,
+            onEditKeydown,
         };
     }
 }; // 对象字面量闭合：使用 }; 而非 });（}); 仅用于 defineComponent() 等函数调用）
@@ -404,7 +486,7 @@ const TuuiChatCard = {
  */
 const TuuiChatBox = {
     template: '#tuui-chat-box-template',
-    emits: ['regenerate'],
+    emits: ['regenerate', 'edit-resend'],
     components: {
         TuuiImgDialog,
         TuuiChatCard,

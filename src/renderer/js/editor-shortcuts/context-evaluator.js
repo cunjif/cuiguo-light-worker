@@ -58,6 +58,8 @@ function evaluatePredicate(pred, store, ctx) {
             return store.tabs.length >= (Number(args[0]) || 0);
         case 'hasDirtyEditable':
             return store.tabs.some(t => t.dirty && !t.readonly && t.viewMode === 'edit');
+        case 'noModalDialog':
+            return !document.querySelector('.v-dialog.v-dialog--active');
         default:
             return false;
     }

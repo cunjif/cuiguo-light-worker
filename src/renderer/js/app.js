@@ -1173,9 +1173,11 @@ const app = createApp({
         'git-page': GitPage,
         'file-editor': FileEditor,
         'editor-tab-bar': EditorTabBar,
+        'editor-status-bar': EditorStatusBar,
         'editor-tab-item': EditorTabItem,
         'editor-confirm-dialog': EditorConfirmDialog,
         'editor-shortcuts': EditorShortcuts,
+        'panel-splitter': PanelSplitter,
     },
     setup() {
         // ======================================================================
@@ -1798,6 +1800,20 @@ const app = createApp({
             agentStore.initAgent();
             agentStore.loadMemoryForPrompt();
             settingStore.refreshMcpServersList();
+            settingStore.loadPanelConfig();
+
+            if (window.LSPConfigManager) {
+                await window.LSPConfigManager.loadConfig();
+            }
+            if (window.LSPServerStatusManager) {
+                window.LSPServerStatusManager._init();
+            }
+            if (window.LSPServerStatusManager && window.CodeNavigationManager) {
+                window.LSPServerStatusManager.onStatusChanged('*', (language, status) => {
+                    window.CodeNavigationManager.onLSPStatusChanged(language, status);
+                });
+            }
+
             if (window.onMcpClientsUpdated) {
                 window.onMcpClientsUpdated.register(() => {
                     settingStore.refreshMcpServersList();

@@ -394,6 +394,13 @@ contextBridge.exposeInMainWorld('workspaceAPI', {
   readFile: (filePath: string) => ipcRenderer.invoke('workspace:read-file', filePath),
   readFileBinary: (filePath: string) => ipcRenderer.invoke('workspace:read-file-binary', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('workspace:write-file', filePath, content),
+  createFile: (parentDir: string, name: string) => ipcRenderer.invoke('workspace:create-file', parentDir, name),
+  createDir: (parentDir: string, name: string) => ipcRenderer.invoke('workspace:create-dir', parentDir, name),
+  renamePath: (oldPath: string, newName: string) => ipcRenderer.invoke('workspace:rename-path', oldPath, newName),
+  removePath: (targetPath: string) => ipcRenderer.invoke('workspace:remove-path', targetPath),
+  copyPath: (srcPath: string, destDir: string, conflict: string) => ipcRenderer.invoke('workspace:copy-path', srcPath, destDir, conflict),
+  movePath: (srcPath: string, destDir: string, conflict: string) => ipcRenderer.invoke('workspace:move-path', srcPath, destDir, conflict),
+  copyPathText: (targetPath: string, absolute: boolean) => ipcRenderer.invoke('workspace:copy-path-text', targetPath, absolute),
   previewFile: (filePath: string) => ipcRenderer.invoke('workspace:preview-file', filePath),
   rebuildFilesystem: (rootPath: string) => ipcRenderer.invoke('workspace:rebuild-filesystem', rootPath),
   awaitDrain: () => ipcRenderer.invoke('workspace:await-drain'),
@@ -452,6 +459,37 @@ contextBridge.exposeInMainWorld('windowAPI', {
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
+});
+
+// 面板布局配置持久化 API
+contextBridge.exposeInMainWorld('panelConfigAPI', {
+  load: () => ipcRenderer.invoke('panel-config:load'),
+  save: (config: any) => ipcRenderer.invoke('panel-config:save', config),
+});
+
+// LSP 语言服务器 API
+contextBridge.exposeInMainWorld('lspAPI', {
+  startServer: (language: string, command: string, args: string[], rootUri: string) =>
+    ipcRenderer.invoke('lsp:start', language, command, args, rootUri),
+  stopServer: (language: string) =>
+    ipcRenderer.invoke('lsp:stop', language),
+  sendRequest: (language: string, method: string, params: any, timeoutMs?: number) =>
+    ipcRenderer.invoke('lsp:request', language, method, params, timeoutMs),
+  sendNotification: (language: string, method: string, params: any) =>
+    ipcRenderer.invoke('lsp:notify', language, method, params),
+  getStatus: (language: string) =>
+    ipcRenderer.invoke('lsp:status', language),
+  onStatusChanged: (callback: (data: { language: string, status: string }) => void) => {
+    ipcRenderer.on('lsp:status-changed', (_event: Electron.IpcRendererEvent, data: { language: string, status: string }) => callback(data));
+  },
+  removeStatusChangedListener: () => {
+    ipcRenderer.removeAllListeners('lsp:status-changed');
+  },
+});
+
+contextBridge.exposeInMainWorld('lspConfigAPI', {
+  save: (config: any) => ipcRenderer.invoke('lsp-config:save', config),
+  load: () => ipcRenderer.invoke('lsp-config:load'),
 });
 
 exposeAPIs();
